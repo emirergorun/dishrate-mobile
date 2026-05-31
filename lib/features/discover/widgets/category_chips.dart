@@ -68,17 +68,17 @@ class _Chip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
+          color: isSelected ? AppColors.primary : context.surfaceElevatedColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.divider,
+            color: isSelected ? AppColors.primary : context.dividerColor,
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+            color: isSelected ? Colors.white : context.textPrimaryColor,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             fontSize: 13,
             letterSpacing: 0,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Dishrate renk paleti — karanlık tema ağırlıklı, Letterboxd hissi.
+// ignore_for_file: avoid_classes_with_only_static_members
+
+/// Dishrate renk paleti — sabit marka renkleri + koyu tema varsayılanları.
 abstract final class AppColors {
   // ─── Arka plan katmanları ──────────────────────────────────────────────────
   /// Ana sayfa arka planı: en derin siyah
@@ -44,4 +46,45 @@ abstract final class AppColors {
   static const Color navBackground = Color(0xFF141414);
   static const Color navSelected = Color(0xFFFF6B35);
   static const Color navUnselected = Color(0xFF636366);
+
+  // ─── Açık tema eşdeğerleri ────────────────────────────────────────────────
+  static const Color lightBackground = Color(0xFFF5F5F5);
+  static const Color lightSurface = Colors.white;
+  static const Color lightSurfaceElevated = Color(0xFFEFEFEF);
+  static const Color lightDivider = Color(0xFFE0E0E0);
+  static const Color lightTextPrimary = Color(0xFF111111);
+  static const Color lightTextSecondary = Color(0xFF6B6B6B);
+  static const Color lightTextDisabled = Color(0xFFBBBBBB);
+  static const Color lightNavBackground = Colors.white;
+  static const Color lightNavUnselected = Color(0xFF9E9E9E);
+}
+
+/// Tema'ya duyarlı renk erişimi — widget build metodlarında kullanılır.
+/// Örn: `context.scheme.surface`
+extension ThemeColors on BuildContext {
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  Color get bgColor =>
+      isDark ? AppColors.background : AppColors.lightBackground;
+
+  Color get surfaceColor =>
+      isDark ? AppColors.surface : AppColors.lightSurface;
+
+  Color get surfaceElevatedColor =>
+      isDark ? AppColors.surfaceElevated : AppColors.lightSurfaceElevated;
+
+  Color get dividerColor =>
+      isDark ? AppColors.divider : AppColors.lightDivider;
+
+  Color get textPrimaryColor =>
+      isDark ? AppColors.textPrimary : AppColors.lightTextPrimary;
+
+  Color get textSecondaryColor =>
+      isDark ? AppColors.textSecondary : AppColors.lightTextSecondary;
+
+  Color get navBgColor =>
+      isDark ? AppColors.navBackground : AppColors.lightNavBackground;
+
+  Color get navUnselectedColor =>
+      isDark ? AppColors.navUnselected : AppColors.lightNavUnselected;
 }

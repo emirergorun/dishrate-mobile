@@ -128,7 +128,7 @@ class _TopBar extends StatelessWidget {
             onPressed: canGoBack ? onBack : null,
             icon: Icon(
               Icons.arrow_back_ios_rounded,
-              color: canGoBack ? AppColors.textPrimary : Colors.transparent,
+              color: canGoBack ? context.textPrimaryColor : Colors.transparent,
               size: 20,
             ),
           ),

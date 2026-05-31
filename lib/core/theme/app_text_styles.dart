@@ -1,100 +1,114 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// Dishrate tipografi sistemi.
-/// Başlıklar: DM Serif Display (sıcak, editorial)
-/// Gövde & UI: DM Sans (temiz, modern)
+/// Dishrate tipografi sistemi — Satoshi font ailesi.
+///
+/// Ağırlık skalası:
+///   300 → Light  |  400 → Regular  |  500 → Medium
+///   700 → Bold   |  900 → Black
 abstract final class AppTextStyles {
-  // ─── Başlıklar (DM Serif Display) ─────────────────────────────────────────
-  static TextStyle get displayLarge => GoogleFonts.dmSerifDisplay(
-        fontSize: 32,
-        fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
-        height: 1.2,
-      );
+  static const _font = 'Urbanist';
 
-  static TextStyle get headlineLarge => GoogleFonts.dmSerifDisplay(
-        fontSize: 24,
-        fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
-        height: 1.3,
-      );
+  // ─── Büyük başlıklar — Black (900) ────────────────────────────────────────
+  static const TextStyle displayLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 32,
+    fontWeight: FontWeight.w900,
+    height: 1.15,
+    letterSpacing: -0.5,
+  );
 
-  static TextStyle get headlineMedium => GoogleFonts.dmSerifDisplay(
-        fontSize: 20,
-        fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
-        height: 1.3,
-      );
+  static const TextStyle headlineLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 26,
+    fontWeight: FontWeight.w900,
+    height: 1.2,
+    letterSpacing: -0.3,
+  );
 
-  // ─── Gövde & UI (DM Sans) ─────────────────────────────────────────────────
-  static TextStyle get titleLarge => GoogleFonts.dmSans(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-        letterSpacing: -0.2,
-      );
+  static const TextStyle headlineMedium = TextStyle(
+    fontFamily: _font,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+    letterSpacing: -0.2,
+  );
 
-  static TextStyle get titleMedium => GoogleFonts.dmSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-        letterSpacing: -0.1,
-      );
+  // ─── UI başlıkları — Bold / SemiBold (700 / 600) ─────────────────────────
+  static const TextStyle titleLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.2,
+  );
 
-  static TextStyle get titleSmall => GoogleFonts.dmSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: AppColors.textPrimary,
-      );
+  static const TextStyle titleMedium = TextStyle(
+    fontFamily: _font,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.1,
+  );
 
-  static TextStyle get bodyLarge => GoogleFonts.dmSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
-        height: 1.5,
-      );
+  static const TextStyle titleSmall = TextStyle(
+    fontFamily: _font,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get bodyMedium => GoogleFonts.dmSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        color: AppColors.textPrimary,
-        height: 1.5,
-      );
+  // ─── Gövde metinleri — Medium / Regular (500 / 400) ──────────────────────
+  static const TextStyle bodyLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    height: 1.5,
+  );
 
-  static TextStyle get bodySmall => GoogleFonts.dmSans(
+  static const TextStyle bodyMedium = TextStyle(
+    fontFamily: _font,
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.5,
+  );
+
+  /// İkincil / meta metin — açık ve koyu tema için nötr gri.
+  static TextStyle get bodySmall => const TextStyle(
+        fontFamily: _font,
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
         height: 1.4,
       );
 
-  static TextStyle get labelLarge => GoogleFonts.dmSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-        letterSpacing: 0.1,
-      );
+  // ─── Etiket / UI metni — Medium (500) ────────────────────────────────────
+  static const TextStyle labelLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+  );
 
-  static TextStyle get labelSmall => GoogleFonts.dmSans(
+  static TextStyle get labelSmall => const TextStyle(
+        fontFamily: _font,
         fontSize: 11,
         fontWeight: FontWeight.w500,
         color: AppColors.textSecondary,
-        letterSpacing: 0.5,
+        letterSpacing: 0.4,
       );
 
   // ─── Puan gösterimi ───────────────────────────────────────────────────────
-  static TextStyle get ratingLarge => GoogleFonts.dmSans(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-        color: AppColors.star,
-        letterSpacing: -0.5,
-      );
+  static const TextStyle ratingLarge = TextStyle(
+    fontFamily: _font,
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: AppColors.star,
+    letterSpacing: -0.5,
+  );
 
-  static TextStyle get ratingSmall => GoogleFonts.dmSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppColors.star,
-      );
+  static const TextStyle ratingSmall = TextStyle(
+    fontFamily: _font,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: AppColors.star,
+  );
 }

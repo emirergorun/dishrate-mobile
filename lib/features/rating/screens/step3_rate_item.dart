@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/rating_repository.dart';
+import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
@@ -49,6 +50,11 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
           score: state.score,
           comment: _commentController.text.trim(),
         ),
+      );
+      // Değerlendirilen yemek istek listesindeyse otomatik kaldır
+      await WishlistRepository.instance.removeByMenuItemId(
+        1, // TODO: gerçek kullanıcı ID'si
+        state.selectedMenuItem!.menuItemId,
       );
       if (mounted) widget.onSuccess();
     } catch (e) {

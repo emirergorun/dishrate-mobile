@@ -29,6 +29,13 @@ dependencies:
   # Puan widget
   flutter_rating_bar: ^4.0.1
 
+  # Harita
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Tarih formatlama
+  intl: ^0.20.0
+
   # Temel ikonlar
   cupertino_icons: ^1.0.8
 
@@ -45,3 +52,50 @@ flutter:
   assets:
     - assets/images/
     - assets/fonts/
+
+  fonts:
+    - family: Satoshi
+      fonts:
+        - asset: assets/fonts/Satoshi-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Satoshi-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Satoshi-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Satoshi-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Satoshi-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/Satoshi-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Satoshi-BoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/Satoshi-Black.ttf
+          weight: 900
+
+    - family: Urbanist
+      fonts:
+        - asset: assets/fonts/Urbanist-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Urbanist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Urbanist-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Urbanist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Urbanist-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/Urbanist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Urbanist-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Urbanist-BoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/Urbanist-Black.ttf
+          weight: 900

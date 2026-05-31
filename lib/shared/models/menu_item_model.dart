@@ -9,6 +9,8 @@ class MenuItemModel {
   final String? categoryName;
   final String? city;
   final String? district;
+  final double? restaurantLatitude;
+  final double? restaurantLongitude;
 
   const MenuItemModel({
     required this.menuItemId,
@@ -21,6 +23,8 @@ class MenuItemModel {
     this.categoryName,
     this.city,
     this.district,
+    this.restaurantLatitude,
+    this.restaurantLongitude,
   });
 
   factory MenuItemModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class MenuItemModel {
       categoryName: json['category']?['name'] as String?,
       city: json['city'] as String?,
       district: json['district'] as String?,
+      restaurantLatitude: (json['restaurantLatitude'] as num?)?.toDouble(),
+      restaurantLongitude: (json['restaurantLongitude'] as num?)?.toDouble(),
     );
   }
 }

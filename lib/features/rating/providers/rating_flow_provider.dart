@@ -82,12 +82,20 @@ class RatingFlowNotifier extends StateNotifier<RatingFlowState> {
     state = state.copyWith(errorMessage: message, isLoading: false);
   }
 
+  void jumpToRateItem(RestaurantModel restaurant, MenuItemModel item) {
+    state = RatingFlowState(
+      currentStep: 2,
+      selectedRestaurant: restaurant,
+      selectedMenuItem: item,
+    );
+  }
+
   void reset() {
     state = const RatingFlowState();
   }
 }
 
 final ratingFlowProvider =
-    StateNotifierProvider.autoDispose<RatingFlowNotifier, RatingFlowState>(
+    StateNotifierProvider<RatingFlowNotifier, RatingFlowState>(
   (ref) => RatingFlowNotifier(),
 );

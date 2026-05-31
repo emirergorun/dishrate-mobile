@@ -25,7 +25,7 @@ class MenuItemCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: AppColors.surface,
+          color: context.surfaceColor,
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
@@ -217,7 +217,7 @@ class _RatingBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

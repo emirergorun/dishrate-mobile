@@ -46,7 +46,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -77,10 +77,10 @@ class _DishRateBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.navBackground,
+      decoration: BoxDecoration(
+        color: context.navBgColor,
         border: Border(
-          top: BorderSide(color: AppColors.divider, width: 0.5),
+          top: BorderSide(color: context.dividerColor, width: 0.5),
         ),
       ),
       child: SafeArea(
@@ -139,7 +139,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color =
-        isSelected ? AppColors.navSelected : AppColors.navUnselected;
+        isSelected ? AppColors.navSelected : context.navUnselectedColor;
 
     return Expanded(
       child: GestureDetector(
@@ -185,7 +185,7 @@ class _AddButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.4),
+                  color: AppColors.primary.withValues(alpha: 0.4),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -212,9 +212,9 @@ class _AddRatingSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.92,
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: context.surfaceElevatedColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: const Column(
         children: [

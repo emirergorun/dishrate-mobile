@@ -5,6 +5,11 @@ class RestaurantModel {
   final String city;
   final String? district;
   final String fullAddress;
+  final double? latitude;
+  final double? longitude;
+  /// Restoran türü — harita marker emoji'si için kullanılır.
+  /// Gerçek API'da bu alan yoksa null gelir ve varsayılan emoji gösterilir.
+  final String? categoryName;
 
   const RestaurantModel({
     required this.restaurantId,
@@ -13,6 +18,9 @@ class RestaurantModel {
     required this.city,
     this.district,
     required this.fullAddress,
+    this.latitude,
+    this.longitude,
+    this.categoryName,
   });
 
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +32,8 @@ class RestaurantModel {
       city: address['city'] as String? ?? '',
       district: address['district'] as String?,
       fullAddress: address['fullAddress'] as String? ?? '',
+      latitude: (address['latitude'] as num?)?.toDouble(),
+      longitude: (address['longitude'] as num?)?.toDouble(),
     );
   }
 }
