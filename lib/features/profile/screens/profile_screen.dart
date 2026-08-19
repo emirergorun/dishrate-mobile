@@ -1,7 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/token_storage.dart';
 import '../../../core/mock/mock_data.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/user_repository.dart';
@@ -13,9 +16,20 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../core/network/file_repository.dart';
+import '../../admin/screens/admin_panel_screen.dart';
+import '../../notifications/screens/notifications_screen.dart';
+import '../../owner/screens/application_status_screen.dart';
+import '../../owner/screens/owner_dashboard_screen.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+
+/// Değeri her arttığında profil verisi sessizce yeniden yüklenir.
+/// (Puan verince / profil sekmesine geçince MainScaffold tetikler.)
+final profileRefreshProvider = StateProvider<int>((ref) => 0);
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -25,16 +39,15 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  static const int _userId = 1; // TODO: auth sonrası gerçek userId
-
   UserModel? _user;
   List<RatingModel> _ratings = [];
   List<WishlistModel> _wishlist = [];
   bool _isLoading = true;
 
-  List<RatingModel> get _top3 {
+  /// En yüksek puanlı 5 değerlendirme (favori yemekler).
+  List<RatingModel> get _topFavorites {
     final sorted = [..._ratings]..sort((a, b) => b.score.compareTo(a.score));
-    return sorted.take(3).toList();
+    return sorted.take(5).toList();
   }
 
   @override
@@ -43,13 +56,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
+  Future<void> _load({bool silent = false}) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    if (!silent) setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
-        UserRepository.instance.getUser(_userId),
-        RatingRepository.instance.getRatingsByUser(_userId),
-        WishlistRepository.instance.getWishlist(_userId),
+        UserRepository.instance.getUser(userId),
+        RatingRepository.instance.getRatingsByUser(userId),
+        WishlistRepository.instance.getWishlist(userId),
       ]);
       if (mounted) {
         setState(() {
@@ -68,8 +86,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ── Sheet açıcılar ──────────────────────────────────────────────────────────
 
   Future<void> _showWishlist() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
     // Profil tab'ına döndükten sonra güncel veriyi çek
-    final fresh = await WishlistRepository.instance.getWishlist(_userId);
+    final fresh = await WishlistRepository.instance.getWishlist(userId);
     if (mounted) setState(() => _wishlist = fresh);
     if (!mounted) return;
 
@@ -99,7 +119,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         MenuItemModel(
           menuItemId: wish.menuItemId,
           name: wish.menuItemName,
-          price: wish.price ?? 0,
+          price: wish.price,
           averageRating: wish.averageRating,
           restaurantId: wish.restaurantId,
           restaurantName: wish.restaurantName,
@@ -135,18 +155,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _FavoritesSheet(favorites: _top3),
-    );
-  }
-
-  void _showAllRatings() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.surfaceColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _AllRatingsSheet(ratings: _ratings),
+      builder: (_) => _FavoritesSheet(favorites: _topFavorites),
     );
   }
 
@@ -160,22 +169,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _EditProfileSheet(
         user: _user!,
-        onSave: (username, bio) {
-          setState(() {
-            _user = UserModel(
-              userId: _user!.userId,
-              username: username,
-              email: _user!.email,
-              bio: bio.trim().isEmpty ? null : bio.trim(),
-              profilePhotoUrl: _user!.profilePhotoUrl,
-            );
-          });
+        onSave: (updated) {
+          setState(() => _user = updated);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Text('Profil güncellendi.'),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ));
         },
       ),
@@ -244,7 +245,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // TODO: auth — oturum kapatma
+              // Oturumu kapat → _AuthGate otomatik giriş ekranına yönlendirir
+              ref.read(authProvider.notifier).logout();
             },
             child: const Text('Çıkış Yap',
                 style: TextStyle(color: AppColors.error)),
@@ -289,6 +291,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Dışarıdan (puanlama, sekme değişimi) tetiklenen sessiz yenileme.
+    ref.listen<int>(profileRefreshProvider, (_, __) => _load(silent: true));
+
     return Scaffold(
       backgroundColor: context.bgColor,
       body: _isLoading
@@ -330,25 +335,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                       const SizedBox(height: 8),
 
+                      // ── YÖNETİM (admin) ────────────────────────────
+                      if (_user != null && _user!.isAdmin) ...[
+                        _SectionLabel('YÖNETİM'),
+                        _ProfileItem(
+                          icon: Icons.admin_panel_settings_rounded,
+                          iconColor: AppColors.error,
+                          label: 'Admin Paneli',
+                          subtitle: 'Başvurular ve kullanıcı yönetimi',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminPanelScreen()),
+                          ),
+                        ),
+                      ],
+
+                      // ── RESTORAN (rol bazlı) ───────────────────────
+                      if (_user != null &&
+                          (_user!.isRestaurantOwner || _user!.isUser)) ...[
+                        _SectionLabel('RESTORAN'),
+                        if (_user!.isRestaurantOwner) ...[
+                          _ProfileItem(
+                            icon: Icons.storefront_rounded,
+                            iconColor: AppColors.primary,
+                            label: 'Restoranım',
+                            subtitle: 'Menünü ve bilgilerini yönet',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const OwnerDashboardScreen()),
+                            ),
+                          ),
+                          _ProfileItem(
+                            icon: Icons.notifications_rounded,
+                            iconColor: AppColors.star,
+                            label: 'Bildirimler',
+                            subtitle: 'Ürünlerine gelen değerlendirmeler',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const NotificationsScreen()),
+                            ),
+                          ),
+                        ] else
+                          _ProfileItem(
+                            icon: Icons.assignment_rounded,
+                            iconColor: AppColors.primary,
+                            label: 'Başvuru Durumum',
+                            subtitle: 'Restoran sahibi başvurunu takip et',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ApplicationStatusScreen()),
+                            ),
+                          ),
+                      ],
+
                       // ── KEŞFEDİN ───────────────────────────────────
                       _SectionLabel('KEŞFEDİN'),
                       _ProfileItem(
                         icon: Icons.favorite_rounded,
                         iconColor: const Color(0xFFE57373),
                         label: 'Favori Yemekler',
-                        subtitle: _top3.isEmpty
+                        subtitle: _topFavorites.isEmpty
                             ? 'Henüz puan verilmedi'
-                            : 'En yüksek puanlı ${_top3.length} yemeğin',
+                            : 'En yüksek puanlı ${_topFavorites.length} yemeğin',
                         onTap: _showFavorites,
-                      ),
-                      _ProfileItem(
-                        icon: Icons.star_rounded,
-                        iconColor: AppColors.star,
-                        label: 'Tüm Değerlendirmelerim',
-                        subtitle: _ratings.isEmpty
-                            ? 'Henüz değerlendirme yapılmadı'
-                            : '${_ratings.length} değerlendirme',
-                        onTap: _showAllRatings,
                       ),
                       _ProfileItem(
                         icon: Icons.bookmark_rounded,
@@ -421,8 +476,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(height: 8),
 
                       // ── TEHLİKELİ BÖLGE ─────────────────────────────
-                      _SectionLabel('TEHLİKELİ BÖLGE',
-                          color: AppColors.error),
+                      _SectionLabel('TEHLİKELİ BÖLGE', color: AppColors.error),
                       _ProfileItem(
                         icon: Icons.ac_unit_rounded,
                         iconColor: AppColors.error,
@@ -499,8 +553,15 @@ class _ProfileHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user?.username ?? '—',
+                    Text(user?.fullName ?? '—',
                         style: AppTextStyles.titleMedium),
+                    if (user != null) ...[
+                      const SizedBox(height: 2),
+                      Text('@${user!.username}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: context.textSecondaryColor,
+                          )),
+                    ],
                     if (user?.bio != null && user!.bio!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(user!.bio!,
@@ -615,12 +676,12 @@ class _ProfileItem extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: (iconColor ?? AppColors.primary)
-                      .withValues(alpha: 0.12),
+                  color:
+                      (iconColor ?? AppColors.primary).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon,
-                    color: iconColor ?? AppColors.primary, size: 18),
+                child:
+                    Icon(icon, color: iconColor ?? AppColors.primary, size: 18),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -654,133 +715,6 @@ class _ProfileItem extends StatelessWidget {
   }
 }
 
-// ── Tüm değerlendirmeler sheet ────────────────────────────────────────────────
-
-class _AllRatingsSheet extends StatelessWidget {
-  const _AllRatingsSheet({required this.ratings});
-  final List<RatingModel> ratings;
-
-  @override
-  Widget build(BuildContext context) {
-    final sorted = [...ratings]
-      ..sort((a, b) => b.ratingId.compareTo(a.ratingId));
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.65,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
-      builder: (_, controller) => Column(
-        children: [
-          _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Row(
-              children: [
-                const Icon(Icons.star_rounded,
-                    color: AppColors.star, size: 20),
-                const SizedBox(width: 8),
-                Text('Tüm Değerlendirmelerim',
-                    style: AppTextStyles.titleSmall),
-                const Spacer(),
-                Text('${ratings.length} adet',
-                    style: AppTextStyles.bodySmall),
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: context.dividerColor),
-          Expanded(
-            child: ListView.builder(
-              controller: controller,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              itemCount: sorted.length,
-              itemBuilder: (_, i) => _AllRatingRow(rating: sorted[i]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllRatingRow extends StatelessWidget {
-  const _AllRatingRow({required this.rating});
-  final RatingModel rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(rating.menuItemName,
-                        style: AppTextStyles.titleSmall),
-                    const SizedBox(height: 2),
-                    Text(rating.restaurantName,
-                        style: AppTextStyles.bodySmall),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      RatingBarIndicator(
-                        rating: rating.score,
-                        itemSize: 13,
-                        itemBuilder: (_, __) => const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.star),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        rating.score.toStringAsFixed(1),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.star,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (rating.comment != null && rating.comment!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: context.surfaceColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '"${rating.comment}"',
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 // ── Profili düzenle sheet ─────────────────────────────────────────────────────
 
@@ -791,54 +725,159 @@ class _EditProfileSheet extends StatefulWidget {
   });
 
   final UserModel user;
-  final void Function(String username, String bio) onSave;
+  final void Function(UserModel updated) onSave;
 
   @override
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _firstNameCtrl;
+  late final TextEditingController _lastNameCtrl;
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _bioCtrl;
   bool _saving = false;
 
+  // Profil fotoğrafı (galeriden seçilip yüklenir, Kaydet ile kalıcı olur)
+  String? _photoUrl;
+  bool _uploadingPhoto = false;
+
+  bool get _canChangeName => widget.user.canChangeName;
+
   @override
   void initState() {
     super.initState();
+    _firstNameCtrl = TextEditingController(text: widget.user.firstName ?? '');
+    _lastNameCtrl = TextEditingController(text: widget.user.lastName ?? '');
     _usernameCtrl = TextEditingController(text: widget.user.username);
     _bioCtrl = TextEditingController(text: widget.user.bio ?? '');
+    _photoUrl = widget.user.profilePhotoUrl;
+  }
+
+  Future<void> _pickPhoto() async {
+    if (_uploadingPhoto) return;
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final url = await FileRepository.instance.uploadImage(picked);
+      if (mounted) {
+        setState(() {
+          _photoUrl = url;
+          _uploadingPhoto = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      _error(_parseError(e));
+    }
   }
 
   @override
   void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
     _usernameCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
   }
 
+  InputDecoration _nameDecoration(
+      BuildContext context, String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: AppTextStyles.bodySmall,
+      prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
+      filled: true,
+      fillColor:
+          _canChangeName ? context.surfaceElevatedColor : context.surfaceColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.dividerColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.dividerColor),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.dividerColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+  }
+
+  void _error(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   Future<void> _save() async {
     final username = _usernameCtrl.text.trim();
+    final firstName = _firstNameCtrl.text.trim();
+    final lastName = _lastNameCtrl.text.trim();
+
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Kullanıcı adı boş olamaz.'),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      _error('Kullanıcı adı boş olamaz.');
       return;
     }
-    setState(() => _saving = true);
-    await Future.delayed(const Duration(milliseconds: 400)); // mock delay
-    if (mounted) {
-      Navigator.pop(context);
-      widget.onSave(username, _bioCtrl.text);
+    if (_canChangeName && (firstName.isEmpty || lastName.isEmpty)) {
+      _error('İsim ve soyisim boş olamaz.');
+      return;
     }
+
+    setState(() => _saving = true);
+    try {
+      final updated = await UserRepository.instance.updateUser(
+        widget.user.userId,
+        username: username,
+        // İsim alanları yalnızca değiştirilebilir durumdaysa gönderilir.
+        firstName: _canChangeName ? firstName : null,
+        lastName: _canChangeName ? lastName : null,
+        bio: _bioCtrl.text.trim(),
+        // Yeni foto seçildiyse gönder
+        profilePhotoUrl:
+            _photoUrl != widget.user.profilePhotoUrl ? _photoUrl : null,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onSave(updated);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _error(_parseError(e));
+    }
+  }
+
+  String _parseError(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+      if (e.response?.statusCode == 409) {
+        return 'Bu kullanıcı adı zaten kullanımda.';
+      }
+    }
+    return 'Güncellenemedi, tekrar dene.';
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -857,14 +896,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                // Profil fotoğrafı
+                // Profil fotoğrafı — tıkla → galeriden seç → yükle
                 GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Fotoğraf yükleme yakında geliyor.'),
-                      behavior: SnackBarBehavior.floating,
-                    ));
-                  },
+                  onTap: _pickPhoto,
                   child: Stack(
                     children: [
                       Container(
@@ -876,13 +910,24 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                           border:
                               Border.all(color: context.dividerColor, width: 2),
                         ),
-                        child: widget.user.profilePhotoUrl != null
-                            ? ClipOval(
-                                child: Image.network(
-                                    widget.user.profilePhotoUrl!,
-                                    fit: BoxFit.cover))
-                            : const Icon(Icons.person_rounded,
-                                color: AppColors.textDisabled, size: 38),
+                        child: _uploadingPhoto
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary),
+                                ),
+                              )
+                            : _photoUrl != null
+                                ? ClipOval(
+                                    child: Image.network(_photoUrl!,
+                                        width: 80,
+                                        height: 80,
+                                        fit: BoxFit.cover))
+                                : const Icon(Icons.person_rounded,
+                                    color: AppColors.textDisabled, size: 38),
                       ),
                       Positioned(
                         right: 0,
@@ -902,6 +947,51 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // İsim + Soyisim (15 günde bir değiştirilebilir)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _firstNameCtrl,
+                        enabled: _canChangeName,
+                        style: AppTextStyles.bodyMedium,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _nameDecoration(
+                            context, 'İsim', Icons.badge_outlined),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _lastNameCtrl,
+                        enabled: _canChangeName,
+                        style: AppTextStyles.bodyMedium,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _nameDecoration(
+                            context, 'Soyisim', Icons.badge_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!_canChangeName) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_clock_rounded,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'İsim ve soyisim 15 günde bir değiştirilebilir. ',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
                 // Kullanıcı adı
                 TextField(
                   controller: _usernameCtrl,
@@ -915,13 +1005,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     fillColor: context.surfaceElevatedColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: context.dividerColor),
+                      borderSide: BorderSide(color: context.dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: context.dividerColor),
+                      borderSide: BorderSide(color: context.dividerColor),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -954,13 +1042,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         AppTextStyles.bodySmall.copyWith(fontSize: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: context.dividerColor),
+                      borderSide: BorderSide(color: context.dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: context.dividerColor),
+                      borderSide: BorderSide(color: context.dividerColor),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -986,8 +1072,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white))
+                                strokeWidth: 2, color: Colors.white))
                         : Text('Kaydet',
                             style: AppTextStyles.labelLarge
                                 .copyWith(color: Colors.white)),
@@ -1014,13 +1099,6 @@ class _PrivacySheet extends StatefulWidget {
 class _PrivacySheetState extends State<_PrivacySheet> {
   bool _privateProfile = false;
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Bu özellik yakında geliyor.'),
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -1038,8 +1116,7 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                 const Icon(Icons.lock_rounded,
                     color: AppColors.primary, size: 20),
                 const SizedBox(width: 8),
-                Text('Gizlilik ve Güvenlik',
-                    style: AppTextStyles.titleSmall),
+                Text('Gizlilik ve Güvenlik', style: AppTextStyles.titleSmall),
               ],
             ),
           ),
@@ -1049,7 +1126,18 @@ class _PrivacySheetState extends State<_PrivacySheet> {
             icon: Icons.key_rounded,
             label: 'Şifre Değiştir',
             subtitle: 'Hesap güvenliğini artır',
-            onTap: () => _showComingSoon(context),
+            onTap: () {
+              Navigator.pop(context);
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: context.surfaceColor,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20))),
+                builder: (_) => const _ChangePasswordSheet(),
+              );
+            },
           ),
           Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1057,8 +1145,7 @@ class _PrivacySheetState extends State<_PrivacySheet> {
               color: context.dividerColor),
           // Profil gizliliği toggle
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
               children: [
                 Container(
@@ -1077,8 +1164,8 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Profili Gizle',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                              color: context.textPrimaryColor)),
+                          style: AppTextStyles.bodyMedium
+                              .copyWith(color: context.textPrimaryColor)),
                       Text('Değerlendirmelerin sadece sana görünür',
                           style: AppTextStyles.bodySmall
                               .copyWith(color: AppColors.textDisabled)),
@@ -1093,17 +1180,6 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                 ),
               ],
             ),
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              height: 0.5,
-              color: context.dividerColor),
-          // Veri indir
-          _SheetItem(
-            icon: Icons.download_rounded,
-            label: 'Verilerimi İndir',
-            subtitle: 'Tüm değerlendirmelerini dışa aktar',
-            onTap: () => _showComingSoon(context),
           ),
         ],
       ),
@@ -1466,8 +1542,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 const SizedBox(width: 8),
                 Text('İstek Listesi', style: AppTextStyles.titleSmall),
                 const Spacer(),
-                Text('${_items.length} ürün',
-                    style: AppTextStyles.bodySmall),
+                Text('${_items.length} ürün', style: AppTextStyles.bodySmall),
               ],
             ),
           ),
@@ -1543,11 +1618,9 @@ class _WishlistItemRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.menuItemName,
-                        style: AppTextStyles.bodyMedium),
+                    Text(item.menuItemName, style: AppTextStyles.bodyMedium),
                     const SizedBox(height: 2),
-                    Text(item.restaurantName,
-                        style: AppTextStyles.bodySmall),
+                    Text(item.restaurantName, style: AppTextStyles.bodySmall),
                   ],
                 ),
               ),
@@ -1561,13 +1634,13 @@ class _WishlistItemRow extends StatelessWidget {
               onPressed: onRate,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                side: BorderSide(
-                    color: AppColors.primary.withValues(alpha: 0.5)),
+                side:
+                    BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600),
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
               icon: const Icon(Icons.star_rounded, size: 16),
               label: const Text('Sonunda denedim!'),
@@ -1628,10 +1701,15 @@ class _FavoriteItemRow extends StatelessWidget {
   final RatingModel rating;
 
   static const _rankColors = [
-    Color(0xFFFFD700),
-    Color(0xFFC0C0C0),
-    Color(0xFFCD7F32),
+    Color(0xFFFFD700), // 1 — altın
+    Color(0xFFC0C0C0), // 2 — gümüş
+    Color(0xFFCD7F32), // 3 — bronz
+    Color(0xFF9E9E9E), // 4
+    Color(0xFF9E9E9E), // 5
   ];
+
+  Color get _rankColor =>
+      _rankColors[(rank - 1).clamp(0, _rankColors.length - 1)];
 
   @override
   Widget build(BuildContext context) {
@@ -1648,20 +1726,22 @@ class _FavoriteItemRow extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: _rankColors[rank - 1].withValues(alpha: 0.15),
+              color: _rankColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 '$rank',
                 style: TextStyle(
-                  color: _rankColors[rank - 1],
+                  color: _rankColor,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
               ),
             ),
           ),
+          const SizedBox(width: 12),
+          _RatingThumb(photoUrl: rating.photoUrl, size: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1698,7 +1778,226 @@ class _FavoriteItemRow extends StatelessWidget {
   }
 }
 
+// ── Şifre değiştir sheet ──────────────────────────────────────────────────────
+
+class _ChangePasswordSheet extends StatefulWidget {
+  const _ChangePasswordSheet();
+
+  @override
+  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  void _snack(String msg, {bool error = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? AppColors.error : AppColors.success,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<void> _save() async {
+    final current = _currentCtrl.text;
+    final next = _newCtrl.text;
+    final confirm = _confirmCtrl.text;
+
+    if (current.isEmpty || next.isEmpty) {
+      _snack('Tüm alanları doldur.');
+      return;
+    }
+    if (next.length < 6) {
+      _snack('Yeni şifre en az 6 karakter olmalı.');
+      return;
+    }
+    if (next != confirm) {
+      _snack('Yeni şifreler eşleşmiyor.');
+      return;
+    }
+
+    final userId = await TokenStorage.instance.getUserId();
+    if (userId == null) {
+      _snack('Oturum bulunamadı.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await UserRepository.instance.changePassword(
+        userId,
+        currentPassword: current,
+        newPassword: next,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      _snack('Şifren güncellendi.', error: false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _snack(_parseError(e));
+    }
+  }
+
+  String _parseError(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+    }
+    return 'Şifre değiştirilemedi, tekrar dene.';
+  }
+
+  InputDecoration _dec(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: AppTextStyles.bodySmall,
+        prefixIcon: const Icon(Icons.lock_outline_rounded,
+            size: 18, color: AppColors.textSecondary),
+        filled: true,
+        fillColor: context.surfaceElevatedColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: context.dividerColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: context.dividerColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SheetHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.key_rounded,
+                        color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Şifre Değiştir', style: AppTextStyles.titleSmall),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        size: 20,
+                        color: context.textSecondaryColor,
+                      ),
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _currentCtrl,
+                  obscureText: _obscure,
+                  style: AppTextStyles.bodyMedium,
+                  decoration: _dec('Mevcut şifre'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _newCtrl,
+                  obscureText: _obscure,
+                  style: AppTextStyles.bodyMedium,
+                  decoration: _dec('Yeni şifre (en az 6 karakter)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmCtrl,
+                  obscureText: _obscure,
+                  style: AppTextStyles.bodyMedium,
+                  decoration: _dec('Yeni şifre (tekrar)'),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : Text('Güncelle',
+                            style: AppTextStyles.labelLarge
+                                .copyWith(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Ortak yardımcı widget'lar ─────────────────────────────────────────────────
+
+/// Değerlendirme/yemek fotoğrafı küçük resmi — yoksa ikon gösterir.
+class _RatingThumb extends StatelessWidget {
+  const _RatingThumb({required this.photoUrl, this.size = 44});
+  final String? photoUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      width: size,
+      height: size,
+      color: context.surfaceColor,
+      child: const Icon(Icons.restaurant_rounded,
+          color: AppColors.textDisabled, size: 20),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: (photoUrl != null && photoUrl!.isNotEmpty)
+          ? Image.network(
+              photoUrl!,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => placeholder,
+            )
+          : placeholder,
+    );
+  }
+}
 
 class _SheetHandle extends StatelessWidget {
   @override

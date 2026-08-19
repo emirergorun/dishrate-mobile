@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
@@ -40,12 +41,20 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
       return;
     }
 
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) {
+      ref.read(ratingFlowProvider.notifier).showError(
+            'Oturum bulunamadı. Lütfen tekrar giriş yap.',
+          );
+      return;
+    }
+
     ref.read(ratingFlowProvider.notifier).setLoading(true);
 
     try {
       await RatingRepository.instance.submitRating(
         RatingRequestModel(
-          userId: 1, // TODO: gerçek kullanıcı ID'si (auth sonrası)
+          userId: userId,
           menuItemId: state.selectedMenuItem!.menuItemId,
           score: state.score,
           comment: _commentController.text.trim(),
@@ -53,7 +62,7 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
       );
       // Değerlendirilen yemek istek listesindeyse otomatik kaldır
       await WishlistRepository.instance.removeByMenuItemId(
-        1, // TODO: gerçek kullanıcı ID'si
+        userId,
         state.selectedMenuItem!.menuItemId,
       );
       if (mounted) widget.onSuccess();

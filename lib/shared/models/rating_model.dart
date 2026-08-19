@@ -4,6 +4,7 @@ class RatingModel {
   final String username;
   final int menuItemId;
   final String menuItemName;
+  final String? photoUrl;
   final String restaurantName;
   final String? categoryName;
   final double score;
@@ -16,6 +17,7 @@ class RatingModel {
     required this.username,
     required this.menuItemId,
     required this.menuItemName,
+    this.photoUrl,
     required this.restaurantName,
     this.categoryName,
     required this.score,
@@ -30,6 +32,7 @@ class RatingModel {
       username: json['username'] as String,
       menuItemId: json['menuItemId'] as int,
       menuItemName: json['menuItemName'] as String,
+      photoUrl: json['photoUrl'] as String?,
       restaurantName: json['restaurantName'] as String,
       categoryName: json['categoryName'] as String?,
       score: (json['score'] as num).toDouble(),

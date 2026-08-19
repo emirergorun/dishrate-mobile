@@ -3,12 +3,23 @@ import '../mock/mock_data.dart';
 import 'dio_client.dart';
 import '../../shared/models/rating_model.dart';
 import '../../shared/models/rating_request_model.dart';
+import '../../shared/models/menu_item_review_model.dart';
 
 class RatingRepository {
   RatingRepository._();
   static final RatingRepository instance = RatingRepository._();
 
   final _dio = DioClient.instance;
+
+  /// Bir menü öğesine yapılan tüm değerlendirmeler (isimler maskeli gelir).
+  Future<List<MenuItemReviewModel>> getMenuItemReviews(int menuItemId) async {
+    final response =
+        await _dio.get('${ApiConstants.ratings}/menu-item/$menuItemId');
+    final list = response.data as List<dynamic>;
+    return list
+        .map((e) => MenuItemReviewModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// Create or update a rating (UPSERT)
   Future<void> submitRating(RatingRequestModel request) async {

@@ -1,10 +1,31 @@
 abstract final class ApiConstants {
-  // Geliştirme ortamında localhost.
-  // Android emülatörde 10.0.2.2, fiziksel cihazda bilgisayarın LAN IP'si kullanılır.
-  // Web: localhost | Android emülatör: 10.0.2.2 | Fiziksel cihaz: LAN IP
-  static const String baseUrl = 'http://localhost:8080/api/v1';
+  /// API adresi. Derleme sırasında dışarıdan verilebilir:
+  ///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
+  ///
+  /// Verilmezse localhost kullanılır (web ve iOS simülatörü için doğru).
+  /// Android emülatör: 10.0.2.2 · Fiziksel cihaz: bilgisayarın LAN IP'si
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8080/api/v1',
+  );
 
-  // Endpoint'ler
+  // Auth endpoint'leri
+  static const String authLogin = '/auth/login';
+  static const String authRegister = '/auth/register';
+  static const String authRefresh = '/auth/refresh';
+  static const String authLogout = '/auth/logout';
+
+  // Restoran başvurusu
+  static const String applications = '/applications';
+
+  // Admin
+  static const String admin = '/admin';
+
+  // Dosya yükleme & bildirimler
+  static const String files = '/files';
+  static const String notifications = '/notifications';
+
+  // Diğer endpoint'ler
   static const String users = '/users';
   static const String restaurants = '/restaurants';
   static const String menuItems = '/menu-items';

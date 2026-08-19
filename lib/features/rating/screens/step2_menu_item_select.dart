@@ -251,12 +251,15 @@ class _MenuItemTile extends StatelessWidget {
                           style: AppTextStyles.ratingSmall
                               .copyWith(fontSize: 12),
                         ),
-                        const SizedBox(width: 8),
                       ],
-                      Text(
-                        '₺${item.price.toStringAsFixed(0)}',
-                        style: AppTextStyles.bodySmall,
-                      ),
+                      if (item.categoryName != null) ...[
+                        if (item.averageRating > 0)
+                          const SizedBox(width: 8),
+                        Text(
+                          item.categoryName!,
+                          style: AppTextStyles.bodySmall,
+                        ),
+                      ],
                     ],
                   ),
                 ],

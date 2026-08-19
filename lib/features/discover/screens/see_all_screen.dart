@@ -9,10 +9,12 @@ class SeeAllScreen extends StatelessWidget {
     super.key,
     required this.title,
     required this.items,
+    this.onItemTap,
   });
 
   final String title;
   final List<MenuItemModel> items;
+  final void Function(MenuItemModel)? onItemTap;
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +62,7 @@ class SeeAllScreen extends StatelessWidget {
               itemCount: items.length,
               itemBuilder: (context, index) => MenuItemCard(
                 item: items[index],
-                onTap: () {
-                  // TODO: menü öğesi detay sayfası
-                },
+                onTap: () => onItemTap?.call(items[index]),
               ),
             ),
     );

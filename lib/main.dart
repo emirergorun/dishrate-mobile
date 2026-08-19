@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/auth/auth_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/splash_screen.dart';
 import 'shared/widgets/main_scaffold.dart';
 
 void main() {
@@ -23,7 +26,6 @@ class DishrateApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
 
-    // Status bar ikon rengini tema'ya göre ayarla
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
             WidgetsBinding
@@ -48,7 +50,26 @@ class DishrateApp extends ConsumerWidget {
       themeMode: themeMode,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      home: const MainScaffold(),
+      home: const _AuthGate(),
     );
+  }
+}
+
+/// Auth durumuna göre hangi ekranın gösterileceğine karar verir.
+/// - loading       → SplashScreen
+/// - authenticated → MainScaffold
+/// - unauthenticated → LoginScreen
+class _AuthGate extends ConsumerWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    return switch (authState.status) {
+      AuthStatus.loading => const SplashScreen(),
+      AuthStatus.authenticated => const MainScaffold(),
+      AuthStatus.unauthenticated => const LoginScreen(),
+    };
   }
 }

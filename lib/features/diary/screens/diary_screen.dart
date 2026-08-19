@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -21,16 +23,14 @@ enum _SortBy {
 
 // ── Ekran ─────────────────────────────────────────────────────────────────────
 
-class DiaryScreen extends StatefulWidget {
+class DiaryScreen extends ConsumerStatefulWidget {
   const DiaryScreen({super.key});
 
   @override
-  State<DiaryScreen> createState() => _DiaryScreenState();
+  ConsumerState<DiaryScreen> createState() => _DiaryScreenState();
 }
 
-class _DiaryScreenState extends State<DiaryScreen> {
-  static const int _userId = 1; // TODO: auth sonrası gerçek userId
-
+class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   List<RatingModel> _allRatings = [];
   List<RatingModel> _displayed = [];
   bool _isLoading = true;
@@ -55,13 +55,23 @@ class _DiaryScreenState extends State<DiaryScreen> {
   }
 
   Future<void> _load() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Oturum bulunamadı.';
+        });
+      }
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
       final ratings =
-          await RatingRepository.instance.getRatingsByUser(_userId);
+          await RatingRepository.instance.getRatingsByUser(userId);
       if (mounted) {
         setState(() {
           _allRatings = List.from(ratings); // unmodifiable → mutable copy
@@ -135,6 +145,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
           username: rating.username,
           menuItemId: rating.menuItemId,
           menuItemName: rating.menuItemName,
+          photoUrl: rating.photoUrl,
           restaurantName: rating.restaurantName,
           categoryName: rating.categoryName,
           score: newScore,
@@ -187,8 +198,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        color: AppColors.primary,
+        child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         slivers: [
           // ── App Bar ──────────────────────────────────────────────────
           SliverAppBar(
@@ -304,6 +320,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ],
+        ),
       ),
     );
   }
@@ -606,16 +623,30 @@ class _RatingCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // İkon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: context.surfaceElevatedColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.restaurant_rounded,
-                    color: AppColors.textDisabled, size: 22),
+              // Fotoğraf (varsa) veya ikon
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: (rating.photoUrl != null && rating.photoUrl!.isNotEmpty)
+                    ? Image.network(
+                        rating.photoUrl!,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 48,
+                          height: 48,
+                          color: context.surfaceElevatedColor,
+                          child: const Icon(Icons.restaurant_rounded,
+                              color: AppColors.textDisabled, size: 22),
+                        ),
+                      )
+                    : Container(
+                        width: 48,
+                        height: 48,
+                        color: context.surfaceElevatedColor,
+                        child: const Icon(Icons.restaurant_rounded,
+                            color: AppColors.textDisabled, size: 22),
+                      ),
               ),
               const SizedBox(width: 12),
               // Orta: yemek adı + restoran + yıldızlar
@@ -829,7 +860,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     try {
       await RatingRepository.instance.submitRating(
         RatingRequestModel(
-          userId: 1,
+          userId: widget.rating.userId,
           menuItemId: widget.rating.menuItemId,
           score: _score,
           comment: _commentCtrl.text.trim(),

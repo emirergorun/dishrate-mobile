@@ -14,7 +14,7 @@ class MockData {
   MockData._();
 
   /// false yap → gerçek API'ye geç. true iken backend'e istek atmaz.
-  static const bool enabled = true;
+  static const bool enabled = false;
 
   // ── Mock kullanıcı ────────────────────────────────────────────────────────
   static const UserModel mockUser = UserModel(
@@ -565,6 +565,7 @@ class MockData {
       username: 'emir_test',
       menuItemId: menuItemId,
       menuItemName: item?.name ?? 'Bilinmeyen Yemek',
+      photoUrl: item?.photoUrl,
       restaurantName: item?.restaurantName ?? 'Bilinmeyen Restoran',
       categoryName: item?.categoryName,
       score: score,
@@ -592,7 +593,7 @@ class MockData {
       restaurantId: item?.restaurantId ?? 0,
       restaurantName: item?.restaurantName ?? 'Bilinmeyen Restoran',
       averageRating: item?.averageRating ?? 0.0,
-      price: item?.price.toDouble(),
+      price: item?.price,
     ));
   }
 

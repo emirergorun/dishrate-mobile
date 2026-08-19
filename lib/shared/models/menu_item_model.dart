@@ -1,7 +1,8 @@
 class MenuItemModel {
   final int menuItemId;
   final String name;
-  final double price;
+  // Fiyat artık kullanılmıyor (ürün puanlama odaklı); geriye dönük uyum için tutuluyor.
+  final double? price;
   final double averageRating;
   final String? photoUrl;
   final int restaurantId;
@@ -15,7 +16,7 @@ class MenuItemModel {
   const MenuItemModel({
     required this.menuItemId,
     required this.name,
-    required this.price,
+    this.price,
     required this.averageRating,
     this.photoUrl,
     required this.restaurantId,
@@ -31,7 +32,7 @@ class MenuItemModel {
     return MenuItemModel(
       menuItemId: json['menuItemId'] as int,
       name: json['name'] as String,
-      price: (json['price'] as num).toDouble(),
+      price: (json['price'] as num?)?.toDouble(),
       averageRating: (json['averageRating'] as num).toDouble(),
       photoUrl: json['photoUrl'] as String?,
       restaurantId: json['restaurantId'] as int,

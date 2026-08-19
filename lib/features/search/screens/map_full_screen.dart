@@ -4,6 +4,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/network/restaurant_repository.dart';
+import '../../../core/auth/token_storage.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -25,7 +26,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   static const _istanbul = LatLng(41.0082, 28.9784);
 
   static const _categories = [
-    'Burger', 'Sushi', 'Pizza', 'Döner', 'Noodle', 'Kahve', 'Salata', 'Tatlı',
+    'Burger', 'Pizza', 'Kebap', 'Sushi', 'Tavuk',
+    'Kahvaltı', 'Tatlı', 'İtalyan', 'Vegan', 'Meze', 'Noodle',
   ];
 
   String? _selectedCategory;
@@ -53,7 +55,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     });
 
     try {
-      final items = await RestaurantRepository.instance.searchMenuItems(label);
+      final items =
+          await RestaurantRepository.instance.getMenuItemsByCategory(label);
       final markers = _itemsToRestaurants(items);
       if (mounted) {
         setState(() {
@@ -282,9 +285,12 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
     try {
       final items = await RestaurantRepository.instance
           .getRestaurantMenu(widget.restaurant.restaurantId);
+      // En yüksek puanlı ürün en üstte ("Önerilen") çıksın.
+      final sorted = [...items]
+        ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
       if (mounted) {
         setState(() {
-          _items = items;
+          _items = sorted;
           _isLoading = false;
         });
       }
@@ -406,6 +412,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                 itemBuilder: (context, i) => _MenuItemRow(
                   item: _items![i],
                   restaurant: widget.restaurant,
+                  isRecommended: i == 0 && _items![0].averageRating > 0,
                   onRate: () => Navigator.pop(context, _items![i]),
                 ),
               ),
@@ -425,11 +432,13 @@ class _MenuItemRow extends StatefulWidget {
     required this.item,
     required this.restaurant,
     required this.onRate,
+    this.isRecommended = false,
   });
 
   final MenuItemModel item;
   final RestaurantModel restaurant;
   final VoidCallback onRate;
+  final bool isRecommended;
 
   @override
   State<_MenuItemRow> createState() => _MenuItemRowState();
@@ -443,9 +452,14 @@ class _MenuItemRowState extends State<_MenuItemRow> {
     if (_wishlistLoading) return;
     setState(() => _wishlistLoading = true);
     try {
+      final userId = await TokenStorage.instance.getUserId();
+      if (userId == null) {
+        if (mounted) setState(() => _wishlistLoading = false);
+        return;
+      }
       if (_inWishlist) {
         await WishlistRepository.instance
-            .removeByMenuItemId(1, widget.item.menuItemId);
+            .removeByMenuItemId(userId, widget.item.menuItemId);
         if (mounted) {
           setState(() { _inWishlist = false; _wishlistLoading = false; });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -457,7 +471,7 @@ class _MenuItemRowState extends State<_MenuItemRow> {
         }
       } else {
         await WishlistRepository.instance
-            .addToWishlist(1, widget.item.menuItemId);
+            .addToWishlist(userId, widget.item.menuItemId);
         if (mounted) {
           setState(() { _inWishlist = true; _wishlistLoading = false; });
           ScaffoldMessenger.of(context).showSnackBar(
@@ -520,6 +534,33 @@ class _MenuItemRowState extends State<_MenuItemRow> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.isRecommended) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.thumb_up_rounded,
+                                size: 11, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Önerilen',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     Text(widget.item.name,
                         style: AppTextStyles.titleSmall,
                         maxLines: 2,

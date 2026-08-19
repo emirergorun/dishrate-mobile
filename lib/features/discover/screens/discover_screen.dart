@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/token_storage.dart';
+import '../../../core/network/restaurant_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -7,6 +9,8 @@ import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
+import '../../restaurant/screens/restaurant_detail_screen.dart';
+import '../../reviews/screens/menu_item_reviews_screen.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/menu_item_card.dart';
 import '../widgets/section_header.dart';
@@ -22,346 +26,38 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String? _selectedCategory; // null veya 'Tümü' → hepsi gösterilir
 
-  // ── Mock veri (API entegrasyonuna kadar) ─────────────────────────────────
-  static const List<MenuItemModel> _nearbyItems = [
-    MenuItemModel(
-      menuItemId: 1,
-      name: 'Smash Burger',
-      price: 320,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=500&fit=crop',
-      restaurantId: 1,
-      restaurantName: 'Burger Joint',
-      categoryName: 'Burger',
-      district: 'Beşiktaş',
-    ),
-    MenuItemModel(
-      menuItemId: 2,
-      name: 'Margherita',
-      price: 280,
-      averageRating: 4.5,
-      photoUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=500&fit=crop',
-      restaurantId: 2,
-      restaurantName: 'Pizza Napoli',
-      categoryName: 'Pizza',
-      district: 'Nişantaşı',
-    ),
-    MenuItemModel(
-      menuItemId: 3,
-      name: 'Adana Kebap',
-      price: 350,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&h=500&fit=crop',
-      restaurantId: 3,
-      restaurantName: 'Ocakbaşı 1969',
-      categoryName: 'Kebap',
-      district: 'Karaköy',
-    ),
-    MenuItemModel(
-      menuItemId: 4,
-      name: 'Tuna Tataki',
-      price: 480,
-      averageRating: 4.6,
-      photoUrl: 'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=400&h=500&fit=crop',
-      restaurantId: 4,
-      restaurantName: 'Nobu Istanbul',
-      categoryName: 'Sushi',
-      district: 'Etiler',
-    ),
-    MenuItemModel(menuItemId: 28, name: 'Kuzu Şiş', price: 420, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&h=500&fit=crop', restaurantId: 9, restaurantName: 'Ocakbaşı 1969', categoryName: 'Kebap', district: 'Karaköy'),
-    MenuItemModel(menuItemId: 29, name: 'Dragon Roll', price: 520, averageRating: 4.9, photoUrl: 'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=400&h=500&fit=crop', restaurantId: 7, restaurantName: 'Sushi Kaito', categoryName: 'Sushi', district: 'Nişantaşı'),
-    MenuItemModel(menuItemId: 30, name: 'Tiramisu', price: 240, averageRating: 4.9, photoUrl: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=500&fit=crop', restaurantId: 18, restaurantName: 'La Cucina', categoryName: 'Tatlı', district: 'Cihangir'),
-  ];
+  List<MenuItemModel> _allItems = [];
+  bool _loading = true;
+  String? _error;
 
-  static const List<MenuItemModel> _weeklyTop = [
-    MenuItemModel(
-      menuItemId: 5,
-      name: 'Double Smash',
-      price: 395,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400&h=500&fit=crop',
-      restaurantId: 5,
-      restaurantName: 'Bun Lab',
-      categoryName: 'Burger',
-      district: 'Kadıköy',
-    ),
-    MenuItemModel(
-      menuItemId: 6,
-      name: 'Truffle Risotto',
-      price: 520,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400&h=500&fit=crop',
-      restaurantId: 6,
-      restaurantName: 'La Cucina',
-      categoryName: 'İtalyan',
-      district: 'Cihangir',
-    ),
-    MenuItemModel(
-      menuItemId: 7,
-      name: 'Künefe',
-      price: 180,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=500&fit=crop',
-      restaurantId: 7,
-      restaurantName: 'Şanlıurfa Sofrası',
-      categoryName: 'Tatlı',
-      district: 'Fatih',
-    ),
-    MenuItemModel(
-      menuItemId: 8,
-      name: 'Eggs Benedict',
-      price: 290,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400&h=500&fit=crop',
-      restaurantId: 8,
-      restaurantName: 'Sunday Brunch',
-      categoryName: 'Kahvaltı',
-      district: 'Moda',
-    ),
-    MenuItemModel(menuItemId: 31, name: 'İskender Kebap', price: 380, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&h=500&fit=crop', restaurantId: 3, restaurantName: 'Ocakbaşı 1969', categoryName: 'Kebap', district: 'Karaköy'),
-    MenuItemModel(menuItemId: 32, name: 'Fıstıklı Baklava', price: 130, averageRating: 4.9, photoUrl: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=500&fit=crop', restaurantId: 11, restaurantName: 'Güllüoğlu', categoryName: 'Tatlı', district: 'Karaköy'),
-    MenuItemModel(menuItemId: 33, name: 'Vongole Spaghetti', price: 440, averageRating: 4.7, photoUrl: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400&h=500&fit=crop', restaurantId: 6, restaurantName: 'La Cucina', categoryName: 'İtalyan', district: 'Cihangir'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
-  static const List<MenuItemModel> _mostWishlisted = [
-    MenuItemModel(
-      menuItemId: 9,
-      name: 'Wagyu Burger',
-      price: 650,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=400&h=500&fit=crop',
-      restaurantId: 9,
-      restaurantName: 'The Fat Cow',
-      categoryName: 'Burger',
-      district: 'Bebek',
-    ),
-    MenuItemModel(
-      menuItemId: 10,
-      name: 'Omakase Set',
-      price: 1200,
-      averageRating: 5.0,
-      photoUrl: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=500&fit=crop',
-      restaurantId: 10,
-      restaurantName: 'Sushi Kaito',
-      categoryName: 'Sushi',
-      district: 'Nişantaşı',
-    ),
-    MenuItemModel(
-      menuItemId: 11,
-      name: 'Pistachio Baklava',
-      price: 120,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=500&fit=crop',
-      restaurantId: 11,
-      restaurantName: 'Güllüoğlu',
-      categoryName: 'Tatlı',
-      district: 'Karaköy',
-    ),
-    MenuItemModel(menuItemId: 34, name: 'Taze Mantı', price: 280, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&h=500&fit=crop', restaurantId: 15, restaurantName: 'Earthly Kitchen', categoryName: 'Vegan', district: 'Beyoğlu'),
-    MenuItemModel(menuItemId: 35, name: 'Izgara Köfte', price: 260, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1561651823-34feb02250e4?w=400&h=500&fit=crop', restaurantId: 17, restaurantName: 'Köfteci Arnavut', categoryName: 'Kebap', district: 'Beşiktaş'),
-    MenuItemModel(menuItemId: 36, name: 'Salmon Nigiri', price: 680, averageRating: 4.9, photoUrl: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=500&fit=crop', restaurantId: 10, restaurantName: 'Sushi Kaito', categoryName: 'Sushi', district: 'Nişantaşı'),
-    MenuItemModel(menuItemId: 37, name: 'Smoked BBQ Burger', price: 460, averageRating: 4.7, photoUrl: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400&h=500&fit=crop', restaurantId: 9, restaurantName: 'The Fat Cow', categoryName: 'Burger', district: 'Bebek'),
-  ];
-
-  static const List<MenuItemModel> _cheatMeal = [
-    MenuItemModel(
-      menuItemId: 12,
-      name: 'Triple Smash',
-      price: 420,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=500&fit=crop',
-      restaurantId: 12,
-      restaurantName: 'Smoke & Grill',
-      categoryName: 'Burger',
-      district: 'Şişli',
-    ),
-    MenuItemModel(
-      menuItemId: 13,
-      name: 'Pepperoni Calzone',
-      price: 380,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=500&fit=crop',
-      restaurantId: 13,
-      restaurantName: 'Forno di Napoli',
-      categoryName: 'Pizza',
-      district: 'Galata',
-    ),
-    MenuItemModel(
-      menuItemId: 14,
-      name: 'Truffle Carbonara',
-      price: 460,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400&h=500&fit=crop',
-      restaurantId: 6,
-      restaurantName: 'La Cucina',
-      categoryName: 'İtalyan',
-      district: 'Cihangir',
-    ),
-    MenuItemModel(
-      menuItemId: 15,
-      name: 'Loaded Fries',
-      price: 220,
-      averageRating: 4.6,
-      photoUrl: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=400&h=500&fit=crop',
-      restaurantId: 5,
-      restaurantName: 'Bun Lab',
-      categoryName: 'Burger',
-      district: 'Kadıköy',
-    ),
-    MenuItemModel(menuItemId: 38, name: 'Kokoreç Ekmek', price: 160, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1561651823-34feb02250e4?w=400&h=500&fit=crop', restaurantId: 16, restaurantName: 'Şampiyon Kokoreç', categoryName: 'Sandviç', district: 'Beyoğlu'),
-    MenuItemModel(menuItemId: 39, name: 'Nutella Krep', price: 185, averageRating: 4.7, photoUrl: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=500&fit=crop', restaurantId: 8, restaurantName: 'Sunday Brunch', categoryName: 'Tatlı', district: 'Moda'),
-    MenuItemModel(menuItemId: 40, name: 'Döner Dürüm', price: 180, averageRating: 4.6, photoUrl: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&h=500&fit=crop', restaurantId: 17, restaurantName: 'Karadeniz Döner', categoryName: 'Kebap', district: 'Beşiktaş'),
-  ];
-
-  static const List<MenuItemModel> _healthy = [
-    MenuItemModel(
-      menuItemId: 16,
-      name: 'Quinoa Power Bowl',
-      price: 280,
-      averageRating: 4.6,
-      photoUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=500&fit=crop',
-      restaurantId: 14,
-      restaurantName: 'Green Bowl',
-      categoryName: 'Vegan',
-      district: 'Nişantaşı',
-    ),
-    MenuItemModel(
-      menuItemId: 17,
-      name: 'Avocado Toast',
-      price: 220,
-      averageRating: 4.5,
-      photoUrl: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=500&fit=crop',
-      restaurantId: 8,
-      restaurantName: 'Sunday Brunch',
-      categoryName: 'Kahvaltı',
-      district: 'Moda',
-    ),
-    MenuItemModel(
-      menuItemId: 18,
-      name: 'Mercimek Köftesi',
-      price: 160,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=500&fit=crop',
-      restaurantId: 15,
-      restaurantName: 'Earthly Kitchen',
-      categoryName: 'Vegan',
-      district: 'Beyoğlu',
-    ),
-    MenuItemModel(
-      menuItemId: 19,
-      name: 'Açık Sandviç',
-      price: 195,
-      averageRating: 4.4,
-      photoUrl: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=500&fit=crop',
-      restaurantId: 14,
-      restaurantName: 'Green Bowl',
-      categoryName: 'Sandviç',
-      district: 'Nişantaşı',
-    ),
-    MenuItemModel(menuItemId: 41, name: 'Buddha Bowl', price: 310, averageRating: 4.6, photoUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=500&fit=crop', restaurantId: 14, restaurantName: 'Green Bowl', categoryName: 'Vegan', district: 'Nişantaşı'),
-    MenuItemModel(menuItemId: 42, name: 'Ton Balığı Salata', price: 270, averageRating: 4.5, photoUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=500&fit=crop', restaurantId: 21, restaurantName: 'Sahil Meyhane', categoryName: 'Meze', district: 'Ortaköy'),
-    MenuItemModel(menuItemId: 43, name: 'Chia Pudding', price: 180, averageRating: 4.5, photoUrl: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=500&fit=crop', restaurantId: 15, restaurantName: 'Earthly Kitchen', categoryName: 'Vegan', district: 'Beyoğlu'),
-  ];
-
-  static const List<MenuItemModel> _budget = [
-    MenuItemModel(
-      menuItemId: 20,
-      name: 'Islak Burger',
-      price: 100,
-      averageRating: 4.6,
-      photoUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=500&fit=crop',
-      restaurantId: 16,
-      restaurantName: 'Bambi',
-      categoryName: 'Sandviç',
-      district: 'Beyoğlu',
-    ),
-    MenuItemModel(
-      menuItemId: 21,
-      name: 'Dürüm Döner',
-      price: 120,
-      averageRating: 4.5,
-      photoUrl: 'https://images.unsplash.com/photo-1561651823-34feb02250e4?w=400&h=500&fit=crop',
-      restaurantId: 17,
-      restaurantName: 'Karadeniz Döner',
-      categoryName: 'Kebap',
-      district: 'Beşiktaş',
-    ),
-    MenuItemModel(
-      menuItemId: 22,
-      name: 'Karışık Gözleme',
-      price: 95,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&h=500&fit=crop',
-      restaurantId: 18,
-      restaurantName: 'Gözlemeci Hanım',
-      categoryName: 'Kahvaltı',
-      district: 'Üsküdar',
-    ),
-    MenuItemModel(
-      menuItemId: 23,
-      name: 'Mercimek Çorbası',
-      price: 85,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=500&fit=crop',
-      restaurantId: 19,
-      restaurantName: 'Ev Yemekleri',
-      categoryName: 'Vegan',
-      district: 'Fatih',
-    ),
-    MenuItemModel(menuItemId: 44, name: 'Lahmacun', price: 75, averageRating: 4.7, photoUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&h=500&fit=crop', restaurantId: 20, restaurantName: 'Lahmacun Ustası', categoryName: 'Kebap', district: 'Fatih'),
-    MenuItemModel(menuItemId: 45, name: 'Kuru Fasulye', price: 95, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=500&fit=crop', restaurantId: 19, restaurantName: 'Tarihi Kuru Fasulye', categoryName: 'Vegan', district: 'Fatih'),
-    MenuItemModel(menuItemId: 46, name: 'Pide Kaşarlı', price: 130, averageRating: 4.6, photoUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=500&fit=crop', restaurantId: 22, restaurantName: 'Karadeniz Fırını', categoryName: 'Kahvaltı', district: 'Sarıyer'),
-  ];
-
-  static const List<MenuItemModel> _hidden = [
-    MenuItemModel(
-      menuItemId: 24,
-      name: 'Tantuni',
-      price: 180,
-      averageRating: 4.9,
-      photoUrl: 'https://images.unsplash.com/photo-1561651823-34feb02250e4?w=400&h=500&fit=crop',
-      restaurantId: 20,
-      restaurantName: 'Mersin Tantunisi',
-      categoryName: 'Kebap',
-      district: 'Bağcılar',
-    ),
-    MenuItemModel(
-      menuItemId: 25,
-      name: 'Midye Dolma',
-      price: 250,
-      averageRating: 4.7,
-      photoUrl: 'https://images.unsplash.com/photo-1559742811-822873691df8?w=400&h=500&fit=crop',
-      restaurantId: 21,
-      restaurantName: 'Sahil Meyhane',
-      categoryName: 'Meze',
-      district: 'Ortaköy',
-    ),
-    MenuItemModel(
-      menuItemId: 26,
-      name: 'Çiğ Börek',
-      price: 140,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1517244683847-7456b63c5969?w=400&h=500&fit=crop',
-      restaurantId: 22,
-      restaurantName: 'Kırım Mutfağı',
-      categoryName: 'Meze',
-      district: 'Sarıyer',
-    ),
-    MenuItemModel(
-      menuItemId: 27,
-      name: 'Ramen',
-      price: 320,
-      averageRating: 4.8,
-      photoUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=500&fit=crop',
-      restaurantId: 23,
-      restaurantName: 'Noodle Bar',
-      categoryName: 'Noodle',
-      district: 'Karaköy',
-    ),
-    MenuItemModel(menuItemId: 47, name: 'Balık Ekmek', price: 200, averageRating: 4.9, photoUrl: 'https://images.unsplash.com/photo-1559742811-822873691df8?w=400&h=500&fit=crop', restaurantId: 21, restaurantName: 'Galata Balıkçısı', categoryName: 'Meze', district: 'Galata'),
-    MenuItemModel(menuItemId: 48, name: 'Çiğ Börek', price: 145, averageRating: 4.8, photoUrl: 'https://images.unsplash.com/photo-1517244683847-7456b63c5969?w=400&h=500&fit=crop', restaurantId: 22, restaurantName: 'Kırım Mutfağı', categoryName: 'Meze', district: 'Sarıyer'),
-    MenuItemModel(menuItemId: 49, name: 'Pad Thai', price: 340, averageRating: 4.7, photoUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=500&fit=crop', restaurantId: 23, restaurantName: 'Noodle Bar', categoryName: 'Noodle', district: 'Karaköy'),
-  ];
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await RestaurantRepository.instance.getAllMenuItems();
+      if (mounted) {
+        setState(() {
+          _allItems = items;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'İçerikler yüklenemedi.';
+          _loading = false;
+        });
+      }
+    }
+  }
 
   static const List<String> _categories = [
     'Tümü',
@@ -378,6 +74,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     'Noodle',
   ];
 
+  // ── Bölüm üretimi ─────────────────────────────────────────────────────────
+  // Backend henüz "trend / en çok istek listesinde / bu hafta" gibi sorguları
+  // sunmadığından bölümler, mevcut alanlardan (puan, fiyat, kategori) istemci
+  // tarafında türetilir. Backend feed endpoint'leri gelince burası sadeleşecek.
+
+  static const Set<String> _indulgentCats = {
+    'Burger', 'Pizza', 'Tatlı', 'Kebap', 'İtalyan', 'Noodle', 'Sandviç',
+  };
+  static const Set<String> _healthyCats = {
+    'Vegan', 'Salata', 'Kahvaltı', 'Meze',
+  };
+
   List<MenuItemModel> _filtered(List<MenuItemModel> src) {
     if (_selectedCategory == null || _selectedCategory == 'Tümü') return src;
     return src
@@ -385,11 +93,48 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         .toList();
   }
 
+  /// Seçili kategoriye göre filtrelenmiş tüm öğeler — bölümlerin kaynağı.
+  List<MenuItemModel> get _baseItems => _filtered(_allItems);
+
+  List<MenuItemModel> _byRatingDesc(Iterable<MenuItemModel> src) {
+    final l = src.toList()
+      ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
+    return l.take(12).toList();
+  }
+
+  List<MenuItemModel> get _topRated => _byRatingDesc(_baseItems);
+
+  // "Bu hafta" için yaklaşık: en yeni eklenen (yüksek ID) yüksek puanlılar.
+  List<MenuItemModel> get _weeklyTop {
+    final l = _baseItems.where((i) => i.averageRating >= 4.5).toList()
+      ..sort((a, b) => b.menuItemId.compareTo(a.menuItemId));
+    return l.take(12).toList();
+  }
+
+  // "Herkes denemek istiyor": en sevilenler (en yüksek puanlıların ardından gelenler).
+  List<MenuItemModel> get _mostWanted {
+    final l = _baseItems.toList()
+      ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
+    return l.skip(3).take(12).toList();
+  }
+
+  List<MenuItemModel> get _cheatMeal => _byRatingDesc(
+      _baseItems.where((i) => _indulgentCats.contains(i.categoryName)));
+
+  List<MenuItemModel> get _healthy => _byRatingDesc(
+      _baseItems.where((i) => _healthyCats.contains(i.categoryName)));
+
+  // "Gizli mücevherler": az bilinen kategorilerde yüksek puanlılar.
+  static const Set<String> _nicheCats = {'Meze', 'Noodle', 'Vegan', 'Tavuk'};
+  List<MenuItemModel> get _hidden => _byRatingDesc(
+      _baseItems.where((i) => _nicheCats.contains(i.categoryName)));
+
   void _seeAll(String title, List<MenuItemModel> items) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SeeAllScreen(title: title, items: items),
+        builder: (_) =>
+            SeeAllScreen(title: title, items: items, onItemTap: _showItemSheet),
       ),
     );
   }
@@ -424,174 +169,160 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     }
   }
 
+  /// Görünür bölümler — boş olanlar otomatik elenir.
+  List<({String title, String subtitle, List<MenuItemModel> items})>
+      get _sections => [
+            (
+              title: 'İstanbul\'da En İyiler',
+              subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
+              items: _topRated,
+            ),
+            (
+              title: 'Bu Haftanın Favorileri',
+              subtitle: 'Yeni eklenen, en çok beğenilen menü öğeleri',
+              items: _weeklyTop,
+            ),
+            (
+              title: 'Herkes Denemek İstiyor',
+              subtitle: 'Merak uyandıran özel lezzetler',
+              items: _mostWanted,
+            ),
+            (
+              title: 'Diyeti Bozmaya Değer',
+              subtitle: 'Pişman olmayacağın kalorili şaheserler',
+              items: _cheatMeal,
+            ),
+            (
+              title: 'Sağlıklı & Fit Seçenekler',
+              subtitle: 'Hem lezzetli hem de hafif alternatifler',
+              items: _healthy,
+            ),
+            (
+              title: 'Şehrin Gizli Mücevherleri',
+              subtitle: 'Az bilinen ama çok sevilecek lezzetler',
+              items: _hidden,
+            ),
+          ].where((s) => s.items.isNotEmpty).toList();
+
   @override
   Widget build(BuildContext context) {
+    final sections = _loading || _error != null ? const [] : _sections;
+
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // ── App Bar ────────────────────────────────────────────────────
-          _DiscoverAppBar(),
-
-          // ── Kategori Chip'leri ─────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                CategoryChips(
-                  categories: _categories,
-                  onSelected: (category) {
-                    setState(() => _selectedCategory = category);
-                  },
-                ),
-              ],
-            ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        color: AppColors.primary,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
+          slivers: [
+            // ── App Bar ──────────────────────────────────────────────────
+            _DiscoverAppBar(),
 
-          // ── Yakınındaki En İyiler ──────────────────────────────────────
-          if (_filtered(_nearbyItems).isNotEmpty)
+            // ── Kategori Chip'leri ───────────────────────────────────────
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SectionHeader(
-                    title: 'İstanbul\'da En İyiler',
-                    subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
-                    onSeeAll: () => _seeAll('İstanbul\'da En İyiler', _filtered(_nearbyItems)),
+                  const SizedBox(height: 16),
+                  CategoryChips(
+                    categories: _categories,
+                    onSelected: (category) {
+                      setState(() => _selectedCategory = category);
+                    },
                   ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_nearbyItems)),
                 ],
               ),
             ),
 
-          // ── Bu Haftanın Favorileri ─────────────────────────────────────
-          if (_filtered(_weeklyTop).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Bu Haftanın Favorileri',
-                    subtitle: 'Son 7 günün en çok puan alan menü öğeleri',
-                    onSeeAll: () => _seeAll('Bu Haftanın Favorileri', _filtered(_weeklyTop)),
-                  ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_weeklyTop)),
-                ],
-              ),
-            ),
+            // ── Yükleniyor ───────────────────────────────────────────────
+            if (_loading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              )
 
-          // ── En Çok İstek Listesinde ───────────────────────────────────
-          if (_filtered(_mostWishlisted).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Herkes Denemek İstiyor',
-                    subtitle: 'En çok istek listesine eklenen yemekler',
-                    onSeeAll: () => _seeAll('Herkes Denemek İstiyor', _filtered(_mostWishlisted)),
+            // ── Hata ─────────────────────────────────────────────────────
+            else if (_error != null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_off_rounded,
+                          color: AppColors.textDisabled, size: 48),
+                      const SizedBox(height: 12),
+                      Text(_error!,
+                          style: AppTextStyles.titleMedium
+                              .copyWith(color: AppColors.textSecondary)),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: _load,
+                        child: const Text('Tekrar Dene'),
+                      ),
+                    ],
                   ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_mostWishlisted)),
-                ],
-              ),
-            ),
+                ),
+              )
 
-          // ── Diyeti Bozmaya Değer ──────────────────────────────────────
-          if (_filtered(_cheatMeal).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Diyeti Bozmaya Değer',
-                    subtitle: 'Pişman olmayacağın kalorili şaheserler',
-                    onSeeAll: () => _seeAll('Diyeti Bozmaya Değer', _filtered(_cheatMeal)),
+            // ── Boş ──────────────────────────────────────────────────────
+            else if (sections.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.ramen_dining_rounded,
+                          color: AppColors.textDisabled, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        _selectedCategory == null ||
+                                _selectedCategory == 'Tümü'
+                            ? 'Henüz içerik yok'
+                            : 'Bu kategoride içerik yok',
+                        style: AppTextStyles.titleMedium
+                            .copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
                   ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_cheatMeal)),
-                ],
-              ),
-            ),
+                ),
+              )
 
-          // ── Sağlıklı & Fit Seçenekler ────────────────────────────────
-          if (_filtered(_healthy).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Sağlıklı & Fit Seçenekler',
-                    subtitle: 'Hem lezzetli hem de hafif alternatifler',
-                    onSeeAll: () => _seeAll('Sağlıklı & Fit Seçenekler', _filtered(_healthy)),
-                  ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_healthy)),
-                ],
-              ),
-            ),
-
-          // ── Bütçe Dostu Lezzetler ─────────────────────────────────────
-          if (_filtered(_budget).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Bütçe Dostu Lezzetler',
-                    subtitle: 'Cüzdanı yakmadan dolu dolu lezzet',
-                    onSeeAll: () => _seeAll('Bütçe Dostu Lezzetler', _filtered(_budget)),
-                  ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_budget)),
-                ],
-              ),
-            ),
-
-          // ── Şehrin Gizli Mücevherleri ─────────────────────────────────
-          if (_filtered(_hidden).isNotEmpty)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(
-                    title: 'Şehrin Gizli Mücevherleri',
-                    subtitle: 'Az bilinen ama çok sevilecek mekanlar',
-                    onSeeAll: () => _seeAll('Şehrin Gizli Mücevherleri', _filtered(_hidden)),
-                  ),
-                  _HorizontalCardList(onItemTap: _showItemSheet, items: _filtered(_hidden)),
-                ],
-              ),
-            ),
-
-          // ── Hiç sonuç yoksa ───────────────────────────────────────────
-          if (_filtered(_nearbyItems).isEmpty &&
-              _filtered(_weeklyTop).isEmpty &&
-              _filtered(_mostWishlisted).isEmpty &&
-              _filtered(_cheatMeal).isEmpty &&
-              _filtered(_healthy).isEmpty &&
-              _filtered(_budget).isEmpty &&
-              _filtered(_hidden).isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.search_off_rounded,
-                        color: AppColors.textDisabled, size: 48),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Bu kategoride içerik yok',
-                      style: AppTextStyles.titleMedium
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
+            // ── Bölümler ─────────────────────────────────────────────────
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final s = sections[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SectionHeader(
+                          title: s.title,
+                          subtitle: s.subtitle,
+                          onSeeAll: () => _seeAll(s.title, s.items),
+                        ),
+                        _HorizontalCardList(
+                          onItemTap: _showItemSheet,
+                          items: s.items,
+                        ),
+                      ],
+                    );
+                  },
+                  childCount: sections.length,
                 ),
               ),
-            ),
 
-          // ── Alt boşluk (bottom nav ile çakışmasın) ────────────────────
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+            // ── Alt boşluk (bottom nav ile çakışmasın) ──────────────────
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        ),
       ),
     );
   }
@@ -709,7 +440,12 @@ class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
 
   Future<void> _checkWishlist() async {
     try {
-      final list = await WishlistRepository.instance.getWishlist(1);
+      final userId = await TokenStorage.instance.getUserId();
+      if (userId == null) {
+        if (mounted) setState(() => _wishlistLoading = false);
+        return;
+      }
+      final list = await WishlistRepository.instance.getWishlist(userId);
       if (!mounted) return;
       setState(() {
         _inWishlist =
@@ -724,12 +460,17 @@ class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
   Future<void> _toggleWishlist() async {
     setState(() => _wishlistLoading = true);
     try {
+      final userId = await TokenStorage.instance.getUserId();
+      if (userId == null) {
+        if (mounted) setState(() => _wishlistLoading = false);
+        return;
+      }
       if (_inWishlist) {
         await WishlistRepository.instance
-            .removeByMenuItemId(1, widget.item.menuItemId);
+            .removeByMenuItemId(userId, widget.item.menuItemId);
       } else {
         await WishlistRepository.instance
-            .addToWishlist(1, widget.item.menuItemId);
+            .addToWishlist(userId, widget.item.menuItemId);
       }
       if (!mounted) return;
       setState(() {
@@ -835,35 +576,75 @@ class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Restoran + konum
-                Row(
-                  children: [
-                    const Icon(Icons.storefront_rounded,
-                        color: AppColors.primary, size: 14),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        item.restaurantName,
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.primary),
-                        overflow: TextOverflow.ellipsis,
+                // Restoran + konum (restorana tıkla → detay)
+                GestureDetector(
+                  onTap: () {
+                    final loc = [item.district, item.city]
+                        .where((e) => e != null && e.isNotEmpty)
+                        .join(', ');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RestaurantDetailScreen(
+                          restaurantId: item.restaurantId,
+                          restaurantName: item.restaurantName,
+                          locationText: loc,
+                        ),
                       ),
-                    ),
-                    if (item.district != null) ...[
-                      const SizedBox(width: 8),
-                      const Icon(Icons.location_on_rounded,
-                          color: AppColors.textSecondary, size: 12),
-                      const SizedBox(width: 2),
-                      Text(item.district!,
-                          style: AppTextStyles.bodySmall),
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.storefront_rounded,
+                          color: AppColors.primary, size: 14),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          item.restaurantName,
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.primary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.primary, size: 16),
+                      if (item.district != null) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.location_on_rounded,
+                            color: AppColors.textSecondary, size: 12),
+                        const SizedBox(width: 2),
+                        Text(item.district!,
+                            style: AppTextStyles.bodySmall),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
 
           const SizedBox(height: 20),
+
+          // ── Yorumları gör ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MenuItemReviewsScreen(
+                      menuItemId: item.menuItemId,
+                      menuItemName: item.name,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.reviews_outlined, size: 18),
+                label: const Text('Yorumları Gör'),
+              ),
+            ),
+          ),
 
           // ── Butonlar ─────────────────────────────────────────────────
           Padding(

@@ -47,11 +47,9 @@ class WishlistRepository {
       return;
     }
     try {
-      final wishlist = await getWishlist(userId);
-      final match = wishlist.where((w) => w.menuItemId == menuItemId).firstOrNull;
-      if (match != null) {
-        await removeFromWishlist(match.wishId);
-      }
+      await _dio.delete(
+        '${ApiConstants.wishlist}/user/$userId/menu-item/$menuItemId',
+      );
     } catch (_) {
       // best-effort — rating akışını etkilemesin
     }

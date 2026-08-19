@@ -24,8 +24,6 @@ dependencies:
   cached_network_image: ^3.3.1
 
   # Fontlar
-  google_fonts: ^6.2.1
-
   # Puan widget
   flutter_rating_bar: ^4.0.1
 
@@ -33,11 +31,16 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
+  # Güvenli token saklama
+  flutter_secure_storage: ^9.2.2
+
   # Tarih formatlama
   intl: ^0.20.0
 
   # Temel ikonlar
   cupertino_icons: ^1.0.8
+  image_picker: ^1.2.3
+  http_parser: ^4.1.2
 
 dev_dependencies:
   flutter_test:

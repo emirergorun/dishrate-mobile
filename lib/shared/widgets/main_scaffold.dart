@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/discover/screens/discover_screen.dart';
 import '../../features/search/screens/search_screen.dart';
@@ -6,14 +7,14 @@ import '../../features/rating/screens/add_rating_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 
-class MainScaffold extends StatefulWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   const MainScaffold({super.key});
 
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> {
+class _MainScaffoldState extends ConsumerState<MainScaffold> {
   // 0=Keşfet, 1=Ara, 2=Günlük, 3=Profil (+ modal, ekran değil)
   int _currentIndex = 0;
 
@@ -32,15 +33,21 @@ class _MainScaffoldState extends State<MainScaffold> {
     // Nav: 0→screen 0, 1→screen 1, 3→screen 2, 4→screen 3
     final screenIndex = navIndex > 2 ? navIndex - 1 : navIndex;
     setState(() => _currentIndex = screenIndex);
+    // Profil sekmesi → güncel veriyi sessizce yenile (IndexedStack canlı tutuyor)
+    if (screenIndex == 3) {
+      ref.read(profileRefreshProvider.notifier).state++;
+    }
   }
 
-  void _openAddRatingModal() {
-    showModalBottomSheet(
+  Future<void> _openAddRatingModal() async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _AddRatingSheet(),
     );
+    // Puan eklenmiş olabilir → profil verisini tazele
+    if (mounted) ref.read(profileRefreshProvider.notifier).state++;
   }
 
   @override

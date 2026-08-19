@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/restaurant_repository.dart';
+import '../../../core/auth/token_storage.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -126,7 +127,7 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _searching = true);
     try {
       final items =
-          await RestaurantRepository.instance.searchMenuItems(category);
+          await RestaurantRepository.instance.getMenuItemsByCategory(category);
       if (mounted) setState(() => _results = _groupByRestaurant(items));
     } catch (_) {
       if (mounted) setState(() => _results = []);
@@ -259,7 +260,8 @@ class _SearchCategoryChips extends StatelessWidget {
   final ValueChanged<String> onCategoryTap;
 
   static const _categories = [
-    'Burger', 'Sushi', 'Pizza', 'Döner', 'Noodle', 'Kahve', 'Salata', 'Tatlı',
+    'Burger', 'Pizza', 'Kebap', 'Sushi', 'Tavuk',
+    'Kahvaltı', 'Tatlı', 'İtalyan', 'Vegan', 'Meze', 'Noodle',
   ];
 
   @override
@@ -721,9 +723,14 @@ class _PopupItemRowState extends State<_PopupItemRow> {
     if (_wishlistLoading) return;
     setState(() => _wishlistLoading = true);
     try {
+      final userId = await TokenStorage.instance.getUserId();
+      if (userId == null) {
+        if (mounted) setState(() => _wishlistLoading = false);
+        return;
+      }
       if (_inWishlist) {
         await WishlistRepository.instance
-            .removeByMenuItemId(1, widget.item.menuItemId);
+            .removeByMenuItemId(userId, widget.item.menuItemId);
         if (mounted) setState(() { _inWishlist = false; _wishlistLoading = false; });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -735,7 +742,7 @@ class _PopupItemRowState extends State<_PopupItemRow> {
         }
       } else {
         await WishlistRepository.instance
-            .addToWishlist(1, widget.item.menuItemId);
+            .addToWishlist(userId, widget.item.menuItemId);
         if (mounted) setState(() { _inWishlist = true; _wishlistLoading = false; });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
