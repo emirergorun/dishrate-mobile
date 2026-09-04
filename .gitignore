@@ -51,7 +51,6 @@ flutter_*.png
 **/macos/Flutter/ephemeral/
 
 # Web
-lib/generated_plugin_registrant.dart
 
 # Environment / Secrets
 .env

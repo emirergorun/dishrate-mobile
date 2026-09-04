@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- The INTERNET permission is required for development. Specifically,
+         the Flutter tool needs it to communicate with the running application
+         to allow setting breakpoints, to provide hot reload, etc.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Geliştirme sırasında backend ev ağında düz HTTP ile çalışır
+         (örn. http://192.168.1.20:8080). Android 9+ düz HTTP'yi varsayılan
+         olarak engellediği için sadece DEBUG derlemesinde açıyoruz.
+         Release derlemesi bu ayardan etkilenmez — orada HTTPS zorunlu kalır. -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+</manifest>
