@@ -58,20 +58,29 @@ class AuthRepository {
   Future<void> submitRestaurantApplication({
     required String restaurantName,
     required String city,
-    String? district,
-    String? fullAddress,
+    required String district,
+    required String addressLine1,
+    required String buildingNo,
+    String? addressLine2,
+    String? floorApartment,
+    String? postalCode,
     String? contactPhone,
     String? description,
   }) async {
+    bool has(String? v) => v != null && v.trim().isNotEmpty;
     await _dio.post(
       ApiConstants.applications,
       data: {
         'restaurantName': restaurantName,
         'city': city,
-        if (district != null && district.isNotEmpty) 'district': district,
-        if (fullAddress != null && fullAddress.isNotEmpty) 'fullAddress': fullAddress,
-        if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
-        if (description != null && description.isNotEmpty) 'description': description,
+        'district': district,
+        'addressLine1': addressLine1,
+        'buildingNo': buildingNo,
+        if (has(addressLine2)) 'addressLine2': addressLine2,
+        if (has(floorApartment)) 'floorApartment': floorApartment,
+        if (has(postalCode)) 'postalCode': postalCode,
+        if (has(contactPhone)) 'contactPhone': contactPhone,
+        if (has(description)) 'description': description,
       },
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import '../auth/token_storage.dart';
 import '../constants/api_constants.dart';
@@ -53,9 +55,16 @@ class _AuthInterceptor extends Interceptor {
 
   final Dio _dio;
   final _storage = TokenStorage.instance;
-  bool _isRefreshing = false;
 
-  // Auth endpoint'leri — token ekleme
+  /// Aynı anda birden fazla istek 401 alırsa hepsi TEK bir yenileme işlemini
+  /// bekler. Aksi halde ilk istek yenilerken diğerleri hiç denenmeden düşer
+  /// (uygulama ilk açılışta ekranların boş kalmasına yol açıyordu).
+  Completer<String?>? _refreshCompleter;
+
+  /// Sonsuz döngüyü önlemek için: bir istek yalnızca bir kez tekrarlanır.
+  static const _retriedFlag = '__dishrate_retried';
+
+  // Auth endpoint'leri — token eklenmez, 401'de yenileme denenmez
   static const _publicPaths = [
     ApiConstants.authLogin,
     ApiConstants.authRegister,
@@ -63,13 +72,14 @@ class _AuthInterceptor extends Interceptor {
     ApiConstants.authLogout,
   ];
 
+  bool _isPublic(String path) => _publicPaths.any((p) => path.contains(p));
+
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Public endpoint'lere token ekleme
-    if (_publicPaths.any((p) => options.path.contains(p))) {
+    if (_isPublic(options.path)) {
       return handler.next(options);
     }
 
@@ -85,20 +95,49 @@ class _AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    final statusCode = err.response?.statusCode;
+    final options = err.requestOptions;
+    final is401 = err.response?.statusCode == 401;
+    final alreadyRetried = options.extra[_retriedFlag] == true;
 
-    // 401: access token süresi dolmuş → refresh et
-    if (statusCode == 401 && !_isRefreshing) {
-      _isRefreshing = true;
+    if (!is401 || alreadyRetried || _isPublic(options.path)) {
+      return handler.next(err);
+    }
 
+    // Tek bir yenileme işlemi; eşzamanlı 401'ler aynı sonucu bekler.
+    final newToken = await _refreshAccessToken();
+    if (newToken == null) {
+      return handler.next(err);
+    }
+
+    // İsteği yeni token ile tekrarla
+    options.extra[_retriedFlag] = true;
+    options.headers['Authorization'] = 'Bearer $newToken';
+    try {
+      final retryResponse = await _dio.fetch(options);
+      return handler.resolve(retryResponse);
+    } on DioException catch (retryError) {
+      return handler.next(retryError);
+    }
+  }
+
+  /// Access token'ı yeniler. Zaten devam eden bir yenileme varsa onu bekler.
+  /// Başarısızsa null döner.
+  Future<String?> _refreshAccessToken() {
+    final inFlight = _refreshCompleter;
+    if (inFlight != null) return inFlight.future;
+
+    final completer = Completer<String?>();
+    _refreshCompleter = completer;
+
+    unawaited(() async {
       try {
         final refreshToken = await _storage.getRefreshToken();
-        if (refreshToken == null) {
-          _isRefreshing = false;
-          return handler.next(err);
+        if (refreshToken == null || refreshToken.isEmpty) {
+          completer.complete(null);
+          return;
         }
 
-        // Yeni access token al
+        // Interceptor'sız ayrı Dio — yenileme isteği kendi kendini tetiklemesin
         final refreshDio = Dio(BaseOptions(baseUrl: ApiConstants.baseUrl));
         final response = await refreshDio.post(
           ApiConstants.authRefresh,
@@ -107,22 +146,22 @@ class _AuthInterceptor extends Interceptor {
 
         final newAccessToken = response.data['accessToken'] as String;
         await _storage.updateAccessToken(newAccessToken);
-
-        // Başarısız isteği yeni token ile tekrarla
-        final retryOptions = err.requestOptions;
-        retryOptions.headers['Authorization'] = 'Bearer $newAccessToken';
-        final retryResponse = await _dio.fetch(retryOptions);
-
-        _isRefreshing = false;
-        return handler.resolve(retryResponse);
+        completer.complete(newAccessToken);
+      } on DioException catch (e) {
+        // Yalnızca refresh token GERÇEKTEN geçersizse oturumu kapat.
+        // Ağ hatasında token'ları silmek kullanıcıyı gereksiz yere atardı.
+        final status = e.response?.statusCode;
+        if (status == 401 || status == 403 || status == 404) {
+          await _storage.clearAll();
+        }
+        completer.complete(null);
       } catch (_) {
-        _isRefreshing = false;
-        // Refresh başarısız → token'ları sil (auth provider logout yapar)
-        await _storage.clearAll();
-        return handler.next(err);
+        completer.complete(null);
+      } finally {
+        _refreshCompleter = null;
       }
-    }
+    }());
 
-    handler.next(err);
+    return completer.future;
   }
 }

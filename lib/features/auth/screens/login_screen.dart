@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/password_validator.dart';
+import '../../../shared/widgets/dishrate_logo.dart';
+import 'welcome_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -66,22 +69,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.restaurant_menu_rounded,
-                        color: Colors.white,
-                        size: 36,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Dishrate', style: AppTextStyles.headlineLarge),
-                    const SizedBox(height: 6),
+                    const DishrateWordmark(width: 200),
+                    const SizedBox(height: 10),
                     Text(
                       'Yemek günlüğüne hoşgeldin!',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -137,12 +126,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: () => setState(
                             () => _obscurePassword = !_obscurePassword),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Şifre gerekli';
-                        if (v.length < 6)
-                          return 'Şifre en az 6 karakter olmalı';
-                        return null;
-                      },
+                      // Girişte karmaşıklık kuralı uygulanmaz — eski şifresi
+                      // olan kullanıcılar kilitlenmesin. Doğrulama sunucuda.
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Şifre gerekli' : null,
                     ),
                     const SizedBox(height: 28),
 
@@ -255,6 +242,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _restaurantNameController = TextEditingController();
   final _cityController = TextEditingController();
   final _districtController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _buildingNoController = TextEditingController();
+  final _floorApartmentController = TextEditingController();
+  final _postalCodeController = TextEditingController();
   final _phoneController = TextEditingController();
   final _descriptionController = TextEditingController();
 
@@ -268,6 +260,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _restaurantNameController.dispose();
     _cityController.dispose();
     _districtController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _buildingNoController.dispose();
+    _floorApartmentController.dispose();
+    _postalCodeController.dispose();
     _phoneController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -290,6 +287,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             restaurantName: _restaurantNameController.text.trim(),
             city: _cityController.text.trim(),
             district: _districtController.text.trim(),
+            addressLine1: _addressLine1Controller.text.trim(),
+            addressLine2: _addressLine2Controller.text.trim(),
+            buildingNo: _buildingNoController.text.trim(),
+            floorApartment: _floorApartmentController.text.trim(),
+            postalCode: _postalCodeController.text.trim(),
             contactPhone: _phoneController.text.trim(),
             description: _descriptionController.text.trim(),
           );
@@ -307,6 +309,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isLoading = false);
 
     final authState = ref.read(authProvider);
+    if (authState.isAuthenticated) {
+      // Kayıt başarılı → önce karşılama ekranı, sonra ana ekran.
+      // Bu ekran giriş ekranının ÜZERİNE açıldığı için kapatılmalı; yoksa
+      // _AuthGate arkada MainScaffold'a geçse bile kullanıcı burada kalır.
+      final name = authState.user?.firstName?.trim().isNotEmpty == true
+          ? authState.user!.firstName!.trim()
+          : (authState.user?.username ?? '');
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => WelcomeScreen(name: name)),
+      );
+      if (mounted) Navigator.of(context).pop(); // kayıt ekranını kapat
+      return;
+    }
+
     if (authState.status == AuthStatus.unauthenticated &&
         authState.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -401,11 +418,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       hint: 'ornek_kullanici',
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Kullanıcı adı gerekli';
+                        final t = (v ?? '').trim();
+                        if (t.isEmpty) return 'Kullanıcı adı gerekli';
+                        if (t.length < 3) return 'En az 3 karakter olmalı';
+                        if (t.contains(RegExp(r'\s'))) {
+                          return 'Kullanıcı adı boşluk içeremez';
                         }
-                        if (v.trim().length < 3)
-                          return 'En az 3 karakter olmalı';
+                        if (!RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(t)) {
+                          return 'Sadece harf, rakam, nokta, _ ve - kullanılabilir';
+                        }
                         return null;
                       },
                     ),
@@ -427,12 +448,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _AuthTextField(
                       controller: _passwordController,
                       label: 'Şifre',
-                      hint: 'En az 6 karakter',
+                      hint: 'En az 8 karakter',
                       obscureText: _obscurePassword,
                       textInputAction: _isOwner
                           ? TextInputAction.next
                           : TextInputAction.done,
                       onFieldSubmitted: _isOwner ? null : (_) => _submit(),
+                      onChanged: (_) => setState(() {}), // kural listesi güncellensin
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -444,12 +466,47 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: () => setState(
                             () => _obscurePassword = !_obscurePassword),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Şifre gerekli';
-                        if (v.length < 6) return 'En az 6 karakter olmalı';
-                        return null;
-                      },
+                      validator: PasswordValidator.validate,
                     ),
+
+                    // Şifre kuralları — yazdıkça yeşile döner
+                    if (_passwordController.text.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 6,
+                          children: PasswordValidator.rules.map((rule) {
+                            final ok = rule.test(_passwordController.text);
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  ok
+                                      ? Icons.check_circle_rounded
+                                      : Icons.circle_outlined,
+                                  size: 14,
+                                  color: ok
+                                      ? AppColors.success
+                                      : context.textSecondaryColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  rule.label,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    fontSize: 11,
+                                    color: ok
+                                        ? AppColors.success
+                                        : context.textSecondaryColor,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
 
                     // ── Restoran Alanları (animasyonlu) ─────────────────────
                     AnimatedCrossFade(
@@ -460,11 +517,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       firstChild: const SizedBox.shrink(),
                       secondChild: _RestaurantFields(
                         nameController: _restaurantNameController,
+                        addressLine1Controller: _addressLine1Controller,
+                        addressLine2Controller: _addressLine2Controller,
+                        buildingNoController: _buildingNoController,
+                        floorApartmentController: _floorApartmentController,
+                        postalCodeController: _postalCodeController,
                         cityController: _cityController,
                         districtController: _districtController,
                         phoneController: _phoneController,
                         descriptionController: _descriptionController,
                         onSubmit: _submit,
+                        isActive: _isOwner,
                       ),
                     ),
 
@@ -647,17 +710,33 @@ class _RestaurantFields extends StatelessWidget {
     required this.nameController,
     required this.cityController,
     required this.districtController,
+    required this.addressLine1Controller,
+    required this.addressLine2Controller,
+    required this.buildingNoController,
+    required this.floorApartmentController,
+    required this.postalCodeController,
     required this.phoneController,
     required this.descriptionController,
     required this.onSubmit,
+    required this.isActive,
   });
 
   final TextEditingController nameController;
   final TextEditingController cityController;
   final TextEditingController districtController;
+  final TextEditingController addressLine1Controller;
+  final TextEditingController addressLine2Controller;
+  final TextEditingController buildingNoController;
+  final TextEditingController floorApartmentController;
+  final TextEditingController postalCodeController;
   final TextEditingController phoneController;
   final TextEditingController descriptionController;
   final VoidCallback onSubmit;
+
+  /// Restoran sahibi modu açık mı? AnimatedCrossFade gizlenen alanları
+  /// widget ağacından çıkarmadığı için, kapalıyken doğrulama yapılmamalı —
+  /// yoksa normal kullanıcı kaydında form görünmez şekilde geçersiz kalır.
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
@@ -684,24 +763,60 @@ class _RestaurantFields extends StatelessWidget {
         _AuthTextField(
           controller: nameController,
           label: 'Restoran Adı',
-          hint: 'Örn: Karadeniz Pide Salonu',
+          hint: '',
           textInputAction: TextInputAction.next,
           validator: (v) {
+            if (!isActive) return null;
             if (v == null || v.trim().isEmpty) return 'Restoran adı gerekli';
             return null;
           },
+        ),
+
+        // ── Adres ─────────────────────────────────────────────────────────
+        const SizedBox(height: 20),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Adres',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: context.textSecondaryColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _AuthTextField(
+          controller: addressLine1Controller,
+          label: 'Adres Satırı 1',
+          hint: 'Mahalle, cadde/sokak',
+          textInputAction: TextInputAction.next,
+          validator: (v) {
+            if (!isActive) return null;
+            if (v == null || v.trim().isEmpty) {
+              return 'Mahalle ve cadde/sokak gerekli';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        _AuthTextField(
+          controller: addressLine2Controller,
+          label: 'Adres Satırı 2 (opsiyonel)',
+          hint: 'Site / apartman adı',
+          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: _AuthTextField(
-                controller: cityController,
-                label: 'Şehir',
-                hint: 'İstanbul',
+                controller: buildingNoController,
+                label: 'Bina No',
+                hint: '',
                 textInputAction: TextInputAction.next,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Şehir gerekli';
+                  if (!isActive) return null;
+                  if (v == null || v.trim().isEmpty) return 'Bina no gerekli';
                   return null;
                 },
               ),
@@ -709,19 +824,59 @@ class _RestaurantFields extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _AuthTextField(
-                controller: districtController,
-                label: 'İlçe',
-                hint: 'Beşiktaş',
+                controller: floorApartmentController,
+                label: 'Kat / Daire',
+                hint: 'Opsiyonel',
                 textInputAction: TextInputAction.next,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _AuthTextField(
+                controller: districtController,
+                label: 'İlçe',
+                hint: '',
+                textInputAction: TextInputAction.next,
+                validator: (v) {
+                  if (!isActive) return null;
+                  if (v == null || v.trim().isEmpty) return 'İlçe gerekli';
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _AuthTextField(
+                controller: cityController,
+                label: 'Şehir',
+                hint: '',
+                textInputAction: TextInputAction.next,
+                validator: (v) {
+                  if (!isActive) return null;
+                  if (v == null || v.trim().isEmpty) return 'Şehir gerekli';
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _AuthTextField(
+          controller: postalCodeController,
+          label: 'Posta Kodu (opsiyonel)',
+          hint: '',
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 16),
         _AuthTextField(
           controller: phoneController,
           label: 'Telefon (opsiyonel)',
-          hint: '0212 123 45 67',
+          hint: '',
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
         ),
@@ -750,6 +905,7 @@ class _AuthTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.onChanged,
     this.suffixIcon,
     this.validator,
     this.maxLines = 1,
@@ -762,6 +918,7 @@ class _AuthTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
+  final ValueChanged<String>? onChanged;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
   final int maxLines;
@@ -785,6 +942,7 @@ class _AuthTextField extends StatelessWidget {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           onFieldSubmitted: onFieldSubmitted,
+          onChanged: onChanged,
           validator: validator,
           maxLines: maxLines,
           style: AppTextStyles.bodyMedium.copyWith(

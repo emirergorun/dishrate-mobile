@@ -7,6 +7,11 @@ import '../../features/rating/screens/add_rating_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 
+/// Uygulama içinden sekme değiştirmek için (örn. profildeki "Değerlendirme"
+/// sayacına dokununca Günlük sekmesine geçmek). Ekran indeksi:
+/// 0=Keşfet, 1=Ara, 2=Günlük, 3=Profil
+final selectedTabProvider = StateProvider<int>((ref) => 0);
+
 class MainScaffold extends ConsumerStatefulWidget {
   const MainScaffold({super.key});
 
@@ -32,7 +37,15 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
     // Nav: 0→screen 0, 1→screen 1, 3→screen 2, 4→screen 3
     final screenIndex = navIndex > 2 ? navIndex - 1 : navIndex;
+    _goToScreen(screenIndex);
+  }
+
+  void _goToScreen(int screenIndex) {
     setState(() => _currentIndex = screenIndex);
+    // Provider'ı senkron tut (dışarıdan gelen isteklerle çakışmasın)
+    if (ref.read(selectedTabProvider) != screenIndex) {
+      ref.read(selectedTabProvider.notifier).state = screenIndex;
+    }
     // Profil sekmesi → güncel veriyi sessizce yenile (IndexedStack canlı tutuyor)
     if (screenIndex == 3) {
       ref.read(profileRefreshProvider.notifier).state++;
@@ -52,6 +65,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    // Uygulama içinden sekme değiştirme isteklerini dinle
+    ref.listen<int>(selectedTabProvider, (_, next) {
+      if (next != _currentIndex) _goToScreen(next);
+    });
+
     return Scaffold(
       backgroundColor: context.bgColor,
       body: IndexedStack(

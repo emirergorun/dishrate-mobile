@@ -9,6 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/category_model.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
+import '../../../shared/widgets/image_crop_dialog.dart';
 import '../../reviews/screens/menu_item_reviews_screen.dart';
 
 class RestaurantManageScreen extends StatefulWidget {
@@ -375,13 +376,24 @@ class _MenuItemFormSheetState extends State<_MenuItemFormSheet> {
   Future<void> _pickAndUploadPhoto() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1280,
-      imageQuality: 85,
+      maxWidth: 1600,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
+
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    final cropped = await ImageCropDialog.show(
+      context,
+      imageBytes: bytes,
+      circular: false,
+      title: 'Ürün Fotoğrafı',
+    );
+    if (cropped == null || !mounted) return;
+
     setState(() => _uploadingPhoto = true);
     try {
-      final url = await FileRepository.instance.uploadImage(picked);
+      final url = await FileRepository.instance
+          .uploadBytes(cropped, filename: 'menu-item.png');
       if (mounted) {
         setState(() {
           _photoCtrl.text = url;
@@ -629,13 +641,24 @@ class _RestaurantEditSheetState extends State<_RestaurantEditSheet> {
     if (_uploadingLogo) return;
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 512,
-      imageQuality: 85,
+      maxWidth: 1024,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
+
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    final cropped = await ImageCropDialog.show(
+      context,
+      imageBytes: bytes,
+      circular: false,
+      title: 'Restoran Logosu',
+    );
+    if (cropped == null || !mounted) return;
+
     setState(() => _uploadingLogo = true);
     try {
-      final url = await FileRepository.instance.uploadImage(picked);
+      final url = await FileRepository.instance
+          .uploadBytes(cropped, filename: 'logo.png');
       if (mounted) {
         setState(() {
           _logoUrl = url;

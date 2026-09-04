@@ -15,6 +15,7 @@ import '../../../features/rating/providers/rating_flow_provider.dart';
 import '../../../features/rating/screens/add_rating_screen.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
+import '../../restaurant/screens/restaurant_detail_screen.dart';
 import 'map_full_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -590,7 +591,33 @@ class _RestaurantCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(result.name, style: AppTextStyles.titleSmall),
+                  // Restoran adına dokunmak restoran sayfasını açar
+                  // (kartın kalanı eşleşen ürünleri gösterir)
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RestaurantDetailScreen(
+                          restaurantId: result.restaurantId,
+                          restaurantName: result.name,
+                          locationText: location,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(result.name,
+                              style: AppTextStyles.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.north_east_rounded,
+                            size: 13, color: AppColors.primary),
+                      ],
+                    ),
+                  ),
                   if (location.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(location, style: AppTextStyles.bodySmall),

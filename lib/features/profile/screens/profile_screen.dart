@@ -16,9 +16,12 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
+import '../../../shared/widgets/image_crop_dialog.dart';
+import '../../../shared/widgets/main_scaffold.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/file_repository.dart';
+import '../../../core/utils/password_validator.dart';
 import '../../admin/screens/admin_panel_screen.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../owner/screens/application_status_screen.dart';
@@ -331,6 +334,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         user: _user,
                         ratingCount: _ratings.length,
                         wishlistCount: _wishlist.length,
+                        // Sayaçlara dokununca ilgili yere git
+                        onRatingsTap: () => ref
+                            .read(selectedTabProvider.notifier)
+                            .state = 2, // Günlük sekmesi
+                        onWishlistTap: _showWishlist,
                       ),
 
                       const SizedBox(height: 8),
@@ -517,11 +525,15 @@ class _ProfileHeader extends StatelessWidget {
     required this.user,
     required this.ratingCount,
     required this.wishlistCount,
+    this.onRatingsTap,
+    this.onWishlistTap,
   });
 
   final UserModel? user;
   final int ratingCount;
   final int wishlistCount;
+  final VoidCallback? onRatingsTap;
+  final VoidCallback? onWishlistTap;
 
   @override
   Widget build(BuildContext context) {
@@ -585,9 +597,17 @@ class _ProfileHeader extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _StatItem(value: '$ratingCount', label: 'Değerlendirme'),
+                _StatItem(
+                  value: '$ratingCount',
+                  label: 'Değerlendirme',
+                  onTap: onRatingsTap,
+                ),
                 Container(width: 1, height: 32, color: context.dividerColor),
-                _StatItem(value: '$wishlistCount', label: 'İstek Listesi'),
+                _StatItem(
+                  value: '$wishlistCount',
+                  label: 'İstek Listesi',
+                  onTap: onWishlistTap,
+                ),
               ],
             ),
           ),
@@ -598,21 +618,33 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _StatItem extends StatelessWidget {
-  const _StatItem({required this.value, required this.label});
+  const _StatItem({
+    required this.value,
+    required this.label,
+    this.onTap,
+  });
   final String value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
-        children: [
-          Text(value,
-              style: AppTextStyles.ratingLarge
-                  .copyWith(fontSize: 22, color: context.textPrimaryColor)),
-          const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.bodySmall),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              Text(value,
+                  style: AppTextStyles.ratingLarge
+                      .copyWith(fontSize: 22, color: context.textPrimaryColor)),
+              const SizedBox(height: 2),
+              Text(label, style: AppTextStyles.bodySmall),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -758,13 +790,27 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     if (_uploadingPhoto) return;
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1024,
-      imageQuality: 85,
+      maxWidth: 1600,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
+
+    // Yüklemeden önce kırpma/konumlandırma
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    final cropped = await ImageCropDialog.show(
+      context,
+      imageBytes: bytes,
+      circular: true,
+      title: 'Profil Fotoğrafı',
+    );
+    if (cropped == null || !mounted) return;
+
     setState(() => _uploadingPhoto = true);
     try {
-      final url = await FileRepository.instance.uploadImage(picked);
+      final url = await FileRepository.instance.uploadBytes(
+        cropped,
+        filename: 'avatar.png',
+      );
       if (mounted) {
         setState(() {
           _photoUrl = url;
@@ -1778,6 +1824,43 @@ class _FavoriteItemRow extends StatelessWidget {
   }
 }
 
+// ── Şifre kuralları göstergesi ────────────────────────────────────────────────
+
+/// Şifre yazılırken hangi kuralların sağlandığını canlı gösterir.
+class _PasswordRules extends StatelessWidget {
+  const _PasswordRules({required this.value});
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      children: PasswordValidator.rules.map((rule) {
+        final ok = rule.test(value);
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              ok ? Icons.check_circle_rounded : Icons.circle_outlined,
+              size: 14,
+              color: ok ? AppColors.success : context.textSecondaryColor,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              rule.label,
+              style: AppTextStyles.bodySmall.copyWith(
+                fontSize: 11,
+                color: ok ? AppColors.success : context.textSecondaryColor,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+}
+
 // ── Şifre değiştir sheet ──────────────────────────────────────────────────────
 
 class _ChangePasswordSheet extends StatefulWidget {
@@ -1794,6 +1877,18 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   bool _obscure = true;
   bool _saving = false;
 
+  /// Hata mesajı sheet'İN İÇİNDE gösterilir. SnackBar kullanılamaz:
+  /// ScaffoldMessenger sheet'in ALTINDAKİ Scaffold'a bağlı olduğu için
+  /// mesaj bu panelin arkasında kalıp görünmez oluyordu.
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Kural listesi yazdıkça güncellensin
+    _newCtrl.addListener(() => setState(() {}));
+  }
+
   @override
   void dispose() {
     _currentCtrl.dispose();
@@ -1802,39 +1897,39 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     super.dispose();
   }
 
-  void _snack(String msg, {bool error = true}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? AppColors.error : AppColors.success,
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
-
   Future<void> _save() async {
     final current = _currentCtrl.text;
     final next = _newCtrl.text;
     final confirm = _confirmCtrl.text;
 
     if (current.isEmpty || next.isEmpty) {
-      _snack('Tüm alanları doldur.');
+      setState(() => _error = 'Tüm alanları doldur.');
       return;
     }
-    if (next.length < 6) {
-      _snack('Yeni şifre en az 6 karakter olmalı.');
+    final ruleError = PasswordValidator.validate(next);
+    if (ruleError != null) {
+      setState(() => _error = 'Yeni şifre: ${ruleError.toLowerCase()}');
       return;
     }
     if (next != confirm) {
-      _snack('Yeni şifreler eşleşmiyor.');
+      setState(() => _error = 'Yeni şifreler eşleşmiyor.');
+      return;
+    }
+    if (next == current) {
+      setState(() => _error = 'Yeni şifre eskisiyle aynı olamaz.');
       return;
     }
 
     final userId = await TokenStorage.instance.getUserId();
     if (userId == null) {
-      _snack('Oturum bulunamadı.');
+      setState(() => _error = 'Oturum bulunamadı.');
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await UserRepository.instance.changePassword(
         userId,
@@ -1843,11 +1938,18 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       );
       if (!mounted) return;
       Navigator.pop(context);
-      _snack('Şifren güncellendi.', error: false);
+      // Sheet kapandıktan sonra başarı mesajı artık görünür
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Şifren güncellendi.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      _snack(_parseError(e));
+      setState(() {
+        _saving = false;
+        _error = _parseError(e);
+      });
     }
   }
 
@@ -1927,8 +2029,13 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   controller: _newCtrl,
                   obscureText: _obscure,
                   style: AppTextStyles.bodyMedium,
-                  decoration: _dec('Yeni şifre (en az 6 karakter)'),
+                  decoration: _dec('Yeni şifre'),
                 ),
+                // Kurallar — yazdıkça yeşile döner
+                if (_newCtrl.text.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _PasswordRules(value: _newCtrl.text),
+                ],
                 const SizedBox(height: 12),
                 TextField(
                   controller: _confirmCtrl,
@@ -1936,6 +2043,35 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   style: AppTextStyles.bodyMedium,
                   decoration: _dec('Yeni şifre (tekrar)'),
                 ),
+
+                // Hata — sheet'in İÇİNDE, arkada kalmıyor
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: AppColors.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_error!,
+                              style: AppTextStyles.bodySmall
+                                  .copyWith(color: AppColors.error)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
