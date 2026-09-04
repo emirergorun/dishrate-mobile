@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'app_fonts.dart';
 
-/// Dishrate tipografi sistemi — Satoshi font ailesi.
+/// Dishrate tipografi sistemi.
+///
+/// Font ailesi [AppFonts.active] ile belirlenir — burada elle yazılmaz.
 ///
 /// Ağırlık skalası:
 ///   300 → Light  |  400 → Regular  |  500 → Medium
-///   700 → Bold   |  900 → Black
+///   600 → SemiBold  |  700 → Bold  |  900 → Black
 abstract final class AppTextStyles {
-  static const _font = 'Urbanist';
+  static const _font = AppFonts.active;
 
   // ─── Büyük başlıklar — Black (900) ────────────────────────────────────────
   static const TextStyle displayLarge = TextStyle(

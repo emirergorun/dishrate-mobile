@@ -6,9 +6,9 @@ class TokenStorage {
   TokenStorage._();
   static final TokenStorage instance = TokenStorage._();
 
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  // v11'de `encryptedSharedPreferences` kaldırıldı; Android artık varsayılan
+  // olarak Keystore tabanlı şifreli depolama kullanıyor, ayrıca ayar gerekmiyor.
+  static const _storage = FlutterSecureStorage();
 
   static const _accessTokenKey = 'dishrate_access_token';
   static const _refreshTokenKey = 'dishrate_refresh_token';

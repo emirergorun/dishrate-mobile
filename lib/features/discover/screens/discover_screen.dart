@@ -16,6 +16,10 @@ import '../widgets/menu_item_card.dart';
 import '../widgets/section_header.dart';
 import 'see_all_screen.dart';
 
+/// Başlıktaki "dishrate" kelime markasının punto'su. Harf aralığı buna
+/// oranla (−%2) hesaplanır, böylece punto değişse de logoyla oran korunur.
+const double _wordmarkSize = 28;
+
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
 
@@ -348,13 +352,18 @@ class _DiscoverAppBar extends StatelessWidget {
         title: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Logo alanı — logo gelince Image.asset ile değiştirilecek
+            // Logo kelime markası — ayarlar logonun kendisinden alınmıştır
+            // ("Dishrate logo/OKUBENI.md": Poppins SemiBold 600, harf aralığı
+            // −%2, hep küçük harf). Buradaki yazı logoyla yan yana geldiğinde
+            // (açılış ekranı, giriş ekranı) aynı görünsün diye birebir aynı
+            // olmalı; displayLarge'ın 900'ü ve −1 aralığı bu yüzden eziliyor.
             Text(
               'dishrate',
               style: AppTextStyles.displayLarge.copyWith(
-                fontSize: 28,
+                fontSize: _wordmarkSize,
+                fontWeight: FontWeight.w600,
                 color: AppColors.primary,
-                letterSpacing: -1,
+                letterSpacing: _wordmarkSize * -0.02,
               ),
             ),
             const Spacer(),

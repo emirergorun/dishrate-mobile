@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_fonts.dart';
 
 final class AppTheme {
   const AppTheme._();
 
-  static const _font = 'Urbanist';
+  /// Aktif font ailesi — bkz. [AppFonts].
+  static const _font = AppFonts.active;
 
-  // ─── Satoshi tabanlı textTheme yardımcısı ───────────────────────────────────
-  static TextTheme _satoshiTextTheme(TextTheme base, Color bodyColor) {
+  // ─── Aktif fontu tüm metin rollerine uygulayan yardımcı ─────────────────────
+  static TextTheme _appTextTheme(TextTheme base, Color bodyColor) {
     return base.copyWith(
       displayLarge:  base.displayLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
       displayMedium: base.displayMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
@@ -122,7 +124,7 @@ final class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
 
-      textTheme: _satoshiTextTheme(ThemeData.dark().textTheme, AppColors.textPrimary),
+      textTheme: _appTextTheme(ThemeData.dark().textTheme, AppColors.textPrimary),
     );
   }
 
@@ -220,7 +222,7 @@ final class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
 
-      textTheme: _satoshiTextTheme(ThemeData.light().textTheme, AppColors.lightTextPrimary),
+      textTheme: _appTextTheme(ThemeData.light().textTheme, AppColors.lightTextPrimary),
     );
   }
 }

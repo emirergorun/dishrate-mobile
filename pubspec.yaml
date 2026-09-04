@@ -32,7 +32,9 @@ dependencies:
   latlong2: ^0.9.1
 
   # Güvenli token saklama
-  flutter_secure_storage: ^9.2.2
+  # v11: Darwin tarafı Swift Package Manager destekliyor — iOS derlemesi
+  # CocoaPods olmadan çalışsın diye 9.x'ten yükseltildi.
+  flutter_secure_storage: ^11.0.0
 
   # Tarih formatlama
   intl: ^0.20.0
@@ -41,6 +43,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.3
   http_parser: ^4.1.2
+  crop_your_image: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -49,34 +52,85 @@ dev_dependencies:
   build_runner: ^2.4.9
   riverpod_generator: ^2.4.0
 
+  # Marka varlıklarından uygulama ikonu + açılış ekranı üretir.
+  # Ayarları aşağıdaki flutter_launcher_icons / flutter_native_splash bloklarında.
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+
+# ── Uygulama ikonu ────────────────────────────────────────────────────────────
+# Kaynak: "Dishrate logo/uygulama-ikonu/ikon-1-siyah-zemin-turuncu"
+# (siyah zemin, turuncu tabak + yıldız)
+# Yeniden üretmek için:  dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: assets/branding/app_icon.png
+  ios: true
+  remove_alpha_ios: true          # App Store saydam ikon kabul etmiyor
+  android: ic_launcher
+  min_sdk_android: 21
+  # Android uyarlanabilir ikon: zemin düz siyah, önplan şeffaf işaret
+  adaptive_icon_background: "#0D0D0D"
+  adaptive_icon_foreground: assets/branding/icon_foreground.png
+  adaptive_icon_monochrome: assets/branding/icon_foreground.png
+  web:
+    generate: true
+    image_path: assets/branding/app_icon.png
+    background_color: "#0D0D0D"
+    theme_color: "#FF6B35"
+
+# ── Açılış ekranı ─────────────────────────────────────────────────────────────
+# Kaynak: "Dishrate logo/logo-yazi/logo-1-siyah-turuncu-beyaz-yazi"
+# (siyah zemin, turuncu işaret, beyaz "dishrate" yazısı)
+# Görselin kendi zemini #0D0D0D olduğu için splash rengiyle birebir kaynaşır.
+# Yeniden üretmek için:  dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0D0D0D"
+  image: assets/branding/splash_logo.png
+  # Sistem açık temadayken de aynı koyu açılış ekranı gösterilir
+  color_dark: "#0D0D0D"
+  image_dark: assets/branding/splash_logo.png
+  android_12:
+    # Android 12+ açılışı yuvarlak maskeli tek ikon ister — yazı sığmaz,
+    # bu yüzden yalnızca işaret kullanılır.
+    image: assets/branding/splash_android12.png
+    icon_background_color: "#0D0D0D"
+    color: "#0D0D0D"
+    image_dark: assets/branding/splash_android12.png
+    icon_background_color_dark: "#0D0D0D"
+    color_dark: "#0D0D0D"
+  web: false
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
-    - assets/fonts/
+    - assets/branding/
 
+  # Aktif font AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart).
+  # Her iki aile de aynı ağırlık skalasını sunar: 300/400/400i/500/500i/600/700/700i/900
   fonts:
-    - family: Satoshi
+    - family: Poppins
       fonts:
-        - asset: assets/fonts/Satoshi-Light.ttf
+        - asset: assets/fonts/Poppins-Light.ttf
           weight: 300
-        - asset: assets/fonts/Satoshi-Regular.ttf
+        - asset: assets/fonts/Poppins-Regular.ttf
           weight: 400
-        - asset: assets/fonts/Satoshi-Italic.ttf
+        - asset: assets/fonts/Poppins-Italic.ttf
           weight: 400
           style: italic
-        - asset: assets/fonts/Satoshi-Medium.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
           weight: 500
-        - asset: assets/fonts/Satoshi-MediumItalic.ttf
+        - asset: assets/fonts/Poppins-MediumItalic.ttf
           weight: 500
           style: italic
-        - asset: assets/fonts/Satoshi-Bold.ttf
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
           weight: 700
-        - asset: assets/fonts/Satoshi-BoldItalic.ttf
+        - asset: assets/fonts/Poppins-BoldItalic.ttf
           weight: 700
           style: italic
-        - asset: assets/fonts/Satoshi-Black.ttf
+        - asset: assets/fonts/Poppins-Black.ttf
           weight: 900
 
     - family: Urbanist

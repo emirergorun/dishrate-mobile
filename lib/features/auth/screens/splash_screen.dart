@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/dishrate_logo.dart';
 
 /// Uygulama açılışında gösterilen yükleme ekranı.
 /// AuthProvider token kontrolü yaparken görünür.
+///
+/// Native açılış ekranıyla (flutter_native_splash) aynı logoyu kullanır ki
+/// sistem açılışından uygulamaya geçiş sıçramasız olsun.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -15,28 +18,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.restaurant_menu_rounded,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Dishrate', style: AppTextStyles.headlineLarge),
+            const DishrateWordmark(width: 220),
             const SizedBox(height: 40),
             SizedBox(
               width: 24,
