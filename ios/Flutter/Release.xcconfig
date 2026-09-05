@@ -1,1 +1,5 @@
 #include "Generated.xcconfig"
+// Kişisel imzalama ayarları — dosya yoksa sorunsuz atlanır ("#include?").
+// Böylece repoyu klonlayan biri kendi Signing.xcconfig'ini oluşturana kadar
+// simülatör ve web derlemeleri çalışmaya devam eder.
+#include? "Signing.xcconfig"

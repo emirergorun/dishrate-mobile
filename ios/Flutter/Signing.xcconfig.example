@@ -1,0 +1,9 @@
+// Bu dosyayı "Signing.xcconfig" olarak kopyalayıp kendi Apple Geliştirici
+// Takım Kimliğini yaz. Kopya .gitignore'dadır, repoya girmez.
+//
+// Takım kimliğini bulmak için: Xcode > Settings > Accounts > Apple ID'ni seç,
+// sağdaki takım satırının yanında parantez içinde yazar (örn. ABCDE12345).
+//
+// Yalnızca iOS cihazına yükleme yapacaksan gerekli; simülatör ve web
+// derlemeleri imzalama istemez.
+DEVELOPMENT_TEAM = TAKIM_KIMLIGIN

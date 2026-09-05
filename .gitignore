@@ -66,3 +66,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+
+# iOS imzalama — kişisel Apple Takım Kimliği repoya girmez
+**/ios/Flutter/Signing.xcconfig

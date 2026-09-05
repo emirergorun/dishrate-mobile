@@ -67,6 +67,27 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
 flutter run --dart-define=API_BASE_URL=http://192.168.1.42:8080/api/v1
 ```
 
+IP yerine bilgisayarın Bonjour adını (`http://ADINIZ.local:8080/api/v1`) verirseniz
+modem yeni bir IP dağıttığında derlemeyi tekrarlamanız gerekmez.
+
+### iOS cihazına yükleme
+
+Fiziksel iPhone'a yüklemek için Apple Geliştirici Takım Kimliğiniz gerekir.
+Kişisel bilgi olduğu için depoda tutulmaz — örnek dosyayı kopyalayıp doldurun:
+
+```bash
+cp ios/Flutter/Signing.xcconfig.example ios/Flutter/Signing.xcconfig
+```
+
+Takım kimliğinizi Xcode > Settings > Accounts altında Apple ID'nizin yanında
+bulabilirsiniz. Kopyaladığınız dosya `.gitignore`'dadır.
+
+Simülatör ve web derlemeleri imzalama gerektirmez, bu adım olmadan da çalışır.
+
+> Debug derlemesi fiziksel iOS cihazında ana ekrandan açılmaz — Dart JIT'i
+> hata ayıklayıcı bağlıyken çalışabildiği için iOS uygulamayı sonlandırır.
+> Cihazda bağımsız test için `--release` (veya `--profile`) kullanın.
+
 ---
 
 ## Mimari
