@@ -6,15 +6,47 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
+/// Kırpma ekranının sonucu: kırpılmış baytlar ve bu kırpmanın özgün görsel
+/// üzerindeki dikdörtgeni. Dikdörtgen saklanırsa kullanıcı fotoğrafını daha
+/// sonra aynı çerçevelemeyle açıp ince ayar yapabilir.
+class CropOutcome {
+  const CropOutcome({required this.bytes, required this.area});
+
+  final Uint8List bytes;
+
+  /// Özgün görsel koordinatlarında kırpma dikdörtgeni. Sunucuda
+  /// "x,y,genişlik,yükseklik" olarak saklanır.
+  final Rect? area;
+
+  /// Sunucuya gönderilecek biçim.
+  String? get areaAsString => area == null
+      ? null
+      : '${area!.left.round()},${area!.top.round()},'
+          '${area!.width.round()},${area!.height.round()}';
+
+  /// Sunucudan gelen "x,y,genişlik,yükseklik" metnini çözer.
+  static Rect? parseArea(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final parts = raw.trim().split(',');
+    if (parts.length != 4) return null;
+    final values = parts.map((p) => double.tryParse(p.trim())).toList();
+    if (values.any((v) => v == null)) return null;
+    final w = values[2]!, h = values[3]!;
+    if (w <= 0 || h <= 0) return null;
+    return Rect.fromLTWH(values[0]!, values[1]!, w, h);
+  }
+}
+
 /// Seçilen görseli yüklemeden önce kırpma/konumlandırma ekranı.
-/// Kullanıcı sürükleyerek konumu, köşelerden çekerek boyutu ayarlar.
-/// Onaylarsa kırpılmış görselin baytlarını döner, vazgeçerse null.
+/// Çerçeve sabittir; kullanıcı görseli sürükler ve iki parmakla yakınlaştırır.
+/// Onaylarsa [CropOutcome] döner, vazgeçerse null.
 class ImageCropDialog extends StatefulWidget {
   const ImageCropDialog({
     super.key,
     required this.imageBytes,
     this.circular = true,
     this.title = 'Fotoğrafı Ayarla',
+    this.initialArea,
   });
 
   final Uint8List imageBytes;
@@ -23,20 +55,25 @@ class ImageCropDialog extends StatefulWidget {
   final bool circular;
   final String title;
 
-  /// Kırpma ekranını açar; sonuç kırpılmış baytlar veya null.
-  static Future<Uint8List?> show(
+  /// Önceki kırpma dikdörtgeni — verilirse ekran o çerçevelemeyle açılır.
+  final Rect? initialArea;
+
+  /// Kırpma ekranını açar; sonuç [CropOutcome] veya null.
+  static Future<CropOutcome?> show(
     BuildContext context, {
     required Uint8List imageBytes,
     bool circular = true,
     String title = 'Fotoğrafı Ayarla',
+    Rect? initialArea,
   }) {
-    return showDialog<Uint8List>(
+    return showDialog<CropOutcome>(
       context: context,
       barrierDismissible: false,
       builder: (_) => ImageCropDialog(
         imageBytes: imageBytes,
         circular: circular,
         title: title,
+        initialArea: initialArea,
       ),
     );
   }
@@ -48,6 +85,61 @@ class ImageCropDialog extends StatefulWidget {
 class _ImageCropDialogState extends State<ImageCropDialog> {
   final _controller = CropController();
   bool _processing = false;
+
+  /// Kullanıcı her hareket ettiğinde güncellenen, özgün görsel
+  /// koordinatlarındaki güncel kırpma dikdörtgeni.
+  Rect? _currentArea;
+
+  // ── Önceki çerçevelemeyi geri yükleme ──────────────────────────────────────
+  //
+  // `initialRectBuilder` bu iş için yetmiyor: `interactive: true` olduğunda
+  // kırpıcı, çerçeveyi kurduktan hemen sonra görseli "kapla" ölçeğine
+  // getiriyor ve verdiğimiz çerçeveyi eziyor. Kütüphane görselin ölçeğini
+  // dışarı açmadığı için ölçeği ölçerek buluyoruz:
+  //
+  //   alan verilir  →  geri okunan dikdörtgen = alan / ölçek
+  //
+  // Bağıntı doğrusal, o yüzden bir ölçüm + bir düzeltme yetiyor. Düzeltme
+  // tutmazsa ekran varsayılan çerçevelemeyle açılır — yani en kötü ihtimalde
+  // eski davranış.
+  static const int _kapali = 0, _olculuyor = 1, _tamam = 2;
+  int _geriYukleme = _kapali;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialArea != null) _geriYukleme = _olculuyor;
+  }
+
+  void _onHazir() {
+    if (_geriYukleme != _olculuyor) return;
+    // Kırpıcı kendi setState'i içinden çağırıyor; kareyi bekliyoruz.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.area = widget.initialArea!;
+    });
+  }
+
+  void _onTasindi(Rect rectToCrop) {
+    _currentArea = rectToCrop;
+    if (_geriYukleme != _olculuyor) return;
+    _geriYukleme = _tamam;
+
+    final hedef = widget.initialArea!;
+    if (rectToCrop.width <= 0) return;
+
+    final olcek = hedef.width / rectToCrop.width;
+    if ((olcek - 1).abs() < 0.01) return; // ölçek 1 — düzeltmeye gerek yok
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.area = Rect.fromLTWH(
+        hedef.left * olcek,
+        hedef.top * olcek,
+        hedef.width * olcek,
+        hedef.height * olcek,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +171,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'Sürükleyerek konumlandır, köşelerden çekerek boyutlandır.',
+                'Sürükleyerek konumlandır, iki parmakla yakınlaştır.',
                 style: AppTextStyles.bodySmall
                     .copyWith(color: context.textSecondaryColor),
               ),
@@ -97,14 +189,32 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                   withCircleUi: widget.circular,
                   baseColor: Colors.black,
                   maskColor: Colors.black.withValues(alpha: 0.6),
-                  cornerDotBuilder: (dotSize, _) => widget.circular
-                      ? const SizedBox.shrink()
-                      : const DotControl(color: AppColors.primary),
+                  // Çerçeveyi sabitleyip görseli hareket ettiriyoruz:
+                  // kullanıcı iki parmakla yakınlaştırıp istediği yeri
+                  // (örn. yüzü) çerçeveye getirebilsin. interactive olmadan
+                  // yalnızca çerçeve taşınabiliyor, yakınlaştırma yapılamıyordu.
+                  interactive: true,
+                  fixCropRect: true,
+                  cornerDotBuilder: (dotSize, _) => const SizedBox.shrink(),
+                  // Görsel çözümlenip çerçeve kurulduğunda önceki
+                  // çerçevelemeyi geri yüklemeye başlarız.
+                  onStatusChanged: (status) {
+                    if (status == CropStatus.ready) _onHazir();
+                  },
+                  // Kullanıcı görseli her oynattığında güncel dikdörtgeni
+                  // sakla; "Uygula"da bunu da geri döndüreceğiz.
+                  onMoved: (_, rectToCrop) => _onTasindi(rectToCrop),
                   onCropped: (result) {
                     if (!mounted) return;
                     switch (result) {
                       case CropSuccess(:final croppedImage):
-                        Navigator.pop(context, croppedImage);
+                        Navigator.pop(
+                          context,
+                          CropOutcome(
+                            bytes: croppedImage,
+                            area: _currentArea ?? widget.initialArea,
+                          ),
+                        );
                       case CropFailure():
                         setState(() => _processing = false);
                         ScaffoldMessenger.of(context).showSnackBar(

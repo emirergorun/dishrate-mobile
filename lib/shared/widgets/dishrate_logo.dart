@@ -3,11 +3,12 @@ import '../../core/theme/app_colors.dart';
 
 /// Dishrate marka görselleri.
 ///
-/// Kaynak dosyalar `Dishrate logo/` klasöründen türetilmiştir:
-///   • [DishrateWordmark] → `logo-yazi/logo-1-siyah-turuncu-beyaz-yazi`
-///     (turuncu işaret + "dishrate" yazısı, zemin şeffaf)
-///   • [DishrateMark]     → `uygulama-ikonu/ikon-1-siyah-zemin-turuncu`
-///     (yalnızca tabak + yıldız işareti)
+/// Kaynak: `Dishrate logo/claude küçük yıldız.html` içindeki **A — yan tabak
+/// (tek kalınlıkta yay)** tasarımı. Seçilen varyantlar:
+///   • [DishrateWordmark] → "Logo + dishrate yazısı" 1 numara
+///     (turuncu işaret + beyaz yazı; burada zemin şeffaf tutulur)
+///   • [DishrateMark]     → "Uygulama ikonu" 1 numara
+///     (tabak ve yıldız turuncu; yalnızca işaret)
 ///
 /// Yazı rengi temaya göre değişir: koyu temada beyaz, açık temada siyah.
 /// İşaretin turuncusu her iki temada da aynıdır.
@@ -19,8 +20,8 @@ import '../../core/theme/app_colors.dart';
 class DishrateWordmark extends StatelessWidget {
   const DishrateWordmark({super.key, this.width = 180});
 
-  /// Kaynak görselin en-boy oranı (1200 × 267).
-  static const double _aspectRatio = 1200 / 267;
+  /// Kaynak görselin en-boy oranı (1070 × 242).
+  static const double _aspectRatio = 1070 / 242;
 
   final double width;
 

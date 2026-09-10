@@ -16,15 +16,14 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
-import '../../../shared/widgets/image_crop_dialog.dart';
 import '../../../shared/widgets/main_scaffold.dart';
-import 'package:image_picker/image_picker.dart';
+import '../widgets/profile_photo_editor.dart';
 
-import '../../../core/network/file_repository.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../admin/screens/admin_panel_screen.dart';
 import '../../notifications/screens/notifications_screen.dart';
-import '../../owner/screens/application_status_screen.dart';
+import '../../owner/screens/claim_status_screen.dart';
+import '../../owner/screens/restaurant_claim_screen.dart';
 import '../../owner/screens/owner_dashboard_screen.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
@@ -47,6 +46,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   List<WishlistModel> _wishlist = [];
   bool _isLoading = true;
 
+  /// Başlıktaki avatardan başlatılan fotoğraf işlemi sürüyor mu?
+  bool _photoBusy = false;
+
   /// En yüksek puanlı 5 değerlendirme (favori yemekler).
   List<RatingModel> get _topFavorites {
     final sorted = [..._ratings]..sort((a, b) => b.score.compareTo(a.score));
@@ -57,6 +59,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  /// Sahiplik talebi akışını açar; talep gönderilirse profili tazeler.
+  Future<void> _openApply() async {
+    final gonderildi = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const RestaurantClaimScreen()),
+    );
+    if (!mounted || gonderildi != true) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Talebin alındı. "Sahiplik Taleplerim"den takip edebilirsin.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    _load(silent: true);
+  }
+
+  /// Başlıktaki avatardan fotoğraf değiştirme. "Profili Düzenle" panelinden
+  /// farklı olarak burada Kaydet adımı yok — seçim yapılır yapılmaz kaydedilir.
+  Future<void> _editPhoto(UserModel user) async {
+    if (_photoBusy) return;
+    setState(() => _photoBusy = true);
+    try {
+      final result = await ProfilePhotoEditor.edit(context, user: user);
+      if (!mounted || result == null) return;
+
+      final updated = await UserRepository.instance.updateUser(
+        user.userId,
+        profilePhotoUrl: result.photoUrl,
+        profilePhotoOriginalUrl: result.originalUrl,
+        profilePhotoCrop: result.crop,
+      );
+      if (!mounted) return;
+      setState(() => _user = updated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fotoğraf güncellenemedi, tekrar dene.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _photoBusy = false);
+    }
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -339,6 +388,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             .read(selectedTabProvider.notifier)
                             .state = 2, // Günlük sekmesi
                         onWishlistTap: _showWishlist,
+                        // Avatara dokununca fotoğrafı doğrudan değiştir
+                        onPhotoTap: _user == null
+                            ? null
+                            : () => _editPhoto(_user!),
+                        photoBusy: _photoBusy,
                       ),
 
                       const SizedBox(height: 8),
@@ -387,19 +441,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       const NotificationsScreen()),
                             ),
                           ),
-                        ] else
+                        ] else ...[
+                          // Restoran sahipliği artık kayıt anına bağlı değil;
+                          // her kullanıcı istediği zaman kendi restoranını
+                          // arayıp sahipliğini talep edebilir.
+                          _ProfileItem(
+                            icon: Icons.storefront_rounded,
+                            iconColor: AppColors.primary,
+                            label: 'Restoranımı Sahiplen',
+                            subtitle: 'Restoran sahibiysen sahipliğini talep et',
+                            onTap: () => _openApply(),
+                          ),
                           _ProfileItem(
                             icon: Icons.assignment_rounded,
                             iconColor: AppColors.primary,
-                            label: 'Başvuru Durumum',
-                            subtitle: 'Restoran sahibi başvurunu takip et',
+                            label: 'Sahiplik Taleplerim',
+                            subtitle: 'Talebinin durumunu takip et',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
-                                      const ApplicationStatusScreen()),
+                                  builder: (_) => const ClaimStatusScreen()),
                             ),
                           ),
+                        ],
                       ],
 
                       // ── KEŞFEDİN ───────────────────────────────────
@@ -527,6 +591,8 @@ class _ProfileHeader extends StatelessWidget {
     required this.wishlistCount,
     this.onRatingsTap,
     this.onWishlistTap,
+    this.onPhotoTap,
+    this.photoBusy = false,
   });
 
   final UserModel? user;
@@ -534,6 +600,10 @@ class _ProfileHeader extends StatelessWidget {
   final int wishlistCount;
   final VoidCallback? onRatingsTap;
   final VoidCallback? onWishlistTap;
+
+  /// Avatara dokunulduğunda fotoğrafı değiştirme akışını başlatır.
+  final VoidCallback? onPhotoTap;
+  final bool photoBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -544,21 +614,56 @@ class _ProfileHeader extends StatelessWidget {
           // Avatar + bilgi
           Row(
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: context.surfaceElevatedColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: context.dividerColor, width: 2),
+              // Avatara dokunmak fotoğrafı doğrudan değiştirir —
+              // "Profili Düzenle"ye girmeye gerek yok.
+              GestureDetector(
+                onTap: user == null ? null : onPhotoTap,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: context.surfaceElevatedColor,
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: context.dividerColor, width: 2),
+                      ),
+                      child: user?.profilePhotoUrl != null
+                          ? ClipOval(
+                              child: Image.network(user!.profilePhotoUrl!,
+                                  fit: BoxFit.cover),
+                            )
+                          : const Icon(Icons.person_rounded,
+                              color: AppColors.textDisabled, size: 36),
+                    ),
+                    // Dokunulabilir olduğunu belli eden küçük rozet
+                    if (user != null)
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: context.bgColor, width: 2),
+                          ),
+                          child: photoBusy
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.camera_alt_rounded,
+                                  size: 12, color: Colors.white),
+                        ),
+                      ),
+                  ],
                 ),
-                child: user?.profilePhotoUrl != null
-                    ? ClipOval(
-                        child: Image.network(user!.profilePhotoUrl!,
-                            fit: BoxFit.cover),
-                      )
-                    : const Icon(Icons.person_rounded,
-                        color: AppColors.textDisabled, size: 36),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -770,8 +875,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _bioCtrl;
   bool _saving = false;
 
-  // Profil fotoğrafı (galeriden seçilip yüklenir, Kaydet ile kalıcı olur)
+  // Profil fotoğrafı (seçilip yüklenir, Kaydet ile kalıcı olur)
   String? _photoUrl;
+  String? _photoOriginalUrl;
+  String? _photoCrop;
   bool _uploadingPhoto = false;
 
   bool get _canChangeName => widget.user.canChangeName;
@@ -784,45 +891,46 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _usernameCtrl = TextEditingController(text: widget.user.username);
     _bioCtrl = TextEditingController(text: widget.user.bio ?? '');
     _photoUrl = widget.user.profilePhotoUrl;
+    _photoOriginalUrl = widget.user.profilePhotoOriginalUrl;
+    _photoCrop = widget.user.profilePhotoCrop;
   }
 
   Future<void> _pickPhoto() async {
     if (_uploadingPhoto) return;
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-    );
-    if (picked == null || !mounted) return;
-
-    // Yüklemeden önce kırpma/konumlandırma
-    final bytes = await picked.readAsBytes();
-    if (!mounted) return;
-    final cropped = await ImageCropDialog.show(
-      context,
-      imageBytes: bytes,
-      circular: true,
-      title: 'Profil Fotoğrafı',
-    );
-    if (cropped == null || !mounted) return;
-
     setState(() => _uploadingPhoto = true);
-    try {
-      final url = await FileRepository.instance.uploadBytes(
-        cropped,
-        filename: 'avatar.png',
-      );
-      if (mounted) {
-        setState(() {
-          _photoUrl = url;
-          _uploadingPhoto = false;
-        });
+    final result = await ProfilePhotoEditor.edit(
+      context,
+      // Panel açıldıktan sonra seçilen fotoğraf da yeniden çerçevelenebilsin
+      // diye kullanıcıyı yerel durumla güncel tutuyoruz.
+      user: _draftUser,
+    );
+    if (!mounted) return;
+    setState(() {
+      _uploadingPhoto = false;
+      if (result != null) {
+        _photoUrl = result.photoUrl;
+        _photoOriginalUrl = result.originalUrl;
+        _photoCrop = result.crop;
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _uploadingPhoto = false);
-      _error(_parseError(e));
-    }
+    });
   }
+
+  /// Panel açıkken yapılan fotoğraf değişiklikleri henüz kaydedilmedi;
+  /// "Mevcut fotoğrafı düzenle" seçeneğinin doğru çalışması için
+  /// kullanıcının taslak hâlini veriyoruz.
+  UserModel get _draftUser => UserModel(
+        userId: widget.user.userId,
+        username: widget.user.username,
+        firstName: widget.user.firstName,
+        lastName: widget.user.lastName,
+        email: widget.user.email,
+        profilePhotoUrl: _photoUrl,
+        profilePhotoOriginalUrl: _photoOriginalUrl,
+        profilePhotoCrop: _photoCrop,
+        bio: widget.user.bio,
+        role: widget.user.role,
+        nameChangeAvailableAt: widget.user.nameChangeAvailableAt,
+      );
 
   @override
   void dispose() {
@@ -892,9 +1000,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         firstName: _canChangeName ? firstName : null,
         lastName: _canChangeName ? lastName : null,
         bio: _bioCtrl.text.trim(),
-        // Yeni foto seçildiyse gönder
+        // Fotoğraf değiştiyse üç alanı birlikte gönder — özgün görsel ve
+        // kırpma dikdörtgeni olmadan sonradan yeniden çerçeveleme yapılamaz.
         profilePhotoUrl:
             _photoUrl != widget.user.profilePhotoUrl ? _photoUrl : null,
+        profilePhotoOriginalUrl:
+            _photoOriginalUrl != widget.user.profilePhotoOriginalUrl
+                ? _photoOriginalUrl
+                : null,
+        profilePhotoCrop:
+            _photoCrop != widget.user.profilePhotoCrop ? _photoCrop : null,
       );
       if (!mounted) return;
       Navigator.pop(context);

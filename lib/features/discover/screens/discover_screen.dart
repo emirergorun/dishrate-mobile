@@ -8,17 +8,23 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../rating/providers/rating_flow_provider.dart';
-import '../../rating/screens/add_rating_screen.dart';
+import '../../../shared/widgets/rating_sheet.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
 import '../../reviews/screens/menu_item_reviews_screen.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/menu_item_card.dart';
 import '../widgets/section_header.dart';
+import '../providers/location_provider.dart';
+import '../../../core/data/turkiye_adres.dart';
+import '../../../shared/widgets/searchable_picker.dart';
+import '../../../core/location/location_service.dart';
 import 'see_all_screen.dart';
 
 /// Başlıktaki "dishrate" kelime markasının punto'su. Harf aralığı buna
 /// oranla (−%2) hesaplanır, böylece punto değişse de logoyla oran korunur.
-const double _wordmarkSize = 28;
+///
+/// 28'den 24'e indirildi: sağdaki konum yazısıyla arada nefes kalmıyordu.
+const double _wordmarkSize = 24;
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -100,13 +106,31 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   /// Seçili kategoriye göre filtrelenmiş tüm öğeler — bölümlerin kaynağı.
   List<MenuItemModel> get _baseItems => _filtered(_allItems);
 
+  /// Seçili konum. İlçe seçiliyse önce o ilçe denenir; orada hiç sonuç
+  /// yoksa il geneline düşülür — kullanıcı boş ekranla karşılaşmasın.
+  List<MenuItemModel> get _localItems {
+    final loc = ref.watch(selectedLocationProvider);
+    final ilGeneli = _baseItems
+        .where((i) => i.city == null || _esit(i.city!, loc.il))
+        .toList();
+    if (!loc.hasIlce) return ilGeneli;
+    final ilceIcinde = ilGeneli
+        .where((i) => i.district != null && _esit(i.district!, loc.ilce!))
+        .toList();
+    return ilceIcinde.isEmpty ? ilGeneli : ilceIcinde;
+  }
+
+  static bool _esit(String a, String b) =>
+      TurkiyeAdres.aramaAnahtari(a.trim()) ==
+      TurkiyeAdres.aramaAnahtari(b.trim());
+
   List<MenuItemModel> _byRatingDesc(Iterable<MenuItemModel> src) {
     final l = src.toList()
       ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
     return l.take(12).toList();
   }
 
-  List<MenuItemModel> get _topRated => _byRatingDesc(_baseItems);
+  List<MenuItemModel> get _topRated => _byRatingDesc(_localItems);
 
   // "Bu hafta" için yaklaşık: en yeni eklenen (yüksek ID) yüksek puanlılar.
   List<MenuItemModel> get _weeklyTop {
@@ -164,12 +188,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       );
       ref.read(ratingFlowProvider.notifier).jumpToRateItem(restaurant, item);
       if (!mounted) return;
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => const _DiscoverRatingSheet(),
-      );
+      await RatingSheet.show(context);
     }
   }
 
@@ -177,7 +196,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   List<({String title, String subtitle, List<MenuItemModel> items})>
       get _sections => [
             (
-              title: 'İstanbul\'da En İyiler',
+              title: '${ref.watch(selectedLocationProvider).hasIlce ? ref.watch(selectedLocationProvider).ilce : ref.watch(selectedLocationProvider).il}\'da En İyiler',
               subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
               items: _topRated,
             ),
@@ -334,9 +353,134 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
 // ── App Bar ───────────────────────────────────────────────────────────────────
 
-class _DiscoverAppBar extends StatelessWidget {
+/// İl listesinin başına sabitlenen GPS satırının etiketi.
+const String _konumuKullan = 'Konumumu kullan';
+
+class _DiscoverAppBar extends ConsumerWidget {
+  /// Konuma dokunulduğunda: izin hiç sorulmadıysa önce kısa bir açıklama
+  /// gösterip sistem penceresini açar (tek şansı burada, faydası belliyken
+  /// harcıyoruz). Diğer her durumda seçim listesi açılır.
+  ///
+  /// İzin verilmiş olsa bile buradan GPS'i yeniden çalıştırmıyoruz: kullanıcı
+  /// konuma dokunduysa muhtemelen **başka bir yere** bakmak istiyor. Eskiden
+  /// izin varken dokunmak doğrudan GPS'i tetikleyip geri dönüyordu, bu yüzden
+  /// elle ilçe seçmek imkânsızdı. GPS artık listenin başındaki "Konumumu
+  /// kullan" satırından çalışıyor.
+  Future<void> _onLocationTap(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(selectedLocationProvider.notifier);
+
+    final izinVar = await LocationService.hasPermission();
+    if (!izinVar && await LocationService.canAsk()) {
+      if (!context.mounted) return;
+      final izinIster = await _askUseLocation(context);
+      if (!context.mounted) return;
+      if (izinIster == true) {
+        final r = await notifier.requestGps();
+        if (!context.mounted) return;
+        if (r.isOk) return;
+        if (r.outcome == LocationOutcome.serviceDisabled) {
+          _snack(context, 'Cihazının konum servisi kapalı. '
+              'Açıp tekrar dene ya da şehri kendin seç.');
+        }
+      }
+    }
+
+    if (!context.mounted) return;
+    await _pickLocation(context, ref);
+  }
+
+  /// Sistem penceresinden ÖNCE gösterilen açıklama. iOS penceresi ömür boyu
+  /// bir kez açılabildiği için, kullanıcı neye evet dediğini bilerek gelsin.
+  Future<bool?> _askUseLocation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.surfaceColor,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18)),
+        title: Text('Konumunu kullanalım mı?',
+            style: AppTextStyles.titleMedium),
+        content: Text(
+          'Sana en yakın restoranları gösterebilmemiz için konumuna '
+          'ihtiyacımız var.',
+          style: AppTextStyles.bodyMedium
+              .copyWith(color: ctx.textSecondaryColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Şimdi değil'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary),
+            child: const Text('Konumumu kullan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _snack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  /// İl → (opsiyonel) ilçe seçimi. İl değişirse ilçe sıfırlanır.
+  Future<void> _pickLocation(BuildContext context, WidgetRef ref) async {
+    final iller = await TurkiyeAdres.iller();
+    final izinVar = await LocationService.hasPermission();
+    if (!context.mounted) return;
+    final mevcut = ref.read(selectedLocationProvider);
+
+    final secilenIl = await SearchablePicker.show(
+      context,
+      title: 'İl Seç',
+      options: iller.map((i) => i.ad).toList(),
+      // Elle seçim yaptıktan sonra cihaz konumuna dönebilmenin tek yolu.
+      pinned: izinVar
+          ? const [
+              SabitSecenek(_konumuKullan, icon: Icons.my_location_rounded),
+            ]
+          : const [],
+      selected: mevcut.il,
+      searchHint: 'İl ara…',
+    );
+    if (secilenIl == null || !context.mounted) return;
+
+    if (secilenIl == _konumuKullan) {
+      final r = await ref.read(selectedLocationProvider.notifier).requestGps();
+      if (!context.mounted || r.isOk) return;
+      _snack(context, 'Konum alınamadı. Şehri listeden seçebilirsin.');
+      return;
+    }
+
+    final il = iller.firstWhere((i) => i.ad == secilenIl);
+    final tumu = 'Tüm $secilenIl';
+    final secilenIlce = await SearchablePicker.show(
+      context,
+      title: '$secilenIl · İlçe Seç',
+      options: il.ilceler.map((i) => i.ad).toList(),
+      // İl geneline dönme seçeneği alfabetik sıraya karışmasın diye sabit.
+      pinned: [SabitSecenek(tumu, icon: Icons.select_all_rounded)],
+      selected: secilenIl == mevcut.il ? (mevcut.ilce ?? tumu) : null,
+      searchHint: 'İlçe ara…',
+    );
+    if (secilenIlce == null) {
+      // İlçe adımı iptal edilse bile il seçimi geçerli olsun.
+      await ref.read(selectedLocationProvider.notifier).setManual(secilenIl);
+      return;
+    }
+    await ref.read(selectedLocationProvider.notifier).setManual(
+          secilenIl,
+          ilce: secilenIlce == tumu ? null : secilenIlce,
+        );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SliverAppBar(
       pinned: true,
       floating: false,
@@ -367,24 +511,50 @@ class _DiscoverAppBar extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            // Konum satırı
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Icon(
-                  Icons.location_on_rounded,
-                  color: AppColors.textSecondary,
-                  size: 14,
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  'İstanbul',
-                  style: AppTextStyles.bodySmall.copyWith(
+            // Konum — dokunulunca il/ilçe seçilir; GPS seçeneği de o listenin
+            // başında duruyor.
+            GestureDetector(
+              onTap: () => _onLocationTap(context, ref),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
                     color: AppColors.textSecondary,
-                    fontSize: 12,
+                    size: 14,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 3),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 170),
+                    child: Text(
+                      ref.watch(selectedLocationProvider).isUnset
+                          ? 'Konum Seç'
+                          : ref.watch(selectedLocationProvider).etiket,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      // Kelime markasının yanında duruyor; aynı ağırlıkta
+                      // olunca ikisi tek blok gibi görünüyordu.
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                  ),
+                  // Konum GPS'ten geliyorsa seçim yapmaya gerek yok — ok
+                  // işareti "burada seçilecek bir şey var" diye çağırmasın.
+                  if (ref.watch(selectedLocationProvider).source !=
+                      LocationSource.gps) ...[
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.expand_more_rounded,
+                      color: AppColors.textSecondary,
+                      size: 14,
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -707,36 +877,3 @@ class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
   }
 }
 
-// ── Değerlendirme modal wrapper ───────────────────────────────────────────────
-
-class _DiscoverRatingSheet extends StatelessWidget {
-  const _DiscoverRatingSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: const Column(
-        children: [
-          SizedBox(height: 12),
-          SizedBox(
-            width: 40,
-            height: 4,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.all(Radius.circular(2)),
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-          Expanded(child: AddRatingScreen()),
-        ],
-      ),
-    );
-  }
-}

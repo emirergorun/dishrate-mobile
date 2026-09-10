@@ -80,6 +80,9 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
     final restaurant = state.selectedRestaurant!;
 
     return SingleChildScrollView(
+      // Yorum yazarken listeyi aşağı çekmek klavyeyi kapatsın — "Puanı
+      // Kaydet"e basmadan klavyeden kurtulmanın başka yolu yoktu.
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,16 +124,24 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
                   style: AppTextStyles.ratingLarge.copyWith(fontSize: 52),
                 ),
                 const SizedBox(height: 12),
-                RatingBar.builder(
+                // Boş yıldızlar dolu olanla aynı ikonun soluk hâli değil,
+                // ÇERÇEVELİ yıldız. Koyu temada dolgu rengi zeminle
+                // karıştığı için puanlanmamış yıldızlar görünmüyordu —
+                // kullanıcı orada tıklanacak bir şey olduğunu anlamıyor.
+                RatingBar(
                   initialRating: state.score,
                   minRating: 0.5,
                   allowHalfRating: true,
                   itemCount: 5,
                   itemSize: 42,
-                  unratedColor: AppColors.surface,
-                  itemBuilder: (_, __) => const Icon(
-                    Icons.star_rounded,
-                    color: AppColors.star,
+                  glow: false,
+                  ratingWidget: RatingWidget(
+                    full: const Icon(Icons.star_rounded,
+                        color: AppColors.star),
+                    half: const Icon(Icons.star_half_rounded,
+                        color: AppColors.star),
+                    empty: Icon(Icons.star_border_rounded,
+                        color: AppColors.star.withValues(alpha: 0.55)),
                   ),
                   onRatingUpdate: (rating) {
                     ref
@@ -256,7 +267,7 @@ class _ItemPreview extends StatelessWidget {
                   colors: [Color(0xDD0D0D0D), Colors.transparent],
                 ),
               ),
-              child: Text(item.name, style: AppTextStyles.titleLarge),
+              child: Text(item.name, style: AppTextStyles.onImageTitleLarge),
             ),
           ),
         ],

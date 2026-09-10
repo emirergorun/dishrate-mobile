@@ -139,10 +139,7 @@ class _CardInfo extends StatelessWidget {
           // Restoran adı
           Text(
             item.restaurantName,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-            ),
+            style: AppTextStyles.onImageCaption,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -150,7 +147,7 @@ class _CardInfo extends StatelessWidget {
           // Yemek adı
           Text(
             item.name,
-            style: AppTextStyles.titleSmall,
+            style: AppTextStyles.onImageTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -161,12 +158,12 @@ class _CardInfo extends StatelessWidget {
                 const Icon(
                   Icons.location_on_rounded,
                   size: 11,
-                  color: AppColors.textSecondary,
+                  color: AppTextStyles.onImageMuted,
                 ),
                 const SizedBox(width: 2),
                 Text(
                   item.district!,
-                  style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                  style: AppTextStyles.onImageCaption,
                 ),
               ],
             ),

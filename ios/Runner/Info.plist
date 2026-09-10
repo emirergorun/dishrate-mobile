@@ -66,6 +66,13 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
+		<!-- ── Konum izni ───────────────────────────────────────────────────────
+	     Yalnızca uygulama kullanılırken; arka planda konum izlenmiyor.
+	     İzin açılışta değil, faydası belli olduğu anda isteniyor (haritaya
+	     girince veya konum seçiciye dokununca) — iOS sistem penceresini
+	     yalnızca bir kez gösteriyor, o tek şansı boşa harcamamak için. -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Sana en yakın restoranları ve yemekleri gösterebilmemiz için konumunu kullanıyoruz. İzin vermezsen şehir ve ilçeyi kendin seçebilirsin.</string>
 		<!-- ── image_picker izin metinleri (olmazsa uygulama çöker) ────────────── -->
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Profil fotoğrafını ve yemek görsellerini seçebilmen için fotoğraflarına erişmemiz gerekiyor.</string>

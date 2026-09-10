@@ -69,3 +69,9 @@ Thumbs.db
 
 # iOS imzalama — kişisel Apple Takım Kimliği repoya girmez
 **/ios/Flutter/Signing.xcconfig
+
+# Claude Code yetenekleri (Leonxlnx/taste-skill)
+# Yerel geliştirme aracı; kaynağı GitHub'da zaten var, repoyu şişirmesin.
+# Kurulum: skills/ altındaki araçla çekilir, sonra .claude/skills'e kopyalanır.
+skills/
+.claude/

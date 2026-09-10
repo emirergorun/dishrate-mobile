@@ -15,9 +15,6 @@ abstract final class ApiConstants {
   static const String authRefresh = '/auth/refresh';
   static const String authLogout = '/auth/logout';
 
-  // Restoran başvurusu
-  static const String applications = '/applications';
-
   // Admin
   static const String admin = '/admin';
 

@@ -393,7 +393,7 @@ class _MenuItemFormSheetState extends State<_MenuItemFormSheet> {
     setState(() => _uploadingPhoto = true);
     try {
       final url = await FileRepository.instance
-          .uploadBytes(cropped, filename: 'menu-item.png');
+          .uploadBytes(cropped.bytes, filename: 'menu-item.png');
       if (mounted) {
         setState(() {
           _photoCtrl.text = url;
@@ -658,7 +658,7 @@ class _RestaurantEditSheetState extends State<_RestaurantEditSheet> {
     setState(() => _uploadingLogo = true);
     try {
       final url = await FileRepository.instance
-          .uploadBytes(cropped, filename: 'logo.png');
+          .uploadBytes(cropped.bytes, filename: 'logo.png');
       if (mounted) {
         setState(() {
           _logoUrl = url;

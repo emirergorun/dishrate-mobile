@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/admin_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/models/restaurant_application_model.dart';
+import '../../../shared/models/restaurant_claim_model.dart';
 import '../../../shared/models/user_model.dart';
 
 class AdminPanelScreen extends StatelessWidget {
@@ -26,14 +26,14 @@ class AdminPanelScreen extends StatelessWidget {
             unselectedLabelColor: context.textSecondaryColor,
             indicatorColor: AppColors.primary,
             tabs: const [
-              Tab(text: 'Başvurular'),
+              Tab(text: 'Talepler'),
               Tab(text: 'Kullanıcılar'),
             ],
           ),
         ),
         body: const TabBarView(
           children: [
-            _ApplicationsTab(),
+            _ClaimsTab(),
             _UsersTab(),
           ],
         ),
@@ -50,21 +50,21 @@ String _parseError(Object e, String fallback) {
   return fallback;
 }
 
-// ── Başvurular sekmesi ────────────────────────────────────────────────────────
+// ── Sahiplik talepleri sekmesi ────────────────────────────────────────────────
 
-class _ApplicationsTab extends StatefulWidget {
-  const _ApplicationsTab();
+class _ClaimsTab extends StatefulWidget {
+  const _ClaimsTab();
 
   @override
-  State<_ApplicationsTab> createState() => _ApplicationsTabState();
+  State<_ClaimsTab> createState() => _ClaimsTabState();
 }
 
-class _ApplicationsTabState extends State<_ApplicationsTab> {
-  List<RestaurantApplicationModel> _apps = [];
+class _ClaimsTabState extends State<_ClaimsTab> {
+  List<RestaurantClaimModel> _claims = [];
   bool _loading = true;
   String? _error;
   bool _pendingOnly = true;
-  int? _busyId; // işlenen başvuru
+  int? _busyId; // işlenen talep
 
   @override
   void initState() {
@@ -78,98 +78,97 @@ class _ApplicationsTabState extends State<_ApplicationsTab> {
       _error = null;
     });
     try {
-      final apps = await AdminRepository.instance
-          .getApplications(pendingOnly: _pendingOnly);
+      final claims =
+          await AdminRepository.instance.getClaims(pendingOnly: _pendingOnly);
       if (mounted) {
         setState(() {
-          _apps = apps;
+          _claims = claims;
           _loading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Başvurular yüklenemedi.';
+          _error = 'Talepler yüklenemedi.';
           _loading = false;
         });
       }
     }
   }
 
-  void _snack(String msg, {bool error = false}) {
+  void _snack(String m, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? AppColors.error : AppColors.success,
+      content: Text(m),
+      backgroundColor: error ? AppColors.error : null,
       behavior: SnackBarBehavior.floating,
     ));
   }
 
-  Future<void> _approve(RestaurantApplicationModel app) async {
-    setState(() => _busyId = app.id);
+  Future<void> _approve(RestaurantClaimModel claim) async {
+    setState(() => _busyId = claim.id);
     try {
-      await AdminRepository.instance.approveApplication(app.id);
-      _snack('Başvuru onaylandı: ${app.restaurantName}');
+      await AdminRepository.instance.reviewClaim(claim.id, approve: true);
+      _snack('Talep onaylandı: ${claim.restaurantName}');
       await _load();
     } catch (e) {
-      _snack(_parseError(e, 'Onaylanamadı.'), error: true);
+      _snack(_parseError(e, 'Talep onaylanamadı.'), error: true);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
   }
 
-  Future<void> _reject(RestaurantApplicationModel app) async {
+  Future<void> _reject(RestaurantClaimModel claim) async {
     final noteCtrl = TextEditingController();
-    final confirm = await showDialog<bool>(
+    final onay = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
-        title: Text('Başvuruyu Reddet', style: AppTextStyles.titleSmall),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text('Talebi Reddet', style: AppTextStyles.titleSmall),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('"${app.restaurantName}" reddedilsin mi?',
-                style: AppTextStyles.bodySmall),
+            Text(
+              '"${claim.restaurantName}" için @${claim.username ?? ''} '
+              'tarafından açılan talep reddedilecek.',
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: ctx.textSecondaryColor),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: noteCtrl,
-              maxLines: 2,
-              style: AppTextStyles.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'Red sebebi (opsiyonel)',
-                hintStyle: AppTextStyles.bodySmall,
-                filled: true,
-                fillColor: ctx.surfaceElevatedColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: ctx.dividerColor),
-                ),
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Red sebebi (kullanıcı görecek)',
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Vazgeç')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child:
-                  const Text('Reddet', style: TextStyle(color: AppColors.error))),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Reddet'),
+          ),
         ],
       ),
     );
-    if (confirm != true) return;
+    if (onay != true) return;
 
-    setState(() => _busyId = app.id);
+    setState(() => _busyId = claim.id);
     try {
       await AdminRepository.instance
-          .rejectApplication(app.id, note: noteCtrl.text.trim());
-      _snack('Başvuru reddedildi.');
+          .reviewClaim(claim.id, approve: false, note: noteCtrl.text.trim());
+      _snack('Talep reddedildi.');
       await _load();
     } catch (e) {
-      _snack(_parseError(e, 'Reddedilemedi.'), error: true);
+      _snack(_parseError(e, 'Talep reddedilemedi.'), error: true);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
@@ -179,7 +178,6 @@ class _ApplicationsTabState extends State<_ApplicationsTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Filtre
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
@@ -217,17 +215,18 @@ class _ApplicationsTabState extends State<_ApplicationsTab> {
       return _CenteredMessage(
         icon: Icons.cloud_off_rounded,
         message: _error!,
-        action: OutlinedButton(onPressed: _load, child: const Text('Tekrar Dene')),
+        action:
+            OutlinedButton(onPressed: _load, child: const Text('Tekrar Dene')),
       );
     }
-    if (_apps.isEmpty) {
+    if (_claims.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 120),
           _CenteredMessage(
             icon: Icons.inbox_rounded,
-            message: 'Gösterilecek başvuru yok.',
+            message: 'Gösterilecek talep yok.',
           ),
         ],
       );
@@ -235,125 +234,144 @@ class _ApplicationsTabState extends State<_ApplicationsTab> {
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount: _apps.length,
-      itemBuilder: (_, i) => _AdminApplicationCard(
-        app: _apps[i],
-        busy: _busyId == _apps[i].id,
-        onApprove: () => _approve(_apps[i]),
-        onReject: () => _reject(_apps[i]),
+      itemCount: _claims.length,
+      itemBuilder: (_, i) => _AdminClaimCard(
+        claim: _claims[i],
+        busy: _busyId == _claims[i].id,
+        onApprove: () => _approve(_claims[i]),
+        onReject: () => _reject(_claims[i]),
       ),
     );
   }
 }
 
-class _AdminApplicationCard extends StatelessWidget {
-  const _AdminApplicationCard({
-    required this.app,
+class _AdminClaimCard extends StatelessWidget {
+  const _AdminClaimCard({
+    required this.claim,
     required this.busy,
     required this.onApprove,
     required this.onReject,
   });
-  final RestaurantApplicationModel app;
+  final RestaurantClaimModel claim;
   final bool busy;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
-  ({Color color, String label}) get _statusInfo => switch (app.status) {
-        ApplicationStatus.pending => (color: const Color(0xFFF59E0B), label: 'Bekliyor'),
-        ApplicationStatus.approved => (color: AppColors.success, label: 'Onaylı'),
-        ApplicationStatus.rejected => (color: AppColors.error, label: 'Red'),
-        ApplicationStatus.unknown => (color: AppColors.textSecondary, label: '—'),
+  ({Color color, String label}) get _statusInfo => switch (claim.status) {
+        ClaimStatus.pending =>
+          (color: const Color(0xFFF59E0B), label: 'Bekliyor'),
+        ClaimStatus.approved => (color: AppColors.success, label: 'Onaylı'),
+        ClaimStatus.rejected => (color: AppColors.error, label: 'Red'),
+        ClaimStatus.unknown => (color: AppColors.textSecondary, label: '—'),
       };
 
   @override
   Widget build(BuildContext context) {
     final s = _statusInfo;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(app.restaurantName,
-                    style: AppTextStyles.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: s.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
+    return GestureDetector(
+      // Karta dokunmak talebin tamamını açar: tam adres, talep sahibi,
+      // tarihler. Kartta yalnızca özet var.
+      onTap: () => _ClaimDetailSheet.show(context, claim),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(claim.restaurantName,
+                      style: AppTextStyles.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                 ),
-                child: Text(s.label,
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: s.color, fontWeight: FontWeight.w700)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${app.type == 'CLAIM' ? 'Sahiplik talebi' : 'Yeni restoran'} · '
-            '${[app.district, app.city].where((e) => e != null && e.isNotEmpty).join(', ')}',
-            style: AppTextStyles.bodySmall,
-          ),
-          if (app.applicantUsername != null) ...[
-            const SizedBox(height: 2),
-            Text('Başvuran: @${app.applicantUsername} (${app.applicantEmail ?? ''})',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
-          ],
-          if (app.isRejected && (app.adminNote?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 8),
-            Text('Red sebebi: ${app.adminNote}',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error)),
-          ],
-          if (app.isPending) ...[
-            const SizedBox(height: 12),
-            busy
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(6),
-                      child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.primary)),
-                    ),
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onReject,
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.error),
-                          label: const Text('Reddet'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: onApprove,
-                          icon: const Icon(Icons.check_rounded, size: 18),
-                          style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.success),
-                          label: const Text('Onayla'),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: s.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: Text(s.label,
+                      style: AppTextStyles.bodySmall.copyWith(
+                          color: s.color, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    claim.restaurantAddress?.trim().isNotEmpty == true
+                        ? claim.restaurantAddress!
+                        : 'Adres kayıtlı değil',
+                    style: AppTextStyles.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    size: 18, color: context.textSecondaryColor),
+              ],
+            ),
+            if (claim.username != null) ...[
+              const SizedBox(height: 2),
+              Text('Talep eden: @${claim.username}',
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.textSecondary)),
+            ],
+            if (claim.isRejected && (claim.adminNote?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 8),
+              Text('Red sebebi: ${claim.adminNote}',
+                  style:
+                      AppTextStyles.bodySmall.copyWith(color: AppColors.error)),
+            ],
+            if (claim.isPending) ...[
+              const SizedBox(height: 12),
+              busy
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(6),
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.primary)),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onReject,
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error),
+                            label: const Text('Reddet'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: onApprove,
+                            icon: const Icon(Icons.check_rounded, size: 18),
+                            style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.success),
+                            label: const Text('Onayla'),
+                          ),
+                        ),
+                      ],
+                    ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -555,6 +573,158 @@ class _CenteredMessage extends StatelessWidget {
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Talep Detayı ──────────────────────────────────────────────────────────────
+
+/// Talebin tamamını gösterir. Kartta yalnızca restoran adı ve adres özeti var;
+/// admin kararını verirken tam adresi ve talep sahibini görmeli.
+class _ClaimDetailSheet extends StatelessWidget {
+  const _ClaimDetailSheet({required this.claim});
+
+  final RestaurantClaimModel claim;
+
+  static Future<void> show(BuildContext context, RestaurantClaimModel claim) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.bgColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ClaimDetailSheet(claim: claim),
+    );
+  }
+
+  static String _tarih(DateTime? d) {
+    if (d == null) return '—';
+    final l = d.toLocal();
+    String iki(int n) => n.toString().padLeft(2, '0');
+    return '${iki(l.day)}.${iki(l.month)}.${l.year} ${iki(l.hour)}:${iki(l.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(claim.restaurantName, style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 4),
+              Text('Sahiplik talebi',
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.primary)),
+              const SizedBox(height: 20),
+
+              _DetaySatiri(
+                icon: Icons.location_on_rounded,
+                label: 'Adres',
+                value: claim.restaurantAddress?.trim().isNotEmpty == true
+                    ? claim.restaurantAddress!
+                    : 'Kayıtlı değil',
+              ),
+              _DetaySatiri(
+                icon: Icons.storefront_rounded,
+                label: 'Restoran ID',
+                value: '${claim.restaurantId}',
+              ),
+
+              const Divider(height: 32),
+
+              _DetaySatiri(
+                icon: Icons.person_rounded,
+                label: 'Talep eden',
+                value: [
+                  if (claim.username != null) '@${claim.username}',
+                  'Kullanıcı ID: ${claim.userId}',
+                ].join('\n'),
+              ),
+              _DetaySatiri(
+                icon: Icons.schedule_rounded,
+                label: 'Talep tarihi',
+                value: _tarih(claim.createdAt),
+              ),
+              if (claim.reviewedAt != null)
+                _DetaySatiri(
+                  icon: Icons.fact_check_rounded,
+                  label: 'İnceleme tarihi',
+                  value: _tarih(claim.reviewedAt),
+                ),
+              if (claim.adminNote?.isNotEmpty == true)
+                _DetaySatiri(
+                  icon: Icons.report_gmailerrorred_rounded,
+                  label: 'Admin notu',
+                  value: claim.adminNote!,
+                  color: AppColors.error,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetaySatiri extends StatelessWidget {
+  const _DetaySatiri({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: color ?? context.textSecondaryColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: context.textSecondaryColor)),
+                const SizedBox(height: 2),
+                SelectableText(
+                  value,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: color ?? context.textPrimaryColor),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

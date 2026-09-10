@@ -124,61 +124,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Restoran sahibi kaydı: önce kullanıcı oluşturur, sonra restoran başvurusu gönderir.
-  /// Başvuru onaylanana kadar kullanıcı USER rolünde kalır.
-  Future<void> registerAsOwner({
-    required String username,
-    required String firstName,
-    required String lastName,
-    required String email,
-    required String password,
-    required String restaurantName,
-    required String city,
-    required String district,
-    required String addressLine1,
-    required String buildingNo,
-    String? addressLine2,
-    String? floorApartment,
-    String? postalCode,
-    String? contactPhone,
-    String? description,
-  }) async {
-    state = const AuthState.loading();
-    try {
-      // 1. Kullanıcı oluştur → token al
-      final authResponse = await _repo.register(
-        username: username,
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        password: password,
-      );
-      await _storage.saveTokens(
-        accessToken: authResponse.accessToken,
-        refreshToken: authResponse.refreshToken,
-        userId: authResponse.user.userId,
-      );
-
-      // 2. Restoran başvurusu gönder (token otomatik eklenir — DioClient interceptor)
-      await _repo.submitRestaurantApplication(
-        restaurantName: restaurantName,
-        city: city,
-        district: district,
-        addressLine1: addressLine1,
-        addressLine2: addressLine2,
-        buildingNo: buildingNo,
-        floorApartment: floorApartment,
-        postalCode: postalCode,
-        contactPhone: contactPhone,
-        description: description,
-      );
-
-      state = AuthState.authenticated(authResponse.user);
-    } catch (e) {
-      state = AuthState.unauthenticated(_parseError(e));
-    }
-  }
-
   /// Çıkış yap
   Future<void> logout() async {
     try {

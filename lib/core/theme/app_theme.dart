@@ -12,19 +12,19 @@ final class AppTheme {
   // ─── Aktif fontu tüm metin rollerine uygulayan yardımcı ─────────────────────
   static TextTheme _appTextTheme(TextTheme base, Color bodyColor) {
     return base.copyWith(
-      displayLarge:  base.displayLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
-      displayMedium: base.displayMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
-      displaySmall:  base.displaySmall?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
-      headlineLarge: base.headlineLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w900, color: bodyColor),
-      headlineMedium:base.headlineMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w700, color: bodyColor),
-      headlineSmall: base.headlineSmall?.copyWith(fontFamily: _font, fontWeight: FontWeight.w700, color: bodyColor),
-      titleLarge:    base.titleLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w700, color: bodyColor),
-      titleMedium:   base.titleMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w700, color: bodyColor),
-      titleSmall:    base.titleSmall?.copyWith(fontFamily: _font, fontWeight: FontWeight.w600, color: bodyColor),
-      bodyLarge:     base.bodyLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w400, color: bodyColor),
-      bodyMedium:    base.bodyMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w400, color: bodyColor),
-      bodySmall:     base.bodySmall?.copyWith(fontFamily: _font, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-      labelLarge:    base.labelLarge?.copyWith(fontFamily: _font, fontWeight: FontWeight.w600, color: bodyColor),
+      displayLarge:  base.displayLarge?.copyWith(fontFamily: _font, fontWeight: AppFonts.display, color: bodyColor),
+      displayMedium: base.displayMedium?.copyWith(fontFamily: _font, fontWeight: AppFonts.display, color: bodyColor),
+      displaySmall:  base.displaySmall?.copyWith(fontFamily: _font, fontWeight: AppFonts.display, color: bodyColor),
+      headlineLarge: base.headlineLarge?.copyWith(fontFamily: _font, fontWeight: AppFonts.display, color: bodyColor),
+      headlineMedium:base.headlineMedium?.copyWith(fontFamily: _font, fontWeight: AppFonts.heading, color: bodyColor),
+      headlineSmall: base.headlineSmall?.copyWith(fontFamily: _font, fontWeight: AppFonts.heading, color: bodyColor),
+      titleLarge:    base.titleLarge?.copyWith(fontFamily: _font, fontWeight: AppFonts.heading, color: bodyColor),
+      titleMedium:   base.titleMedium?.copyWith(fontFamily: _font, fontWeight: AppFonts.heading, color: bodyColor),
+      titleSmall:    base.titleSmall?.copyWith(fontFamily: _font, fontWeight: AppFonts.title, color: bodyColor),
+      bodyLarge:     base.bodyLarge?.copyWith(fontFamily: _font, fontWeight: AppFonts.body, color: bodyColor),
+      bodyMedium:    base.bodyMedium?.copyWith(fontFamily: _font, fontWeight: AppFonts.body, color: bodyColor),
+      bodySmall:     base.bodySmall?.copyWith(fontFamily: _font, fontWeight: AppFonts.body, color: AppColors.textSecondary),
+      labelLarge:    base.labelLarge?.copyWith(fontFamily: _font, fontWeight: AppFonts.title, color: bodyColor),
       labelMedium:   base.labelMedium?.copyWith(fontFamily: _font, fontWeight: FontWeight.w500, color: bodyColor),
       labelSmall:    base.labelSmall?.copyWith(fontFamily: _font, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
     );
@@ -58,7 +58,7 @@ final class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: _font,
           fontSize: 22,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFonts.heading,
           color: AppColors.textPrimary,
         ),
       ),
@@ -71,8 +71,8 @@ final class AppTheme {
         elevation: 0,
         showSelectedLabels: true,
         showUnselectedLabels: true,
-        selectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: FontWeight.w400),
+        selectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: AppFonts.title),
+        unselectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: AppFonts.body),
       ),
 
       cardTheme: CardThemeData(
@@ -89,7 +89,7 @@ final class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: AppFonts.title),
         ),
       ),
 
@@ -156,7 +156,7 @@ final class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: _font,
           fontSize: 22,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFonts.heading,
           color: AppColors.lightTextPrimary,
         ),
       ),
@@ -169,8 +169,8 @@ final class AppTheme {
         elevation: 0,
         showSelectedLabels: true,
         showUnselectedLabels: true,
-        selectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: FontWeight.w400),
+        selectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: AppFonts.title),
+        unselectedLabelStyle: TextStyle(fontFamily: _font, fontSize: 10, fontWeight: AppFonts.body),
       ),
 
       cardTheme: CardThemeData(
@@ -187,7 +187,7 @@ final class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: AppFonts.title),
         ),
       ),
 

@@ -3,6 +3,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+
+import '../../../core/data/turkiye_adres.dart';
+import '../../discover/providers/location_provider.dart';
+import '../../../core/location/location_service.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/auth/token_storage.dart';
 import '../../../core/network/wishlist_repository.dart';
@@ -11,7 +15,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../rating/providers/rating_flow_provider.dart';
-import '../../rating/screens/add_rating_screen.dart';
+import '../../../shared/widgets/rating_sheet.dart';
 
 class MapFullScreen extends ConsumerStatefulWidget {
   final List<RestaurantModel> initialRestaurants;
@@ -24,6 +28,36 @@ class MapFullScreen extends ConsumerStatefulWidget {
 
 class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   static const _istanbul = LatLng(41.0082, 28.9784);
+
+  /// Konum şeridi kapatıldı mı? (Bu oturum için.)
+  bool _konumSeridiKapali = false;
+
+  /// Harita nereye ortalansın?
+  ///
+  /// Konum izni yoksa haritayı ENGELLEMİYORUZ — restoran koordinatları
+  /// sunucudan geliyor, harita kullanıcının nerede olduğunu bilmeden de
+  /// işini görüyor. Sadece seçili konuma ortalıyoruz.
+  LatLng get _center {
+    final loc = ref.watch(selectedLocationProvider);
+    if (loc.hasKoordinat) {
+      return LatLng(loc.latitude!, loc.longitude!);
+    }
+    // Konum yoksa: seçili ilçe/ildeki restoranların ortalaması.
+    final eslesen = widget.initialRestaurants.where((r) {
+      if (r.latitude == null || r.longitude == null) return false;
+      final hedef = loc.hasIlce ? loc.ilce! : loc.il;
+      final alan = loc.hasIlce ? r.district : r.city;
+      return alan != null &&
+          TurkiyeAdres.aramaAnahtari(alan) ==
+              TurkiyeAdres.aramaAnahtari(hedef);
+    }).toList();
+    if (eslesen.isEmpty) return _istanbul;
+    final lat = eslesen.map((r) => r.latitude!).reduce((a, b) => a + b) /
+        eslesen.length;
+    final lng = eslesen.map((r) => r.longitude!).reduce((a, b) => a + b) /
+        eslesen.length;
+    return LatLng(lat, lng);
+  }
 
   static const _categories = [
     'Burger', 'Pizza', 'Kebap', 'Sushi', 'Tavuk',
@@ -176,15 +210,92 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
           .read(ratingFlowProvider.notifier)
           .jumpToRateItem(restaurant, selectedItem);
 
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => const AddRatingScreen(),
-      );
+      await RatingSheet.show(context);
 
       ref.read(ratingFlowProvider.notifier).reset();
     }
+  }
+
+  Widget _buildKonumSeridi() {
+    final loc = ref.watch(selectedLocationProvider);
+    // Konum zaten GPS'ten geliyorsa şeride gerek yok.
+    if (loc.source == LocationSource.gps) return const SizedBox.shrink();
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 64, left: 12, right: 12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.my_location_rounded,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    'Sana en yakınındaki yemekleri gösterebilmemiz için '
+                    'konumunu aç.',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: Colors.white),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _konumIste,
+                  child: Text('Aç',
+                      style: AppTextStyles.labelLarge
+                          .copyWith(color: AppColors.primary)),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded,
+                      size: 18, color: Colors.white.withValues(alpha: 0.7)),
+                  onPressed: () =>
+                      setState(() => _konumSeridiKapali = true),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _konumIste() async {
+    final notifier = ref.read(selectedLocationProvider.notifier);
+    final r = await notifier.requestGps();
+    if (!mounted) return;
+    if (r.isOk) {
+      setState(() => _konumSeridiKapali = true);
+      return;
+    }
+    final mesaj = switch (r.outcome) {
+      LocationOutcome.serviceDisabled =>
+        'Cihazının konum servisi kapalı. Ayarlardan açabilirsin.',
+      LocationOutcome.deniedForever =>
+        'Konum izni kapalı. Ayarlar\u2019dan açabilirsin.',
+      _ => 'Konum alınamadı. Şehri kendin seçebilirsin.',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mesaj),
+        behavior: SnackBarBehavior.floating,
+        action: r.outcome == LocationOutcome.deniedForever
+            ? SnackBarAction(
+                label: 'Ayarlar',
+                // Varsayılan aksiyon rengi açık temada beyaz zemin üstünde
+                // beyaz kalıyor ve buton hiç görünmüyordu.
+                textColor: AppColors.primary,
+                onPressed: LocationService.openSettings)
+            : null,
+      ),
+    );
   }
 
   @override
@@ -195,7 +306,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
           // ── Harita ──────────────────────────────────────────────────
           FlutterMap(
             options: MapOptions(
-              initialCenter: _istanbul,
+              initialCenter: _center,
               initialZoom: 12,
             ),
             children: [
@@ -209,6 +320,12 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
               MarkerLayer(markers: _buildMarkers()),
             ],
           ),
+
+          // ── Konum şeridi ────────────────────────────────────────────
+          // Engellemez, kapatılabilir. Konum izni olmayan kullanıcı
+          // haritayı yine de kullanabilsin diye böyle: haritanın işi
+          // "restoranlar nerede", "ben neredeyim" değil.
+          if (!_konumSeridiKapali) _buildKonumSeridi(),
 
           // ── Geri butonu ─────────────────────────────────────────────
           SafeArea(

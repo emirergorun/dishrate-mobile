@@ -44,6 +44,8 @@ dependencies:
   image_picker: ^1.2.3
   http_parser: ^4.1.2
   crop_your_image: ^2.0.0
+  geolocator: ^14.0.3
+  geocoding: ^5.0.0
 
 dev_dependencies:
   flutter_test:
@@ -105,6 +107,7 @@ flutter:
   assets:
     - assets/images/
     - assets/branding/
+    - assets/data/
 
   # Aktif font AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart).
   # Her iki aile de aynı ağırlık skalasını sunar: 300/400/400i/500/500i/600/700/700i/900

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/turkce.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../providers/rating_flow_provider.dart';
 
@@ -181,7 +182,8 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text(
-                category.toUpperCase(),
+                // Dart'ın toUpperCase()'i "Diğer"i DIĞER yapıyor (İ yerine I).
+                Turkce.buyuk(category),
                 style: AppTextStyles.labelSmall.copyWith(
                   color: AppColors.textDisabled,
                   letterSpacing: 1.2,

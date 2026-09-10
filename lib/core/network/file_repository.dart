@@ -44,6 +44,16 @@ class FileRepository {
     return (response.data as Map)['url'] as String;
   }
 
+  /// Sunucudaki bir görseli ham bayt olarak indirir.
+  /// Kayıtlı özgün fotoğrafı yeniden çerçevelemek için kullanılır.
+  Future<Uint8List> downloadBytes(String url) async {
+    final response = await _dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(response.data!);
+  }
+
   MediaType _mediaTypeFor(XFile file) {
     final mime = file.mimeType;
     if (mime != null && mime.contains('/')) {

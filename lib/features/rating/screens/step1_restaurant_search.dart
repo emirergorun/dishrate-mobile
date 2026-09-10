@@ -205,12 +205,18 @@ class _HintChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        // Sabit koyu zemin açık temada kara lekeler gibi duruyordu. Marka
+        // turuncusunun soluk hâli iki temada da zeminle uyumlu kalıyor.
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.primary.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.divider),
+          border:
+              Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
         ),
-        child: Text(label, style: AppTextStyles.bodySmall),
+        child: Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+        ),
       ),
     );
   }

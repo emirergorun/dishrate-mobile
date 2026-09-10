@@ -6,7 +6,16 @@ class UserModel {
   final String? firstName;
   final String? lastName;
   final String email;
+  /// Kırpılmış, ekranda gösterilen hâli.
   final String? profilePhotoUrl;
+
+  /// Kırpılmamış özgün yükleme. Fotoğrafı yeniden çerçevelerken galeriden
+  /// tekrar seçmeye gerek kalmasın diye saklanır.
+  final String? profilePhotoOriginalUrl;
+
+  /// Özgün görsel üzerindeki kırpma dikdörtgeni: "x,y,genişlik,yükseklik".
+  final String? profilePhotoCrop;
+
   final String? bio;
   final UserRole role;
 
@@ -21,10 +30,18 @@ class UserModel {
     this.lastName,
     required this.email,
     this.profilePhotoUrl,
+    this.profilePhotoOriginalUrl,
+    this.profilePhotoCrop,
     this.bio,
     this.role = UserRole.user,
     this.nameChangeAvailableAt,
   });
+
+  /// Yeniden çerçevelenebilecek bir özgün görsel var mı?
+  /// (Eski kayıtlarda yalnızca kırpılmış hâli olabilir.)
+  bool get canRecropPhoto =>
+      profilePhotoOriginalUrl != null &&
+      profilePhotoOriginalUrl!.trim().isNotEmpty;
 
   /// İsim/soyisim şu an değiştirilebilir mi? (15 günlük pencere dolmuş mu)
   bool get canChangeName =>
@@ -47,13 +64,25 @@ class UserModel {
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       email: json['email'] as String,
-      profilePhotoUrl: json['profilePhotoUrl'] as String?,
+      // Fotoğraf kaldırıldığında sunucuya boş metin gidiyor. Boşu null'a
+      // çevirmezsek `profilePhotoUrl != null` kontrolleri doğru kalır ve
+      // kaldırılan fotoğrafın yerinde kırık görsel görünür.
+      profilePhotoUrl: _bosuNull(json['profilePhotoUrl'] as String?),
+      profilePhotoOriginalUrl:
+          _bosuNull(json['profilePhotoOriginalUrl'] as String?),
+      profilePhotoCrop: _bosuNull(json['profilePhotoCrop'] as String?),
       bio: json['bio'] as String?,
       role: _parseRole(json['role'] as String?),
       nameChangeAvailableAt: json['nameChangeAvailableAt'] != null
           ? DateTime.tryParse(json['nameChangeAvailableAt'] as String)
           : null,
     );
+  }
+
+  static String? _bosuNull(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   static UserRole _parseRole(String? raw) {

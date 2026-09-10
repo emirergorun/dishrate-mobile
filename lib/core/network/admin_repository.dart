@@ -1,6 +1,6 @@
 import '../constants/api_constants.dart';
 import 'dio_client.dart';
-import '../../shared/models/restaurant_application_model.dart';
+import '../../shared/models/restaurant_claim_model.dart';
 import '../../shared/models/user_model.dart';
 
 class AdminRepository {
@@ -9,32 +9,34 @@ class AdminRepository {
 
   final _dio = DioClient.instance;
 
-  // ── Başvurular ──────────────────────────────────────────────────────────────
+  // ── Sahiplik talepleri ──────────────────────────────────────────────────────
 
-  /// Tüm başvurular (pendingOnly=true → sadece bekleyenler).
-  Future<List<RestaurantApplicationModel>> getApplications({
-    bool pendingOnly = false,
-  }) async {
+  /// Talepler. Varsayılan olarak yalnızca bekleyenler gelir.
+  Future<List<RestaurantClaimModel>> getClaims({bool pendingOnly = true}) async {
     final response = await _dio.get(
-      '${ApiConstants.admin}/applications',
+      '${ApiConstants.admin}/claims',
       queryParameters: {'pendingOnly': pendingOnly},
     );
     final list = response.data as List<dynamic>;
     return list
-        .map((e) =>
-            RestaurantApplicationModel.fromJson(e as Map<String, dynamic>))
+        .map((e) => RestaurantClaimModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  Future<void> approveApplication(int id) async {
-    await _dio.post('${ApiConstants.admin}/applications/$id/approve');
-  }
-
-  Future<void> rejectApplication(int id, {String? note}) async {
-    await _dio.post(
-      '${ApiConstants.admin}/applications/$id/reject',
-      data: {if (note != null && note.isNotEmpty) 'adminNote': note},
+  /// Talebi sonuçlandırır. Onay ve red aynı uçtan gider — karar gövdede.
+  Future<RestaurantClaimModel> reviewClaim(
+    int id, {
+    required bool approve,
+    String? note,
+  }) async {
+    final response = await _dio.patch(
+      '${ApiConstants.admin}/claims/$id',
+      data: {
+        'status': approve ? 'APPROVED' : 'REJECTED',
+        if (note != null && note.isNotEmpty) 'adminNote': note,
+      },
     );
+    return RestaurantClaimModel.fromJson(response.data as Map<String, dynamic>);
   }
 
   // ── Kullanıcılar ────────────────────────────────────────────────────────────

@@ -25,6 +25,8 @@ class UserRepository {
     String? lastName,
     String? bio,
     String? profilePhotoUrl,
+    String? profilePhotoOriginalUrl,
+    String? profilePhotoCrop,
   }) async {
     final response = await _dio.patch(
       '${ApiConstants.users}/$userId',
@@ -34,6 +36,9 @@ class UserRepository {
         if (lastName != null) 'lastName': lastName,
         if (bio != null) 'bio': bio,
         if (profilePhotoUrl != null) 'profilePhotoUrl': profilePhotoUrl,
+        if (profilePhotoOriginalUrl != null)
+          'profilePhotoOriginalUrl': profilePhotoOriginalUrl,
+        if (profilePhotoCrop != null) 'profilePhotoCrop': profilePhotoCrop,
       },
     );
     return UserModel.fromJson(response.data as Map<String, dynamic>);

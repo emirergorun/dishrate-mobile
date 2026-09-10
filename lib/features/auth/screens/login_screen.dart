@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
 import 'welcome_screen.dart';
@@ -214,8 +215,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 // ── Kayıt ekranı burada da tanımlı — circular import olmadan ──────────────────
 
-enum _AccountType { user, restaurantOwner }
-
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -236,19 +235,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isLoading = false;
 
   // Hesap türü
-  _AccountType _accountType = _AccountType.user;
 
   // Restoran alanları
-  final _restaurantNameController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _districtController = TextEditingController();
-  final _addressLine1Controller = TextEditingController();
-  final _addressLine2Controller = TextEditingController();
-  final _buildingNoController = TextEditingController();
-  final _floorApartmentController = TextEditingController();
-  final _postalCodeController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  // Ülke kodu numaradan ayrı tutulur; şimdilik yalnızca Türkiye.
 
   @override
   void dispose() {
@@ -257,53 +246,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _restaurantNameController.dispose();
-    _cityController.dispose();
-    _districtController.dispose();
-    _addressLine1Controller.dispose();
-    _addressLine2Controller.dispose();
-    _buildingNoController.dispose();
-    _floorApartmentController.dispose();
-    _postalCodeController.dispose();
-    _phoneController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
-  bool get _isOwner => _accountType == _AccountType.restaurantOwner;
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    if (_isOwner) {
-      await ref.read(authProvider.notifier).registerAsOwner(
-            username: _usernameController.text.trim(),
-            firstName: _firstNameController.text.trim(),
-            lastName: _lastNameController.text.trim(),
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-            restaurantName: _restaurantNameController.text.trim(),
-            city: _cityController.text.trim(),
-            district: _districtController.text.trim(),
-            addressLine1: _addressLine1Controller.text.trim(),
-            addressLine2: _addressLine2Controller.text.trim(),
-            buildingNo: _buildingNoController.text.trim(),
-            floorApartment: _floorApartmentController.text.trim(),
-            postalCode: _postalCodeController.text.trim(),
-            contactPhone: _phoneController.text.trim(),
-            description: _descriptionController.text.trim(),
-          );
-    } else {
-      await ref.read(authProvider.notifier).register(
-            username: _usernameController.text.trim(),
-            firstName: _firstNameController.text.trim(),
-            lastName: _lastNameController.text.trim(),
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          );
-    }
+
+    await ref.read(authProvider.notifier).register(
+          username: _usernameController.text.trim(),
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -360,13 +319,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 'Yemek günlüğünü oluşturmaya başla!',
                 style: AppTextStyles.bodyMedium
                     .copyWith(color: context.textSecondaryColor),
-              ),
-              const SizedBox(height: 28),
-
-              // ── Hesap Türü Toggle ──────────────────────────────────────────
-              _AccountTypeToggle(
-                selected: _accountType,
-                onChanged: (t) => setState(() => _accountType = t),
               ),
               const SizedBox(height: 28),
 
@@ -437,12 +389,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       hint: 'ornek@email.com',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'E-posta gerekli';
-                        if (!v.contains('@')) return 'Geçerli bir e-posta gir';
-                        return null;
-                      },
+                      validator: EmailValidator.validate,
                     ),
                     const SizedBox(height: 16),
                     _AuthTextField(
@@ -450,10 +397,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: 'Şifre',
                       hint: 'En az 8 karakter',
                       obscureText: _obscurePassword,
-                      textInputAction: _isOwner
-                          ? TextInputAction.next
-                          : TextInputAction.done,
-                      onFieldSubmitted: _isOwner ? null : (_) => _submit(),
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
                       onChanged: (_) => setState(() {}), // kural listesi güncellensin
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -508,29 +453,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ],
 
-                    // ── Restoran Alanları (animasyonlu) ─────────────────────
-                    AnimatedCrossFade(
-                      duration: const Duration(milliseconds: 280),
-                      crossFadeState: _isOwner
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
-                      firstChild: const SizedBox.shrink(),
-                      secondChild: _RestaurantFields(
-                        nameController: _restaurantNameController,
-                        addressLine1Controller: _addressLine1Controller,
-                        addressLine2Controller: _addressLine2Controller,
-                        buildingNoController: _buildingNoController,
-                        floorApartmentController: _floorApartmentController,
-                        postalCodeController: _postalCodeController,
-                        cityController: _cityController,
-                        districtController: _districtController,
-                        phoneController: _phoneController,
-                        descriptionController: _descriptionController,
-                        onSubmit: _submit,
-                        isActive: _isOwner,
-                      ),
-                    ),
-
                     const SizedBox(height: 28),
 
                     // ── Submit Butonu ────────────────────────────────────────
@@ -559,7 +481,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                               )
                             : Text(
-                                _isOwner ? 'Başvuru Gönder' : 'Kayıt Ol',
+                                'Kayıt Ol',
                                 style: AppTextStyles.titleSmall.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
@@ -568,16 +490,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
 
-                    if (_isOwner) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Başvurunuz incelendikten sonra restoran sahibi olarak onaylanacaksınız.',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: context.textSecondaryColor,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -617,285 +529,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
 // ── Hesap Türü Toggle ─────────────────────────────────────────────────────────
 
-class _AccountTypeToggle extends StatelessWidget {
-  const _AccountTypeToggle({
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final _AccountType selected;
-  final ValueChanged<_AccountType> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          _ToggleTab(
-            label: 'Kullanıcı',
-            icon: Icons.person_rounded,
-            isSelected: selected == _AccountType.user,
-            onTap: () => onChanged(_AccountType.user),
-          ),
-          _ToggleTab(
-            label: 'Restoran Sahibiyim',
-            icon: Icons.storefront_rounded,
-            isSelected: selected == _AccountType.restaurantOwner,
-            onTap: () => onChanged(_AccountType.restaurantOwner),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleTab extends StatelessWidget {
-  const _ToggleTab({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? Colors.white : context.textSecondaryColor,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: isSelected ? Colors.white : context.textSecondaryColor,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Restoran Kayıt Alanları ───────────────────────────────────────────────────
-
-class _RestaurantFields extends StatelessWidget {
-  const _RestaurantFields({
-    required this.nameController,
-    required this.cityController,
-    required this.districtController,
-    required this.addressLine1Controller,
-    required this.addressLine2Controller,
-    required this.buildingNoController,
-    required this.floorApartmentController,
-    required this.postalCodeController,
-    required this.phoneController,
-    required this.descriptionController,
-    required this.onSubmit,
-    required this.isActive,
-  });
-
-  final TextEditingController nameController;
-  final TextEditingController cityController;
-  final TextEditingController districtController;
-  final TextEditingController addressLine1Controller;
-  final TextEditingController addressLine2Controller;
-  final TextEditingController buildingNoController;
-  final TextEditingController floorApartmentController;
-  final TextEditingController postalCodeController;
-  final TextEditingController phoneController;
-  final TextEditingController descriptionController;
-  final VoidCallback onSubmit;
-
-  /// Restoran sahibi modu açık mı? AnimatedCrossFade gizlenen alanları
-  /// widget ağacından çıkarmadığı için, kapalıyken doğrulama yapılmamalı —
-  /// yoksa normal kullanıcı kaydında form görünmez şekilde geçersiz kalır.
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(child: Divider(color: context.dividerColor)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'Restoran Bilgileri',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: context.textSecondaryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: context.dividerColor)),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _AuthTextField(
-          controller: nameController,
-          label: 'Restoran Adı',
-          hint: '',
-          textInputAction: TextInputAction.next,
-          validator: (v) {
-            if (!isActive) return null;
-            if (v == null || v.trim().isEmpty) return 'Restoran adı gerekli';
-            return null;
-          },
-        ),
-
-        // ── Adres ─────────────────────────────────────────────────────────
-        const SizedBox(height: 20),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Adres',
-            style: AppTextStyles.bodySmall.copyWith(
-              color: context.textSecondaryColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _AuthTextField(
-          controller: addressLine1Controller,
-          label: 'Adres Satırı 1',
-          hint: 'Mahalle, cadde/sokak',
-          textInputAction: TextInputAction.next,
-          validator: (v) {
-            if (!isActive) return null;
-            if (v == null || v.trim().isEmpty) {
-              return 'Mahalle ve cadde/sokak gerekli';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        _AuthTextField(
-          controller: addressLine2Controller,
-          label: 'Adres Satırı 2 (opsiyonel)',
-          hint: 'Site / apartman adı',
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _AuthTextField(
-                controller: buildingNoController,
-                label: 'Bina No',
-                hint: '',
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (!isActive) return null;
-                  if (v == null || v.trim().isEmpty) return 'Bina no gerekli';
-                  return null;
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _AuthTextField(
-                controller: floorApartmentController,
-                label: 'Kat / Daire',
-                hint: 'Opsiyonel',
-                textInputAction: TextInputAction.next,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _AuthTextField(
-                controller: districtController,
-                label: 'İlçe',
-                hint: '',
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (!isActive) return null;
-                  if (v == null || v.trim().isEmpty) return 'İlçe gerekli';
-                  return null;
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _AuthTextField(
-                controller: cityController,
-                label: 'Şehir',
-                hint: '',
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (!isActive) return null;
-                  if (v == null || v.trim().isEmpty) return 'Şehir gerekli';
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _AuthTextField(
-          controller: postalCodeController,
-          label: 'Posta Kodu (opsiyonel)',
-          hint: '',
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        _AuthTextField(
-          controller: phoneController,
-          label: 'Telefon (opsiyonel)',
-          hint: '',
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        _AuthTextField(
-          controller: descriptionController,
-          label: 'Açıklama (opsiyonel)',
-          hint: 'Restoranınız hakkında kısa bilgi...',
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => onSubmit(),
-          maxLines: 3,
-        ),
-      ],
-    );
-  }
-}
-
-// ── Ortak TextField ───────────────────────────────────────────────────────────
-
 class _AuthTextField extends StatelessWidget {
   const _AuthTextField({
     required this.controller,
@@ -908,7 +541,6 @@ class _AuthTextField extends StatelessWidget {
     this.onChanged,
     this.suffixIcon,
     this.validator,
-    this.maxLines = 1,
   });
 
   final TextEditingController controller;
@@ -921,7 +553,6 @@ class _AuthTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
-  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -944,8 +575,7 @@ class _AuthTextField extends StatelessWidget {
           onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
           validator: validator,
-          maxLines: maxLines,
-          style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMedium.copyWith(
             color: context.textPrimaryColor,
           ),
           decoration: InputDecoration(

@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/discover/screens/discover_screen.dart';
 import '../../features/search/screens/search_screen.dart';
-import '../../features/rating/screens/add_rating_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import 'rating_sheet.dart';
 
 /// Uygulama içinden sekme değiştirmek için (örn. profildeki "Değerlendirme"
 /// sayacına dokununca Günlük sekmesine geçmek). Ekran indeksi:
@@ -53,12 +53,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   Future<void> _openAddRatingModal() async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _AddRatingSheet(),
-    );
+    await RatingSheet.show(context);
     // Puan eklenmiş olabilir → profil verisini tazele
     if (mounted) ref.read(profileRefreshProvider.notifier).state++;
   }
@@ -228,37 +223,3 @@ class _AddButton extends StatelessWidget {
   }
 }
 
-// ── Puan Ekle Modal ───────────────────────────────────────────────────────────
-
-class _AddRatingSheet extends StatelessWidget {
-  const _AddRatingSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: const Column(
-        children: [
-          SizedBox(height: 12),
-          // Tutma çubuğu
-          SizedBox(
-            width: 40,
-            height: 4,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.all(Radius.circular(2)),
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-          Expanded(child: AddRatingScreen()),
-        ],
-      ),
-    );
-  }
-}

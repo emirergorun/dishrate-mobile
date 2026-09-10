@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/application_repository.dart';
+import '../../../core/network/claim_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/models/restaurant_application_model.dart';
+import '../../../shared/models/restaurant_claim_model.dart';
+import 'restaurant_claim_screen.dart';
 
-class ApplicationStatusScreen extends StatefulWidget {
-  const ApplicationStatusScreen({super.key});
+/// Kullanıcının açtığı sahiplik taleplerinin durumu.
+class ClaimStatusScreen extends StatefulWidget {
+  const ClaimStatusScreen({super.key});
 
   @override
-  State<ApplicationStatusScreen> createState() =>
-      _ApplicationStatusScreenState();
+  State<ClaimStatusScreen> createState() => _ClaimStatusScreenState();
 }
 
-class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
-  List<RestaurantApplicationModel> _applications = [];
+class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
+  List<RestaurantClaimModel> _claims = [];
   bool _loading = true;
   String? _error;
 
@@ -30,21 +31,29 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
       _error = null;
     });
     try {
-      final apps = await ApplicationRepository.instance.getMyApplications();
+      final claims = await ClaimRepository.instance.myClaims();
       if (mounted) {
         setState(() {
-          _applications = apps;
+          _claims = claims;
           _loading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Başvurular yüklenemedi.';
+          _error = 'Talepler yüklenemedi.';
           _loading = false;
         });
       }
     }
+  }
+
+  Future<void> _yeniTalep() async {
+    final gonderildi = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const RestaurantClaimScreen()),
+    );
+    if (gonderildi == true && mounted) _load();
   }
 
   @override
@@ -54,7 +63,7 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
       appBar: AppBar(
         backgroundColor: context.bgColor,
         elevation: 0,
-        title: Text('Başvuru Durumum', style: AppTextStyles.titleMedium),
+        title: Text('Sahiplik Taleplerim', style: AppTextStyles.titleMedium),
         iconTheme: IconThemeData(color: context.textPrimaryColor),
       ),
       body: RefreshIndicator(
@@ -74,18 +83,33 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
       return _CenteredMessage(
         icon: Icons.cloud_off_rounded,
         message: _error!,
-        action: OutlinedButton(onPressed: _load, child: const Text('Tekrar Dene')),
+        action:
+            OutlinedButton(onPressed: _load, child: const Text('Tekrar Dene')),
       );
     }
-    if (_applications.isEmpty) {
+    if (_claims.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 120),
-          _CenteredMessage(
+        children: [
+          const SizedBox(height: 120),
+          const _CenteredMessage(
             icon: Icons.storefront_outlined,
-            message:
-                'Henüz bir restoran başvurun yok.\nKayıt olurken "Restoran Sahibiyim" ile başvurabilirsin.',
+            message: 'Henüz bir sahiplik talebin yok.',
+          ),
+          const SizedBox(height: 20),
+          // Center şart: ListView çocuklarını yatayda gerdiği için buton
+          // ekranın iki kenarına yapışıyordu.
+          Center(
+            child: FilledButton.icon(
+              onPressed: _yeniTalep,
+              icon: const Icon(Icons.storefront_rounded, size: 18),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              label: const Text('Restoranımı Sahiplen'),
+            ),
           ),
         ],
       );
@@ -93,34 +117,34 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: _applications.length,
-      itemBuilder: (_, i) => _ApplicationCard(app: _applications[i]),
+      itemCount: _claims.length,
+      itemBuilder: (_, i) => _ClaimCard(claim: _claims[i]),
     );
   }
 }
 
-class _ApplicationCard extends StatelessWidget {
-  const _ApplicationCard({required this.app});
-  final RestaurantApplicationModel app;
+class _ClaimCard extends StatelessWidget {
+  const _ClaimCard({required this.claim});
+  final RestaurantClaimModel claim;
 
   ({Color color, String label, IconData icon}) get _statusInfo {
-    return switch (app.status) {
-      ApplicationStatus.pending => (
+    return switch (claim.status) {
+      ClaimStatus.pending => (
           color: const Color(0xFFF59E0B),
           label: 'İnceleniyor',
           icon: Icons.hourglass_top_rounded,
         ),
-      ApplicationStatus.approved => (
+      ClaimStatus.approved => (
           color: AppColors.success,
           label: 'Onaylandı',
           icon: Icons.check_circle_rounded,
         ),
-      ApplicationStatus.rejected => (
+      ClaimStatus.rejected => (
           color: AppColors.error,
           label: 'Reddedildi',
           icon: Icons.cancel_rounded,
         ),
-      ApplicationStatus.unknown => (
+      ClaimStatus.unknown => (
           color: AppColors.textSecondary,
           label: 'Bilinmiyor',
           icon: Icons.help_outline_rounded,
@@ -145,7 +169,7 @@ class _ApplicationCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(app.restaurantName,
+                child: Text(claim.restaurantName,
                     style: AppTextStyles.titleSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
@@ -170,39 +194,47 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.location_on_rounded,
-                  size: 13, color: AppColors.textSecondary),
-              const SizedBox(width: 3),
-              Text(
-                [app.district, app.city]
-                    .where((e) => e != null && e.isNotEmpty)
-                    .join(', '),
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-          if (app.isPending) ...[
-            const SizedBox(height: 12),
-            _InfoBanner(
-              color: s.color,
-              text: 'Başvurun inceleniyor. Onaylanınca restoran sahibi olacaksın.',
+          if ((claim.restaurantAddress ?? '').isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.location_on_rounded,
+                      size: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(claim.restaurantAddress!,
+                      style: AppTextStyles.bodySmall),
+                ),
+              ],
             ),
           ],
-          if (app.isApproved) ...[
+          if (claim.isPending) ...[
             const SizedBox(height: 12),
             _InfoBanner(
               color: s.color,
-              text: 'Tebrikler! Başvurun onaylandı. "Restoranım"dan menünü yönetebilirsin.',
+              text: 'Talebin inceleniyor. Onaylanınca restoranın sahibi '
+                  'olacaksın.',
             ),
           ],
-          if (app.isRejected && (app.adminNote?.isNotEmpty ?? false)) ...[
+          if (claim.isApproved) ...[
             const SizedBox(height: 12),
             _InfoBanner(
               color: s.color,
-              text: 'Red sebebi: ${app.adminNote}',
+              text: 'Tebrikler! Talebin onaylandı. "Restoranım"dan menünü '
+                  'yönetebilirsin.',
+            ),
+          ],
+          if (claim.isRejected) ...[
+            const SizedBox(height: 12),
+            _InfoBanner(
+              color: s.color,
+              text: (claim.adminNote?.isNotEmpty ?? false)
+                  ? 'Red sebebi: ${claim.adminNote}'
+                  : 'Talebin reddedildi. Tekrar deneyebilirsin.',
             ),
           ],
         ],
@@ -225,8 +257,8 @@ class _InfoBanner extends StatelessWidget {
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(text,
-          style: AppTextStyles.bodySmall.copyWith(color: color)),
+      child:
+          Text(text, style: AppTextStyles.bodySmall.copyWith(color: color)),
     );
   }
 }
