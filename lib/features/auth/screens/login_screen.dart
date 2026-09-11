@@ -85,7 +85,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 52),
 
               // ── Form ──────────────────────────────────────────────────────
-              Text('Giriş Yap', style: AppTextStyles.titleLarge),
+              const Text('Giriş Yap', style: AppTextStyles.titleLarge),
               const SizedBox(height: 24),
 
               Form(
@@ -313,7 +313,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
-              Text('Hesap Oluştur', style: AppTextStyles.headlineLarge),
+              const Text('Hesap Oluştur', style: AppTextStyles.headlineLarge),
               const SizedBox(height: 8),
               Text(
                 'Yemek günlüğünü oluşturmaya başla!',

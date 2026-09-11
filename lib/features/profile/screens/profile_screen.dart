@@ -284,7 +284,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
-        title: Text('Oturumu Kapat', style: AppTextStyles.titleSmall),
+        title: const Text('Oturumu Kapat', style: AppTextStyles.titleSmall),
         content: Text(
           'Oturumunu kapatmak istediğine emin misin?',
           style: AppTextStyles.bodySmall,
@@ -358,7 +358,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 SliverAppBar(
                   pinned: true,
                   backgroundColor: context.bgColor,
-                  title: Text('Profil', style: AppTextStyles.headlineMedium),
+                  title: const Text('Profil', style: AppTextStyles.headlineMedium),
                   actions: [
                     IconButton(
                       icon: Icon(Icons.settings_outlined,
@@ -399,7 +399,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                       // ── YÖNETİM (admin) ────────────────────────────
                       if (_user != null && _user!.isAdmin) ...[
-                        _SectionLabel('YÖNETİM'),
+                        const _SectionLabel('YÖNETİM'),
                         _ProfileItem(
                           icon: Icons.admin_panel_settings_rounded,
                           iconColor: AppColors.error,
@@ -416,7 +416,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       // ── RESTORAN (rol bazlı) ───────────────────────
                       if (_user != null &&
                           (_user!.isRestaurantOwner || _user!.isUser)) ...[
-                        _SectionLabel('RESTORAN'),
+                        const _SectionLabel('RESTORAN'),
                         if (_user!.isRestaurantOwner) ...[
                           _ProfileItem(
                             icon: Icons.storefront_rounded,
@@ -467,7 +467,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
 
                       // ── KEŞFEDİN ───────────────────────────────────
-                      _SectionLabel('KEŞFEDİN'),
+                      const _SectionLabel('KEŞFEDİN'),
                       _ProfileItem(
                         icon: Icons.favorite_rounded,
                         iconColor: const Color(0xFFE57373),
@@ -490,7 +490,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(height: 8),
 
                       // ── HESAP ───────────────────────────────────────
-                      _SectionLabel('HESAP'),
+                      const _SectionLabel('HESAP'),
                       _ProfileItem(
                         icon: Icons.edit_rounded,
                         label: 'Profili Düzenle',
@@ -513,7 +513,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(height: 8),
 
                       // ── DESTEK ──────────────────────────────────────
-                      _SectionLabel('DESTEK'),
+                      const _SectionLabel('DESTEK'),
                       _ProfileItem(
                         icon: Icons.chat_bubble_rounded,
                         label: 'Bize Ulaş',
@@ -548,7 +548,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(height: 8),
 
                       // ── TEHLİKELİ BÖLGE ─────────────────────────────
-                      _SectionLabel('TEHLİKELİ BÖLGE', color: AppColors.error),
+                      const _SectionLabel('TEHLİKELİ BÖLGE', color: AppColors.error),
                       _ProfileItem(
                         icon: Icons.ac_unit_rounded,
                         iconColor: AppColors.error,
@@ -1048,11 +1048,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
             child: Column(
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.edit_rounded,
+                    Icon(Icons.edit_rounded,
                         color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text('Profili Düzenle', style: AppTextStyles.titleSmall),
                   ],
                 ),
@@ -1270,13 +1270,13 @@ class _PrivacySheetState extends State<_PrivacySheet> {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
-                const Icon(Icons.lock_rounded,
+                Icon(Icons.lock_rounded,
                     color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Gizlilik ve Güvenlik', style: AppTextStyles.titleSmall),
               ],
             ),
@@ -1372,13 +1372,13 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
-                const Icon(Icons.notifications_rounded,
+                Icon(Icons.notifications_rounded,
                     color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Bildirimler', style: AppTextStyles.titleSmall),
               ],
             ),
@@ -1496,13 +1496,13 @@ class _ContactSheet extends StatelessWidget {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
-                const Icon(Icons.chat_bubble_rounded,
+                Icon(Icons.chat_bubble_rounded,
                     color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Bize Ulaş', style: AppTextStyles.titleSmall),
               ],
             ),
@@ -1572,13 +1572,13 @@ class _TermsSheet extends StatelessWidget {
       builder: (_, controller) => Column(
         children: [
           _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
             child: Row(
               children: [
-                const Icon(Icons.description_rounded,
+                Icon(Icons.description_rounded,
                     color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Kullanım Şartları', style: AppTextStyles.titleSmall),
               ],
             ),
@@ -1589,32 +1589,32 @@ class _TermsSheet extends StatelessWidget {
               controller: controller,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
-                _TermsSection(
+                const _TermsSection(
                   title: '1. Kabul',
                   body:
                       'Dishrate\'i kullanarak bu kullanım şartlarını kabul etmiş olursunuz. Şartları kabul etmiyorsanız uygulamayı kullanmayı bırakınız.',
                 ),
-                _TermsSection(
+                const _TermsSection(
                   title: '2. Kullanıcı İçeriği',
                   body:
                       'Paylaştığınız değerlendirmeler ve yorumlar size aittir. Ancak Dishrate, bu içerikleri platform içinde görüntüleme ve analiz etme hakkına sahiptir. Yanıltıcı, hakaret içerikli veya yasadışı içerik paylaşmak yasaktır.',
                 ),
-                _TermsSection(
+                const _TermsSection(
                   title: '3. Gizlilik',
                   body:
                       'Kişisel verileriniz 6698 sayılı KVKK kapsamında korunmaktadır. Verileriniz üçüncü şahıslarla paylaşılmaz. Ayrıntılı bilgi için Gizlilik Politikamızı inceleyiniz.',
                 ),
-                _TermsSection(
+                const _TermsSection(
                   title: '4. Hesap Güvenliği',
                   body:
                       'Hesabınızın güvenliğinden siz sorumlusunuz. Şifrenizi güçlü tutun ve başkalarıyla paylaşmayın. Yetkisiz erişim şüphesinde derhal bizimle iletişime geçin.',
                 ),
-                _TermsSection(
+                const _TermsSection(
                   title: '5. Hizmet Değişiklikleri',
                   body:
                       'Dishrate, herhangi bir bildirim yapmaksızın hizmeti geçici veya kalıcı olarak değiştirme ya da sonlandırma hakkını saklı tutar.',
                 ),
-                _TermsSection(
+                const _TermsSection(
                   title: '6. İletişim',
                   body:
                       'Sorularınız için destek@dishrate.app adresine e-posta gönderebilirsiniz.',
@@ -1701,7 +1701,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 const Icon(Icons.bookmark_rounded,
                     color: Color(0xFF81C784), size: 20),
                 const SizedBox(width: 8),
-                Text('İstek Listesi', style: AppTextStyles.titleSmall),
+                const Text('İstek Listesi', style: AppTextStyles.titleSmall),
                 const Spacer(),
                 Text('${_items.length} ürün', style: AppTextStyles.bodySmall),
               ],
@@ -1829,13 +1829,13 @@ class _FavoritesSheet extends StatelessWidget {
       builder: (_, controller) => Column(
         children: [
           _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
             child: Row(
               children: [
-                const Icon(Icons.favorite_rounded,
+                Icon(Icons.favorite_rounded,
                     color: Color(0xFFE57373), size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text('Favori Yemekler', style: AppTextStyles.titleSmall),
               ],
             ),
@@ -2054,8 +2054,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       if (!mounted) return;
       Navigator.pop(context);
       // Sheet kapandıktan sonra başarı mesajı artık görünür
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Şifren güncellendi.'),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Şifren güncellendi.'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
       ));
@@ -2118,7 +2118,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                     const Icon(Icons.key_rounded,
                         color: AppColors.primary, size: 20),
                     const SizedBox(width: 8),
-                    Text('Şifre Değiştir', style: AppTextStyles.titleSmall),
+                    const Text('Şifre Değiştir', style: AppTextStyles.titleSmall),
                     const Spacer(),
                     IconButton(
                       icon: Icon(
@@ -2317,7 +2317,7 @@ class _SheetItem extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
+              const Icon(Icons.chevron_right_rounded,
                   color: AppColors.textDisabled, size: 20),
             ],
           ),

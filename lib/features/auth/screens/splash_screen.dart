@@ -14,12 +14,12 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: Center(
+      body: const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const DishrateWordmark(width: 220),
-            const SizedBox(height: 40),
+            DishrateWordmark(width: 220),
+            SizedBox(height: 40),
             SizedBox(
               width: 24,
               height: 24,

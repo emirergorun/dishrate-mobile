@@ -125,7 +125,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       appBar: AppBar(
         backgroundColor: context.bgColor,
         elevation: 0,
-        title: Text('Bildirimler', style: AppTextStyles.titleMedium),
+        title: const Text('Bildirimler', style: AppTextStyles.titleMedium),
         iconTheme: IconThemeData(color: context.textPrimaryColor),
         actions: [
           if (_unread > 0)

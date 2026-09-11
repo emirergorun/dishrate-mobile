@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -37,8 +38,10 @@ class DishrateApp extends ConsumerWidget {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness:
             isDark ? Brightness.light : Brightness.dark,
+        // Android sistem çubuğu alt menüyle aynı tonda; ayrı sabit renk
+        // yazılınca palet değiştiğinde çubuk ile menü arasında şerit kalıyordu.
         systemNavigationBarColor:
-            isDark ? const Color(0xFF141414) : const Color(0xFFFFFFFF),
+            isDark ? AppColors.navBackground : AppColors.lightNavBackground,
         systemNavigationBarIconBrightness:
             isDark ? Brightness.light : Brightness.dark,
       ),

@@ -19,7 +19,7 @@ class AdminPanelScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: context.bgColor,
           elevation: 0,
-          title: Text('Admin Paneli', style: AppTextStyles.titleMedium),
+          title: const Text('Admin Paneli', style: AppTextStyles.titleMedium),
           iconTheme: IconThemeData(color: context.textPrimaryColor),
           bottom: TabBar(
             labelColor: AppColors.primary,
@@ -125,7 +125,7 @@ class _ClaimsTabState extends State<_ClaimsTab> {
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Talebi Reddet', style: AppTextStyles.titleSmall),
+        title: const Text('Talebi Reddet', style: AppTextStyles.titleSmall),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

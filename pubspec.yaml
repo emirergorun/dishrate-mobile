@@ -46,7 +46,7 @@ dependencies:
   crop_your_image: ^2.0.0
   geolocator: ^14.0.3
   geocoding: ^5.0.0
-
+  flutter_tabler_icons: ^1.43.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -109,9 +109,25 @@ flutter:
     - assets/branding/
     - assets/data/
 
-  # Aktif font AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart).
-  # Her iki aile de aynı ağırlık skalasını sunar: 300/400/400i/500/500i/600/700/700i/900
+  # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart);
+  # logo yazısı ("dishrate") her zaman Poppins'tir (AppFonts.wordmark).
   fonts:
+    # Denendi, karşılaştırma için duruyor (--dart-define=APP_FONT=Geist).
+    # Kaynak: github.com/vercel/geist-font (SIL OFL, lisans assets/fonts/GEIST-OFL.txt).
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Geist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Geist-Bold.ttf
+          weight: 700
+
+    # Logo kelime markası ("dishrate") ve karşılaştırma için.
     - family: Poppins
       fonts:
         - asset: assets/fonts/Poppins-Light.ttf
@@ -136,6 +152,7 @@ flutter:
         - asset: assets/fonts/Poppins-Black.ttf
           weight: 900
 
+    # Arayüz fontu. Türkçe harflerin tamamı var; fi/fl bitişik harfi yok.
     - family: Urbanist
       fonts:
         - asset: assets/fonts/Urbanist-Light.ttf

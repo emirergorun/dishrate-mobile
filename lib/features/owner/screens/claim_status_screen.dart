@@ -63,7 +63,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
       appBar: AppBar(
         backgroundColor: context.bgColor,
         elevation: 0,
-        title: Text('Sahiplik Taleplerim', style: AppTextStyles.titleMedium),
+        title: const Text('Sahiplik Taleplerim', style: AppTextStyles.titleMedium),
         iconTheme: IconThemeData(color: context.textPrimaryColor),
       ),
       body: RefreshIndicator(

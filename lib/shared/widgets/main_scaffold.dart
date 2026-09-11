@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_metrics.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../features/discover/screens/discover_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import 'pressable.dart';
 import 'rating_sheet.dart';
 
 /// Uygulama içinden sekme değiştirmek için (örn. profildeki "Değerlendirme"
@@ -106,17 +110,19 @@ class _DishRateBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60,
+          height: 56,
           child: Row(
             children: [
               _NavItem(
-                icon: Icons.home_rounded,
+                icon: TablerIcons.home,
+                activeIcon: TablerIcons.home_filled,
                 label: 'Keşfet',
                 isSelected: _activeNavIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
-                icon: Icons.search_rounded,
+                icon: TablerIcons.search,
+                activeIcon: TablerIcons.search,
                 label: 'Ara',
                 isSelected: _activeNavIndex == 1,
                 onTap: () => onTap(1),
@@ -124,13 +130,15 @@ class _DishRateBottomNav extends StatelessWidget {
               // Merkezi + butonu
               _AddButton(onTap: () => onTap(2)),
               _NavItem(
-                icon: Icons.menu_book_rounded,
+                icon: TablerIcons.notebook,
+                activeIcon: TablerIcons.notebook,
                 label: 'Günlük',
                 isSelected: _activeNavIndex == 3,
                 onTap: () => onTap(3),
               ),
               _NavItem(
-                icon: Icons.person_rounded,
+                icon: TablerIcons.user,
+                activeIcon: TablerIcons.user_filled,
                 label: 'Profil',
                 isSelected: _activeNavIndex == 4,
                 onTap: () => onTap(4),
@@ -146,12 +154,16 @@ class _DishRateBottomNav extends StatelessWidget {
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
+    required this.activeIcon,
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
 
   final IconData icon;
+
+  /// Seçili sekmede dolu ikon: yalnızca renk farkı küçük ikonda zor seçiliyor.
+  final IconData activeIcon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
@@ -159,27 +171,28 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color =
-        isSelected ? AppColors.navSelected : context.navUnselectedColor;
+        isSelected ? context.accentTextColor : context.navUnselectedColor;
 
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: color,
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(isSelected ? activeIcon : icon, color: color, size: 24),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: AppTextStyles.label.copyWith(fontSize: 11, color: color),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -192,29 +205,26 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Turuncu parıltı gölgesi kaldırıldı: şablon alt menülerinin en tanıdık
+    // imzasıydı. Buton zaten menüdeki tek dolu turuncu şekil; öne çıkması
+    // için gölgeye ihtiyacı yok.
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Center(
+      child: Center(
+        child: Pressable(
+          onTap: onTap,
+          scale: 0.92,
+          semanticLabel: 'Değerlendirme ekle',
           child: Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 40,
             decoration: BoxDecoration(
               color: AppColors.primary,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: const Icon(
-              Icons.add_rounded,
-              color: Colors.white,
-              size: 26,
+              TablerIcons.plus,
+              color: AppColors.onPrimary,
+              size: 22,
             ),
           ),
         ),
@@ -222,4 +232,3 @@ class _AddButton extends StatelessWidget {
     );
   }
 }
-

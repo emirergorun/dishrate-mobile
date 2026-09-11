@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/turkce.dart';
 import '../../../shared/models/menu_item_model.dart';
+import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../providers/rating_flow_provider.dart';
 
 class Step2MenuItemSelect extends ConsumerStatefulWidget {
@@ -52,7 +59,7 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Menü yüklenemedi. Lütfen tekrar dene.';
+          _error = 'Menü yüklenemedi';
           _isLoading = false;
         });
       }
@@ -72,46 +79,59 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
 
   @override
   Widget build(BuildContext context) {
-    final restaurant = ref.watch(ratingFlowProvider).selectedRestaurant!;
+    final restaurant = ref.watch(ratingFlowProvider).selectedRestaurant;
+    // Akış sıfırlanırken panel kapanana kadar bir kare daha çizilebiliyor.
+    if (restaurant == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Başlık ──────────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-          child: Text('Ne yedin?', style: AppTextStyles.headlineLarge),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
+          child: Text(
+            'Ne yedin?',
+            style: AppTextStyles.displayLarge
+                .copyWith(color: context.textPrimaryColor),
+          ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpace.screen, AppSpace.sm, AppSpace.screen, AppSpace.screen),
           child: Row(
             children: [
-              const Icon(Icons.storefront_rounded,
-                  color: AppColors.primary, size: 14),
-              const SizedBox(width: 5),
-              Text(restaurant.name,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.primary)),
+              Icon(TablerIcons.building_store,
+                  size: 16, color: context.textSecondaryColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  restaurant.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: context.textSecondaryColor),
+                ),
+              ),
             ],
           ),
         ),
 
         // ── Menü Arama ───────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
           child: TextField(
             controller: _searchController,
             style: AppTextStyles.bodyLarge,
             decoration: const InputDecoration(
-              hintText: 'Menüde ara...',
-              prefixIcon: Icon(Icons.search_rounded,
-                  color: AppColors.textSecondary),
+              hintText: 'Menüde ara',
+              prefixIcon: Icon(TablerIcons.search, size: 20),
             ),
             onChanged: _filter,
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpace.xs),
 
         // ── Menü Listesi ─────────────────────────────────────────────────
         Expanded(child: _buildContent()),
@@ -120,44 +140,51 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
   }
 
   Widget _buildContent() {
+    const pad = EdgeInsets.fromLTRB(
+        AppSpace.screen, AppSpace.lg, AppSpace.screen, 0);
+
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpace.screen, AppSpace.sm, AppSpace.screen, 0),
+        children: const [
+          SkeletonPulse(child: SkeletonRows(count: 5, leadingSize: 52)),
+        ],
       );
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline,
-                color: AppColors.error, size: 40),
-            const SizedBox(height: 12),
-            Text(_error!, style: AppTextStyles.bodyMedium),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _isLoading = true;
-                  _error = null;
-                });
-                _loadMenu();
-              },
-              child: const Text('Tekrar Dene'),
-            ),
-          ],
-        ),
+      return ListView(
+        padding: pad,
+        children: [
+          StateMessage(
+            title: _error!,
+            message: 'Bağlantını kontrol edip tekrar dene.',
+            actionLabel: 'Tekrar dene',
+            onAction: () {
+              setState(() {
+                _isLoading = true;
+                _error = null;
+              });
+              _loadMenu();
+            },
+          ),
+        ],
       );
     }
 
     if (_filteredItems.isEmpty) {
-      return Center(
-        child: Text(
-          'Menüde ürün bulunamadı.',
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: AppColors.textSecondary),
-        ),
+      final menuEmpty = _allItems.isEmpty;
+      return ListView(
+        padding: pad,
+        children: [
+          StateMessage(
+            title: menuEmpty ? 'Menü henüz boş' : 'Eşleşen yemek yok',
+            message: menuEmpty
+                ? 'Bu restoranın menüsü eklendiğinde buradan seçebileceksin.'
+                : 'Farklı bir kelimeyle aramayı dene.',
+          ),
+        ],
       );
     }
 
@@ -169,7 +196,7 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: AppSpace.screen),
       itemCount: grouped.length,
       itemBuilder: (context, groupIndex) {
         final category = grouped.keys.elementAt(groupIndex);
@@ -180,13 +207,15 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
           children: [
             // Kategori başlığı
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.screen, AppSpace.screen, 2),
               child: Text(
                 // Dart'ın toUpperCase()'i "Diğer"i DIĞER yapıyor (İ yerine I).
                 Turkce.buyuk(category),
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textDisabled,
-                  letterSpacing: 1.2,
+                style: AppTextStyles.label.copyWith(
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                  color: context.textSecondaryColor,
                 ),
               ),
             ),
@@ -206,6 +235,8 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
 
 // ── Menü öğesi listesi satırı ─────────────────────────────────────────────────
 
+/// Satırda kategori tekrar edilmiyor (grup başlığı zaten söylüyor) ve sağ ok
+/// yok: listenin tamamı dokunulabilir, her satıra ok koymak yalnızca gürültü.
 class _MenuItemTile extends StatelessWidget {
   const _MenuItemTile({required this.item, required this.onTap});
 
@@ -214,70 +245,40 @@ class _MenuItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Pressable(
       onTap: onTap,
+      scale: 0.98,
+      semanticLabel: item.name,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.screen, vertical: 10),
         child: Row(
           children: [
-            // Fotoğraf küçük görsel
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              clipBehavior: Clip.hardEdge,
-              child: item.photoUrl != null && item.photoUrl!.isNotEmpty
-                  ? Image.network(item.photoUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder())
-                  : _placeholder(),
+            DishPhoto(
+              url: item.photoUrl,
+              width: 52,
+              height: 52,
+              radius: AppRadius.sm,
+              iconSize: 20,
             ),
-            const SizedBox(width: 14),
-            // Bilgiler
+            const SizedBox(width: AppSpace.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.name, style: AppTextStyles.titleSmall),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (item.averageRating > 0) ...[
-                        const Icon(Icons.star_rounded,
-                            color: AppColors.star, size: 13),
-                        const SizedBox(width: 3),
-                        Text(
-                          item.averageRating.toStringAsFixed(1),
-                          style: AppTextStyles.ratingSmall
-                              .copyWith(fontSize: 12),
-                        ),
-                      ],
-                      if (item.categoryName != null) ...[
-                        if (item.averageRating > 0)
-                          const SizedBox(width: 8),
-                        Text(
-                          item.categoryName!,
-                          style: AppTextStyles.bodySmall,
-                        ),
-                      ],
-                    ],
+                  Text(
+                    item.name,
+                    style: AppTextStyles.titleSmall
+                        .copyWith(color: context.textPrimaryColor),
                   ),
+                  const SizedBox(height: 4),
+                  RatingInline(rating: item.averageRating),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
           ],
         ),
       ),
     );
   }
-
-  Widget _placeholder() => Container(
-        color: AppColors.divider,
-        child: const Icon(Icons.restaurant_rounded,
-            color: AppColors.textDisabled, size: 22),
-      );
 }

@@ -287,7 +287,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
         content: Text(mesaj),
         behavior: SnackBarBehavior.floating,
         action: r.outcome == LocationOutcome.deniedForever
-            ? SnackBarAction(
+            ? const SnackBarAction(
                 label: 'Ayarlar',
                 // Varsayılan aksiyon rengi açık temada beyaz zemin üstünde
                 // beyaz kalıyor ve buton hiç görünmüyordu.
@@ -486,7 +486,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
           ),
 
           const SizedBox(height: 12),
-          Divider(height: 1, color: AppColors.divider),
+          const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 4),
 
           // ── Menü içeriği ──────────────────────────────────────────
@@ -525,7 +525,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 itemCount: _items!.length,
                 separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: AppColors.divider),
+                    const Divider(height: 1, color: AppColors.divider),
                 itemBuilder: (context, i) => _MenuItemRow(
                   item: _items![i],
                   restaurant: widget.restaurant,

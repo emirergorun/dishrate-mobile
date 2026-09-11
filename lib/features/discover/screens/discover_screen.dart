@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/auth/token_storage.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/network/restaurant_repository.dart';
-import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
-import '../../../shared/models/restaurant_model.dart';
-import '../../rating/providers/rating_flow_provider.dart';
-import '../../../shared/widgets/rating_sheet.dart';
-import '../../restaurant/screens/restaurant_detail_screen.dart';
-import '../../reviews/screens/menu_item_reviews_screen.dart';
+import '../../../shared/widgets/dish_sheet.dart';
+import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../widgets/category_chips.dart';
-import '../widgets/menu_item_card.dart';
+import '../widgets/dish_layouts.dart';
 import '../widgets/section_header.dart';
 import '../providers/location_provider.dart';
 import '../../../core/data/turkiye_adres.dart';
@@ -23,8 +23,20 @@ import 'see_all_screen.dart';
 /// Başlıktaki "dishrate" kelime markasının punto'su. Harf aralığı buna
 /// oranla (−%2) hesaplanır, böylece punto değişse de logoyla oran korunur.
 ///
-/// 28'den 24'e indirildi: sağdaki konum yazısıyla arada nefes kalmıyordu.
+/// Başlık artık genişleyip daralmıyor: genişken yazı 1.5 kat büyüyüp konum
+/// yazısını da büyütüyor, kaydırınca ikisi birden zıplıyordu.
 const double _wordmarkSize = 24;
+
+/// Bölümün düzeni — bkz. `dish_layouts.dart`. Yan yana iki bölüm aynı
+/// düzeni kullanmıyor.
+enum _Layout { ranked, posters, wide, grid, list }
+
+typedef _Section = ({
+  String title,
+  String subtitle,
+  List<MenuItemModel> items,
+  _Layout layout,
+});
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -62,7 +74,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'İçerikler yüklenemedi.';
+          _error = 'İçerikler yüklenemedi';
           _loading = false;
         });
       }
@@ -84,6 +96,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     'Noodle',
   ];
 
+  bool get _allSelected =>
+      _selectedCategory == null || _selectedCategory == 'Tümü';
+
   // ── Bölüm üretimi ─────────────────────────────────────────────────────────
   // Backend henüz "trend / en çok istek listesinde / bu hafta" gibi sorguları
   // sunmadığından bölümler, mevcut alanlardan (puan, fiyat, kategori) istemci
@@ -97,7 +112,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   };
 
   List<MenuItemModel> _filtered(List<MenuItemModel> src) {
-    if (_selectedCategory == null || _selectedCategory == 'Tümü') return src;
+    if (_allSelected) return src;
     return src
         .where((item) => item.categoryName == _selectedCategory)
         .toList();
@@ -162,168 +177,178 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            SeeAllScreen(title: title, items: items, onItemTap: _showItemSheet),
+            SeeAllScreen(title: title, items: items, onItemTap: _openDish),
       ),
     );
   }
 
-  Future<void> _showItemSheet(MenuItemModel item) async {
-    final shouldRate = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _MenuItemSheet(item: item),
-    );
-    if (shouldRate == true && mounted) {
-      final restaurant = RestaurantModel(
-        restaurantId: item.restaurantId,
-        name: item.restaurantName,
-        city: item.city ?? 'İstanbul',
-        district: item.district,
-        fullAddress:
-            '${item.restaurantName}, ${item.district ?? item.city ?? "İstanbul"}',
-        latitude: item.restaurantLatitude,
-        longitude: item.restaurantLongitude,
-        categoryName: item.categoryName,
-      );
-      ref.read(ratingFlowProvider.notifier).jumpToRateItem(restaurant, item);
-      if (!mounted) return;
-      await RatingSheet.show(context);
+  Future<void> _openDish(MenuItemModel item) =>
+      DishSheet.open(context, ref, item);
+
+  /// Görünür bölümler — boş olanlar otomatik elenir.
+  ///
+  /// Başlıklar cümle düzeninde: Her Kelimesi Büyük Başlık altı bölümde üst
+  /// üste gelince ekran bir menü tabelası gibi okunuyordu.
+  List<_Section> get _sections {
+    final loc = ref.watch(selectedLocationProvider);
+    final yer = loc.hasIlce ? loc.ilce! : loc.il;
+    final List<_Section> all = [
+      (
+        title: '${_bulunmaEki(yer)} en iyiler',
+        subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
+        items: _topRated,
+        layout: _Layout.ranked,
+      ),
+      (
+        title: 'Bu haftanın favorileri',
+        subtitle: 'Yeni eklenen, en çok beğenilen menü öğeleri',
+        items: _weeklyTop,
+        layout: _Layout.posters,
+      ),
+      (
+        title: 'Herkes denemek istiyor',
+        subtitle: 'Merak uyandıran özel lezzetler',
+        items: _mostWanted,
+        layout: _Layout.wide,
+      ),
+      (
+        title: 'Diyeti bozmaya değer',
+        subtitle: 'Pişman olmayacağın kalorili şaheserler',
+        items: _cheatMeal,
+        layout: _Layout.grid,
+      ),
+      (
+        title: 'Sağlıklı & fit seçenekler',
+        subtitle: 'Hem lezzetli hem de hafif alternatifler',
+        items: _healthy,
+        layout: _Layout.posters,
+      ),
+      (
+        title: 'Şehrin gizli mücevherleri',
+        subtitle: 'Az bilinen ama çok sevilecek lezzetler',
+        items: _hidden,
+        layout: _Layout.list,
+      ),
+    ];
+    return all.where((s) => s.items.isNotEmpty).toList();
+  }
+
+  /// "Kadıköy" → "Kadıköy'de", "Beşiktaş" → "Beşiktaş'ta". Önceden her yere
+  /// "'da" ekleniyordu ("Kadıköy'da", "Beşiktaş'da").
+  static String _bulunmaEki(String yer) {
+    const kalin = 'aıouAIOU';
+    const ince = 'eiöüEİÖÜ';
+    var unlu = 'a';
+    for (var i = yer.length - 1; i >= 0; i--) {
+      if (kalin.contains(yer[i])) break;
+      if (ince.contains(yer[i])) {
+        unlu = 'e';
+        break;
+      }
+    }
+    final son = yer.isEmpty ? '' : yer[yer.length - 1];
+    final sert = 'çfhkpsştÇFHKPSŞT'.contains(son);
+    return "$yer'${sert ? 't' : 'd'}$unlu";
+  }
+
+  Widget _sectionBody(_Section s) {
+    switch (s.layout) {
+      case _Layout.ranked:
+        return DishRankedList(
+          items: s.items.take(5).toList(),
+          onTap: _openDish,
+          withLead: true,
+        );
+      case _Layout.list:
+        return DishRankedList(items: s.items.take(5).toList(), onTap: _openDish);
+      case _Layout.posters:
+        return DishPosterCarousel(items: s.items, onTap: _openDish);
+      case _Layout.wide:
+        return DishWideCarousel(items: s.items, onTap: _openDish);
+      case _Layout.grid:
+        return DishTileGrid(items: s.items, onTap: _openDish);
     }
   }
 
-  /// Görünür bölümler — boş olanlar otomatik elenir.
-  List<({String title, String subtitle, List<MenuItemModel> items})>
-      get _sections => [
-            (
-              title: '${ref.watch(selectedLocationProvider).hasIlce ? ref.watch(selectedLocationProvider).ilce : ref.watch(selectedLocationProvider).il}\'da En İyiler',
-              subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
-              items: _topRated,
-            ),
-            (
-              title: 'Bu Haftanın Favorileri',
-              subtitle: 'Yeni eklenen, en çok beğenilen menü öğeleri',
-              items: _weeklyTop,
-            ),
-            (
-              title: 'Herkes Denemek İstiyor',
-              subtitle: 'Merak uyandıran özel lezzetler',
-              items: _mostWanted,
-            ),
-            (
-              title: 'Diyeti Bozmaya Değer',
-              subtitle: 'Pişman olmayacağın kalorili şaheserler',
-              items: _cheatMeal,
-            ),
-            (
-              title: 'Sağlıklı & Fit Seçenekler',
-              subtitle: 'Hem lezzetli hem de hafif alternatifler',
-              items: _healthy,
-            ),
-            (
-              title: 'Şehrin Gizli Mücevherleri',
-              subtitle: 'Az bilinen ama çok sevilecek lezzetler',
-              items: _hidden,
-            ),
-          ].where((s) => s.items.isNotEmpty).toList();
-
   @override
   Widget build(BuildContext context) {
-    final sections = _loading || _error != null ? const [] : _sections;
+    final sections =
+        _loading || _error != null ? const <_Section>[] : _sections;
 
     return Scaffold(
       backgroundColor: context.bgColor,
       body: RefreshIndicator(
         onRefresh: _load,
         color: AppColors.primary,
+        backgroundColor: context.surfaceColor,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
             // ── App Bar ──────────────────────────────────────────────────
-            _DiscoverAppBar(),
+            const _DiscoverAppBar(),
 
             // ── Kategori Chip'leri ───────────────────────────────────────
             SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  CategoryChips(
-                    categories: _categories,
-                    onSelected: (category) {
-                      setState(() => _selectedCategory = category);
-                    },
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpace.xs),
+                child: CategoryChips(
+                  categories: _categories,
+                  onSelected: (category) {
+                    setState(() => _selectedCategory = category);
+                  },
+                ),
               ),
             ),
 
             // ── Yükleniyor ───────────────────────────────────────────────
             if (_loading)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              )
+              const SliverToBoxAdapter(child: _DiscoverSkeleton())
 
             // ── Hata ─────────────────────────────────────────────────────
             else if (_error != null)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cloud_off_rounded,
-                          color: AppColors.textDisabled, size: 48),
-                      const SizedBox(height: 12),
-                      Text(_error!,
-                          style: AppTextStyles.titleMedium
-                              .copyWith(color: AppColors.textSecondary)),
-                      const SizedBox(height: 16),
-                      OutlinedButton(
-                        onPressed: _load,
-                        child: const Text('Tekrar Dene'),
-                      ),
-                    ],
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpace.screen, 48, AppSpace.screen, 0),
+                  child: StateMessage(
+                    title: _error!,
+                    message: 'Bağlantını kontrol edip tekrar dene.',
+                    actionLabel: 'Tekrar dene',
+                    onAction: _load,
                   ),
                 ),
               )
 
             // ── Boş ──────────────────────────────────────────────────────
             else if (sections.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.ramen_dining_rounded,
-                          color: AppColors.textDisabled, size: 48),
-                      const SizedBox(height: 12),
-                      Text(
-                        _selectedCategory == null ||
-                                _selectedCategory == 'Tümü'
-                            ? 'Henüz içerik yok'
-                            : 'Bu kategoride içerik yok',
-                        style: AppTextStyles.titleMedium
-                            .copyWith(color: AppColors.textSecondary),
-                      ),
-                    ],
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpace.screen, 48, AppSpace.screen, 0),
+                  child: StateMessage(
+                    title: _allSelected
+                        ? 'Henüz içerik yok'
+                        : 'Bu kategoride içerik yok',
+                    message: _allSelected
+                        ? 'Restoranlar menülerini ekledikçe yemekler burada görünecek.'
+                        : 'Başka bir kategori seç ya da Tümü\'ne dön.',
                   ),
                 ),
               )
 
             // ── Bölümler ─────────────────────────────────────────────────
             else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final s = sections[index];
-                    return Column(
+              SliverList.builder(
+                itemCount: sections.length,
+                itemBuilder: (context, index) {
+                  final s = sections[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      top: index == 0 ? AppSpace.xl : AppSpace.section,
+                    ),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SectionHeader(
@@ -331,19 +356,70 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                           subtitle: s.subtitle,
                           onSeeAll: () => _seeAll(s.title, s.items),
                         ),
-                        _HorizontalCardList(
-                          onItemTap: _showItemSheet,
-                          items: s.items,
-                        ),
+                        _sectionBody(s),
                       ],
-                    );
-                  },
-                  childCount: sections.length,
-                ),
+                    ),
+                  );
+                },
               ),
 
             // ── Alt boşluk (bottom nav ile çakışmasın) ──────────────────
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpace.xxl)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Yükleme iskeleti ──────────────────────────────────────────────────────────
+
+/// İlk bölümün (öne çıkan + sıralı satırlar) şeklinde iskelet.
+class _DiscoverSkeleton extends StatelessWidget {
+  const _DiscoverSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row() => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              SizedBox(width: 28),
+              SkeletonBox(width: 56, height: 56, radius: AppRadius.sm),
+              SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(width: 160, height: 14),
+                    SizedBox(height: 6),
+                    SkeletonBox(width: 110, height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.xl, AppSpace.screen, 0),
+      child: SkeletonPulse(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonBox(width: 180, height: 20),
+            const SizedBox(height: 6),
+            const SkeletonBox(width: 240, height: 12),
+            const SizedBox(height: AppSpace.lg),
+            const AspectRatio(
+              aspectRatio: 16 / 10,
+              child: SkeletonBox(height: double.infinity, radius: AppRadius.md),
+            ),
+            const SizedBox(height: AppSpace.md),
+            row(),
+            row(),
+            row(),
           ],
         ),
       ),
@@ -357,6 +433,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 const String _konumuKullan = 'Konumumu kullan';
 
 class _DiscoverAppBar extends ConsumerWidget {
+  const _DiscoverAppBar();
+
   /// Konuma dokunulduğunda: izin hiç sorulmadıysa önce kısa bir açıklama
   /// gösterip sistem penceresini açar (tek şansı burada, faydası belliyken
   /// harcıyoruz). Diğer her durumda seçim listesi açılır.
@@ -395,26 +473,21 @@ class _DiscoverAppBar extends ConsumerWidget {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.surfaceColor,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18)),
-        title: Text('Konumunu kullanalım mı?',
-            style: AppTextStyles.titleMedium),
-        content: Text(
+        title: const Text('Konumunu kullanalım mı?'),
+        content: const Text(
           'Sana en yakın restoranları gösterebilmemiz için konumuna '
           'ihtiyacımız var.',
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: ctx.textSecondaryColor),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+                foregroundColor: ctx.textSecondaryColor),
             child: const Text('Şimdi değil'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
             child: const Text('Konumumu kullan'),
           ),
         ],
@@ -424,7 +497,7 @@ class _DiscoverAppBar extends ConsumerWidget {
 
   void _snack(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -481,394 +554,77 @@ class _DiscoverAppBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final loc = ref.watch(selectedLocationProvider);
+
     return SliverAppBar(
       pinned: true,
-      floating: false,
       backgroundColor: context.bgColor,
-      expandedHeight: 100,
-      collapsedHeight: 60,
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Builder(
-          builder: (ctx) => Container(color: ctx.bgColor),
-        ),
-        titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-        title: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // Logo kelime markası — ayarlar logonun kendisinden alınmıştır
-            // ("Dishrate logo/OKUBENI.md": Poppins SemiBold 600, harf aralığı
-            // −%2, hep küçük harf). Buradaki yazı logoyla yan yana geldiğinde
-            // (açılış ekranı, giriş ekranı) aynı görünsün diye birebir aynı
-            // olmalı; displayLarge'ın 900'ü ve −1 aralığı bu yüzden eziliyor.
-            Text(
-              'dishrate',
-              style: AppTextStyles.displayLarge.copyWith(
-                fontSize: _wordmarkSize,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-                letterSpacing: _wordmarkSize * -0.02,
-              ),
+      surfaceTintColor: Colors.transparent,
+      toolbarHeight: 60,
+      titleSpacing: AppSpace.screen,
+      automaticallyImplyLeading: false,
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Logo kelime markası — ayarlar logonun kendisinden alınmıştır
+          // ("Dishrate logo/OKUBENI.md": Poppins SemiBold 600, harf aralığı
+          // −%2, hep küçük harf). Arayüz fontu Geist olsa da bu yazı logoyla
+          // yan yana geldiğinde (açılış, giriş ekranı) aynı görünmeli.
+          const Text(
+            'dishrate',
+            style: TextStyle(
+              fontFamily: AppFonts.wordmark,
+              fontSize: _wordmarkSize,
+              fontWeight: FontWeight.w600,
+              height: 1,
+              color: AppColors.primary,
+              letterSpacing: _wordmarkSize * -0.02,
             ),
-            const Spacer(),
-            // Konum — dokunulunca il/ilçe seçilir; GPS seçeneği de o listenin
-            // başında duruyor.
-            GestureDetector(
-              onTap: () => _onLocationTap(context, ref),
-              behavior: HitTestBehavior.opaque,
+          ),
+          const Spacer(),
+          // Konum — dokunulunca il/ilçe seçilir; GPS seçeneği de o listenin
+          // başında duruyor. Keşfet'in tüm içeriği bu seçime bağlı, bu yüzden
+          // soluk gri değil metin renginde duruyor.
+          Pressable(
+            onTap: () => _onLocationTap(context, ref),
+            semanticLabel: 'Konum: ${loc.isUnset ? 'seçilmedi' : loc.etiket}',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                    color: AppColors.textSecondary,
-                    size: 14,
+                  Icon(
+                    loc.source == LocationSource.gps
+                        ? TablerIcons.navigation_filled
+                        : TablerIcons.map_pin,
+                    color: context.textSecondaryColor,
+                    size: 16,
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 5),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 170),
                     child: Text(
-                      ref.watch(selectedLocationProvider).isUnset
-                          ? 'Konum Seç'
-                          : ref.watch(selectedLocationProvider).etiket,
+                      loc.isUnset ? 'Konum seç' : loc.etiket,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      // Kelime markasının yanında duruyor; aynı ağırlıkta
-                      // olunca ikisi tek blok gibi görünüyordu.
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w300,
+                      style: AppTextStyles.label.copyWith(
+                        fontSize: 14,
+                        color: context.textPrimaryColor,
                       ),
                     ),
                   ),
                   // Konum GPS'ten geliyorsa seçim yapmaya gerek yok — ok
                   // işareti "burada seçilecek bir şey var" diye çağırmasın.
-                  if (ref.watch(selectedLocationProvider).source !=
-                      LocationSource.gps) ...[
-                    const SizedBox(width: 2),
-                    const Icon(
-                      Icons.expand_more_rounded,
-                      color: AppColors.textSecondary,
-                      size: 14,
+                  if (loc.source != LocationSource.gps) ...[
+                    const SizedBox(width: 3),
+                    Icon(
+                      TablerIcons.chevron_down,
+                      color: context.textSecondaryColor,
+                      size: 13,
                     ),
                   ],
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(0.5),
-        child: Builder(
-          builder: (ctx) => Container(height: 0.5, color: ctx.dividerColor),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Yatay kaydırmalı kart listesi ─────────────────────────────────────────────
-
-class _HorizontalCardList extends StatelessWidget {
-  const _HorizontalCardList({
-    required this.items,
-    required this.onItemTap,
-  });
-  final List<MenuItemModel> items;
-  final void Function(MenuItemModel) onItemTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 230,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: items.length,
-        itemBuilder: (context, index) => MenuItemCard(
-          item: items[index],
-          onTap: () => onItemTap(items[index]),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Yemek öğesi detay sheet'i ─────────────────────────────────────────────────
-
-class _MenuItemSheet extends ConsumerStatefulWidget {
-  const _MenuItemSheet({required this.item});
-  final MenuItemModel item;
-
-  @override
-  ConsumerState<_MenuItemSheet> createState() => _MenuItemSheetState();
-}
-
-class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
-  bool _inWishlist = false;
-  bool _wishlistLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkWishlist();
-  }
-
-  Future<void> _checkWishlist() async {
-    try {
-      final userId = await TokenStorage.instance.getUserId();
-      if (userId == null) {
-        if (mounted) setState(() => _wishlistLoading = false);
-        return;
-      }
-      final list = await WishlistRepository.instance.getWishlist(userId);
-      if (!mounted) return;
-      setState(() {
-        _inWishlist =
-            list.any((w) => w.menuItemId == widget.item.menuItemId);
-        _wishlistLoading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _wishlistLoading = false);
-    }
-  }
-
-  Future<void> _toggleWishlist() async {
-    setState(() => _wishlistLoading = true);
-    try {
-      final userId = await TokenStorage.instance.getUserId();
-      if (userId == null) {
-        if (mounted) setState(() => _wishlistLoading = false);
-        return;
-      }
-      if (_inWishlist) {
-        await WishlistRepository.instance
-            .removeByMenuItemId(userId, widget.item.menuItemId);
-      } else {
-        await WishlistRepository.instance
-            .addToWishlist(userId, widget.item.menuItemId);
-      }
-      if (!mounted) return;
-      setState(() {
-        _inWishlist = !_inWishlist;
-        _wishlistLoading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _wishlistLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Handle ───────────────────────────────────────────────────
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.dividerColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Fotoğraf ─────────────────────────────────────────────────
-          if (item.photoUrl != null && item.photoUrl!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  item.photoUrl!,
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: context.surfaceColor,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.restaurant_rounded,
-                        color: AppColors.textDisabled, size: 48),
-                  ),
-                ),
-              ),
-            ),
-
-          const SizedBox(height: 14),
-
-          // ── Bilgiler ─────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // İsim + puan
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(item.name,
-                          style: AppTextStyles.titleLarge),
-                    ),
-                    if (item.averageRating > 0) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color:
-                              AppColors.star.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                color: AppColors.star, size: 14),
-                            const SizedBox(width: 3),
-                            Text(
-                              item.averageRating.toStringAsFixed(1),
-                              style: AppTextStyles.ratingSmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 6),
-                // Restoran + konum (restorana tıkla → detay)
-                GestureDetector(
-                  onTap: () {
-                    final loc = [item.district, item.city]
-                        .where((e) => e != null && e.isNotEmpty)
-                        .join(', ');
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RestaurantDetailScreen(
-                          restaurantId: item.restaurantId,
-                          restaurantName: item.restaurantName,
-                          locationText: loc,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      const Icon(Icons.storefront_rounded,
-                          color: AppColors.primary, size: 14),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          item.restaurantName,
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.primary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.primary, size: 16),
-                      if (item.district != null) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.location_on_rounded,
-                            color: AppColors.textSecondary, size: 12),
-                        const SizedBox(width: 2),
-                        Text(item.district!,
-                            style: AppTextStyles.bodySmall),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Yorumları gör ────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MenuItemReviewsScreen(
-                      menuItemId: item.menuItemId,
-                      menuItemName: item.name,
-                    ),
-                  ),
-                ),
-                icon: const Icon(Icons.reviews_outlined, size: 18),
-                label: const Text('Yorumları Gör'),
-              ),
-            ),
-          ),
-
-          // ── Butonlar ─────────────────────────────────────────────────
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 16),
-            child: Row(
-              children: [
-                // İstek listesi
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed:
-                        _wishlistLoading ? null : _toggleWishlist,
-                    icon: _wishlistLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          )
-                        : Icon(
-                            _inWishlist
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                            size: 18,
-                          ),
-                    label: Text(
-                      _inWishlist
-                          ? 'Listeden Çıkar'
-                          : 'İstek Listesi\'ne Ekle',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Değerlendir
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(context, true),
-                    icon: const Icon(Icons.star_rounded, size: 18),
-                    label: const Text('Değerlendir',
-                        style: TextStyle(fontSize: 13)),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -876,4 +632,3 @@ class _MenuItemSheetState extends ConsumerState<_MenuItemSheet> {
     );
   }
 }
-

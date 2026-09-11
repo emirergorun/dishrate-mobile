@@ -472,7 +472,7 @@ class _SearchBar extends StatelessWidget {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide:
-                BorderSide(color: AppColors.primary, width: 1.5),
+                const BorderSide(color: AppColors.primary, width: 1.5),
           ),
         ),
       ),
@@ -547,8 +547,8 @@ class _RestaurantCard extends ConsumerWidget {
                 ),
               ),
             ),
-            SizedBox(height: 20),
-            Expanded(child: AddRatingScreen()),
+            const SizedBox(height: 20),
+            const Expanded(child: AddRatingScreen()),
           ],
         ),
       ),

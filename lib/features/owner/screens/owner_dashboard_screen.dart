@@ -63,7 +63,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       appBar: AppBar(
         backgroundColor: context.bgColor,
         elevation: 0,
-        title: Text('Restoranım', style: AppTextStyles.titleMedium),
+        title: const Text('Restoranım', style: AppTextStyles.titleMedium),
         iconTheme: IconThemeData(color: context.textPrimaryColor),
       ),
       body: RefreshIndicator(

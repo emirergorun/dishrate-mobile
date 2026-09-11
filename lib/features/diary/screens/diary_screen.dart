@@ -210,7 +210,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
           SliverAppBar(
             pinned: true,
             backgroundColor: context.bgColor,
-            title: Text('Günlüğüm', style: AppTextStyles.headlineMedium),
+            title: const Text('Günlüğüm', style: AppTextStyles.headlineMedium),
             actions: [
               // Filtre butonu — aktifse vurgulu
               Stack(
@@ -923,7 +923,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Değerlendirmeyi Düzenle',
+                  const Text('Değerlendirmeyi Düzenle',
                       style: AppTextStyles.titleSmall),
                   const SizedBox(height: 3),
                   Row(children: [

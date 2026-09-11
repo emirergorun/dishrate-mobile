@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_review_model.dart';
+import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/review_tile.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 
 /// Bir menü öğesine yapılan tüm değerlendirmeler. İsimler gizlilik için
 /// maskeli gelir (E*** E***); kullanıcı kendi yorumunu gerçek adıyla görür.
@@ -25,6 +30,9 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
   List<MenuItemReviewModel> _reviews = [];
   bool _loading = true;
   String? _error;
+
+  static const _pad = EdgeInsets.fromLTRB(
+      AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.xxl);
 
   @override
   void initState() {
@@ -51,7 +59,7 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Değerlendirmeler yüklenemedi.';
+          _error = 'Değerlendirmeler yüklenemedi';
           _loading = false;
         });
       }
@@ -68,150 +76,129 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
       backgroundColor: context.bgColor,
       appBar: AppBar(
         backgroundColor: context.bgColor,
-        elevation: 0,
-        title: Text('Değerlendirmeler', style: AppTextStyles.titleMedium),
-        iconTheme: IconThemeData(color: context.textPrimaryColor),
+        leading: IconButton(
+          icon: const Icon(TablerIcons.chevron_left),
+          tooltip: 'Geri',
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Değerlendirmeler',
+          style: AppTextStyles.titleMedium
+              .copyWith(color: context.textPrimaryColor),
+        ),
+        titleSpacing: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _load,
         color: AppColors.primary,
+        backgroundColor: context.surfaceColor,
         child: _buildBody(),
       ),
     );
   }
 
   Widget _buildBody() {
+    final title = Text(
+      widget.menuItemName,
+      style:
+          AppTextStyles.headlineLarge.copyWith(color: context.textPrimaryColor),
+    );
+
     if (_loading) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColors.primary));
-    }
-    if (_error != null) {
-      return _centered(Icons.cloud_off_rounded, _error!,
-          OutlinedButton(onPressed: _load, child: const Text('Tekrar Dene')));
-    }
-    if (_reviews.isEmpty) {
       return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        padding: _pad,
         children: [
-          const SizedBox(height: 120),
-          _centered(Icons.reviews_outlined,
-              'Bu ürüne henüz değerlendirme yapılmamış.', null),
+          title,
+          const SizedBox(height: AppSpace.lg),
+          const SkeletonPulse(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: 140, height: 34),
+                SizedBox(height: AppSpace.xxl),
+                SkeletonRows(count: 3, leadingSize: 32),
+              ],
+            ),
+          ),
         ],
       );
     }
+
+    if (_error != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: _pad,
+        children: [
+          title,
+          const SizedBox(height: AppSpace.xl),
+          StateMessage(
+            title: _error!,
+            message: 'Bağlantını kontrol edip tekrar dene.',
+            actionLabel: 'Tekrar dene',
+            onAction: _load,
+          ),
+        ],
+      );
+    }
+
+    if (_reviews.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: _pad,
+        children: [
+          title,
+          const SizedBox(height: AppSpace.xl),
+          const StateMessage(
+            title: 'Henüz değerlendirme yok',
+            message: 'Bu yemeği ilk puanlayan sen ol.',
+          ),
+        ],
+      );
+    }
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: _pad,
       children: [
-        // Özet
-        Container(
-          padding: const EdgeInsets.all(16),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: context.surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.dividerColor),
-          ),
-          child: Row(
-            children: [
-              Text(_average.toStringAsFixed(1),
-                  style: AppTextStyles.headlineLarge
-                      .copyWith(color: AppColors.star)),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.menuItemName, style: AppTextStyles.titleSmall),
-                  const SizedBox(height: 2),
-                  Text('${_reviews.length} değerlendirme',
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textSecondary)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        ..._reviews.map((r) => _ReviewCard(review: r)),
-      ],
-    );
-  }
+        title,
+        const SizedBox(height: AppSpace.lg),
 
-  Widget _centered(IconData icon, String msg, Widget? action) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        // Özet — kenarlıklı kart değil, düz satır. Ortalama rakamı metin
+        // renginde; sarı yalnızca yıldızda.
+        Row(
           children: [
-            Icon(icon, size: 52, color: AppColors.textDisabled),
-            const SizedBox(height: 16),
-            Text(msg,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
-            if (action != null) ...[const SizedBox(height: 20), action],
+            Text(
+              _average.toStringAsFixed(1),
+              style: AppTextStyles.ratingLarge
+                  .copyWith(color: context.textPrimaryColor),
+            ),
+            const SizedBox(width: AppSpace.md),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StarRow(rating: _average, size: 14),
+                const SizedBox(height: 4),
+                Text(
+                  '${_reviews.length} değerlendirme',
+                  style: AppTextStyles.caption
+                      .copyWith(color: context.textSecondaryColor),
+                ),
+              ],
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
 
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
-  final MenuItemReviewModel review;
+        const SizedBox(height: AppSpace.xxl),
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: review.mine ? AppColors.primary : context.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                child: const Icon(Icons.person_rounded,
-                    size: 16, color: AppColors.primary),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  review.mine ? '${review.reviewerName} (Sen)' : review.reviewerName,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.textPrimaryColor),
-                ),
-              ),
-              RatingBarIndicator(
-                rating: review.score,
-                itemSize: 14,
-                itemBuilder: (_, __) =>
-                    const Icon(Icons.star_rounded, color: AppColors.star),
-              ),
-              const SizedBox(width: 4),
-              Text(review.score.toStringAsFixed(1),
-                  style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.star, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          if (review.comment != null && review.comment!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text('"${review.comment}"',
-                style: AppTextStyles.bodySmall
-                    .copyWith(fontStyle: FontStyle.italic)),
-          ],
+        for (var i = 0; i < _reviews.length; i++) ...[
+          if (i > 0)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpace.screen),
+              child: Divider(height: 1),
+            ),
+          ReviewTile(review: _reviews[i]),
         ],
-      ),
+      ],
     );
   }
 }

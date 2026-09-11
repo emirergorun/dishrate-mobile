@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_metrics.dart';
 import '../../features/rating/screens/add_rating_screen.dart';
 
 /// Değerlendirme akışını taşıyan alt panel.
@@ -43,22 +44,23 @@ class RatingSheet extends StatelessWidget {
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: context.surfaceElevatedColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          color: context.sheetColor,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
-            // Tutma çubuğu
+            const SizedBox(height: 8),
+            // Tutma çubuğu — yemek panelindekiyle aynı ölçü.
             Container(
-              width: 40,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
                 color: context.dividerColor,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
             const Expanded(child: AddRatingScreen()),
           ],
         ),

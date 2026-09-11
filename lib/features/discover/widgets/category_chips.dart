@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/pressable.dart';
 
 class CategoryChips extends StatefulWidget {
   const CategoryChips({
@@ -22,12 +24,13 @@ class _CategoryChipsState extends State<CategoryChips> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 38,
+      height: 36,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
         itemCount: widget.categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
         itemBuilder: (context, index) {
           final category = widget.categories[index];
           final isSelected = _selected == category ||
@@ -62,26 +65,26 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Seçili çip turuncu değil, metin renginde dolu. Turuncu ana eyleme
+    // (Değerlendir, +) ayrılmış; filtre çipi de turuncu olunca ekranın en
+    // güçlü vurgusu bir filtre oluyordu.
+    return Pressable(
       onTap: onTap,
+      semanticLabel: label,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        duration: AppMotion.base,
+        curve: AppMotion.curve,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : context.surfaceElevatedColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : context.dividerColor,
-            width: 1,
-          ),
+          color: isSelected ? context.textPrimaryColor : context.surfaceColor,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
           label,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: isSelected ? Colors.white : context.textPrimaryColor,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            fontSize: 13,
-            letterSpacing: 0,
+          style: AppTextStyles.label.copyWith(
+            fontSize: 14,
+            color: isSelected ? context.bgColor : context.textPrimaryColor,
           ),
         ),
       ),

@@ -21,7 +21,7 @@ class SettingsScreen extends ConsumerWidget {
           icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Ayarlar', style: AppTextStyles.headlineMedium),
+        title: const Text('Ayarlar', style: AppTextStyles.headlineMedium),
         titleSpacing: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
@@ -77,7 +77,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
 
-          _InfoItem(
+          const _InfoItem(
             icon: Icons.info_outline_rounded,
             label: 'Sürüm',
             value: '1.0.0',
@@ -148,7 +148,7 @@ class _ThemeOption extends StatelessWidget {
               child: Text(title, style: AppTextStyles.titleSmall),
             ),
             if (selected)
-              Icon(Icons.check_circle_rounded,
+              const Icon(Icons.check_circle_rounded,
                   color: AppColors.primary, size: 22)
             else
               Icon(Icons.circle_outlined,

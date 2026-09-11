@@ -64,7 +64,7 @@ class _RestaurantClaimScreenState extends State<RestaurantClaimScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Sahiplik talebi', style: AppTextStyles.titleMedium),
+        title: const Text('Sahiplik talebi', style: AppTextStyles.titleMedium),
         content: Text(
           '"${r.name}" senin restoranın mı? Talebin incelendikten sonra '
           'menüsünü yönetebileceksin.',
@@ -124,7 +124,7 @@ class _RestaurantClaimScreenState extends State<RestaurantClaimScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: Text('Restoranımı Sahiplen', style: AppTextStyles.titleMedium),
+        title: const Text('Restoranımı Sahiplen', style: AppTextStyles.titleMedium),
       ),
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -211,7 +211,7 @@ class _RestaurantClaimScreenState extends State<RestaurantClaimScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Bu adla kayıtlı restoran bulunamadı.',
+          const Text('Bu adla kayıtlı restoran bulunamadı.',
               style: AppTextStyles.bodyMedium),
           const SizedBox(height: 6),
           Text(

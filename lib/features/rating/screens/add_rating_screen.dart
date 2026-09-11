@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../providers/rating_flow_provider.dart';
 import 'step1_restaurant_search.dart';
 import 'step2_menu_item_select.dart';
@@ -27,25 +28,20 @@ class AddRatingScreen extends ConsumerWidget {
           },
         ),
 
-        // ── Adım Göstergesi ──────────────────────────────────────────────
-        _StepIndicator(currentStep: state.currentStep),
-
-        const SizedBox(height: 8),
-
         // ── Adım İçeriği ─────────────────────────────────────────────────
         Expanded(
           child: Material(
             color: Colors.transparent,
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
+              duration: AppMotion.base,
               transitionBuilder: (child, animation) {
                 return SlideTransition(
                   position: Tween<Offset>(
-                    begin: const Offset(0.08, 0),
+                    begin: const Offset(0.06, 0),
                     end: Offset.zero,
                   ).animate(CurvedAnimation(
                     parent: animation,
-                    curve: Curves.easeOutCubic,
+                    curve: AppMotion.curve,
                   )),
                   child: FadeTransition(opacity: animation, child: child),
                 );
@@ -68,31 +64,12 @@ class AddRatingScreen extends ConsumerWidget {
       case 1:
         return const Step2MenuItemSelect();
       case 2:
+        // Onay artık panelin içinde gösteriliyor (bkz. Step3RateItem);
+        // panel kapandıktan sonra ayrıca yeşil bildirim çıkmıyor.
         return Step3RateItem(
           onSuccess: () {
             ref.read(ratingFlowProvider.notifier).reset();
             Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded,
-                        color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Puan kaydedildi!',
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: Colors.white),
-                    ),
-                  ],
-                ),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
           },
         );
       default:
@@ -103,6 +80,10 @@ class AddRatingScreen extends ConsumerWidget {
 
 // ── Üst Bar ───────────────────────────────────────────────────────────────────
 
+/// Geri · adım çizgisi · kapat.
+///
+/// Ortadaki başlık ("Restoran Seç") kaldırıldı: hemen altındaki soru
+/// ("Nerede yedin?") aynı şeyi söylüyordu ve ekranda iki başlık yarışıyordu.
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.currentStep,
@@ -116,35 +97,29 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onClose;
 
-  static const _titles = ['Restoran Seç', 'Menüden Seç', 'Puanla'];
-
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
       child: Row(
         children: [
-          IconButton(
-            onPressed: canGoBack ? onBack : null,
-            icon: Icon(
-              Icons.arrow_back_ios_rounded,
-              color: canGoBack ? context.textPrimaryColor : Colors.transparent,
-              size: 20,
+          // Görünmez olsa da yer kaplıyor: adım çizgisi her adımda ortada kalsın.
+          Opacity(
+            opacity: canGoBack ? 1 : 0,
+            child: IconButton(
+              onPressed: canGoBack ? onBack : null,
+              tooltip: 'Geri',
+              icon: const Icon(TablerIcons.chevron_left, size: 22),
             ),
           ),
-          Expanded(
-            child: Text(
-              _titles[currentStep.clamp(0, 2)],
-              textAlign: TextAlign.center,
-              style: AppTextStyles.titleMedium,
-            ),
-          ),
+          Expanded(child: Center(child: _StepProgress(step: currentStep))),
           IconButton(
             onPressed: onClose,
-            icon: const Icon(
-              Icons.close_rounded,
-              color: AppColors.textSecondary,
+            tooltip: 'Kapat',
+            icon: Icon(
+              TablerIcons.x,
               size: 22,
+              color: context.textSecondaryColor,
             ),
           ),
         ],
@@ -153,31 +128,40 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Adım Göstergesi ───────────────────────────────────────────────────────────
+// ── Adım göstergesi ───────────────────────────────────────────────────────────
 
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({required this.currentStep});
-  final int currentStep;
+/// Üç ince çizgi. Uzayan nokta göstergesi hazır onboarding kalıbıydı; çizgi
+/// "üçte neredeyim" sorusunu daha sessiz yanıtlıyor.
+class _StepProgress extends StatelessWidget {
+  const _StepProgress({required this.step});
+  final int step;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final isActive = index == currentStep;
-        final isDone = index < currentStep;
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 24 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: isDone || isActive ? AppColors.primary : AppColors.divider,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
+    return Semantics(
+      label: 'Adım ${step + 1} / 3',
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 96,
+        child: Row(
+          children: [
+            for (var i = 0; i < 3; i++) ...[
+              if (i > 0) const SizedBox(width: 6),
+              Expanded(
+                child: AnimatedContainer(
+                  duration: AppMotion.base,
+                  curve: AppMotion.curve,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: i <= step ? AppColors.primary : context.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

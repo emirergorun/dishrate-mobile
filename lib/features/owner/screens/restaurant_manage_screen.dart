@@ -102,7 +102,7 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
-        title: Text('Ürünü Sil', style: AppTextStyles.titleSmall),
+        title: const Text('Ürünü Sil', style: AppTextStyles.titleSmall),
         content: Text('"${item.name}" silinsin mi?', style: AppTextStyles.bodySmall),
         actions: [
           TextButton(
@@ -214,7 +214,7 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
         const SizedBox(height: 20),
         Row(
           children: [
-            Text('Menü', style: AppTextStyles.titleSmall),
+            const Text('Menü', style: AppTextStyles.titleSmall),
             const SizedBox(width: 8),
             Text('(${_menu.length})',
                 style: AppTextStyles.bodySmall
@@ -769,7 +769,7 @@ class _RestaurantEditSheetState extends State<_RestaurantEditSheet> {
                 ),
               ),
             ),
-            Text('Restoran Bilgisi', style: AppTextStyles.titleMedium),
+            const Text('Restoran Bilgisi', style: AppTextStyles.titleMedium),
             const SizedBox(height: 16),
             // Logo — tıkla → galeriden seç → yükle
             Row(

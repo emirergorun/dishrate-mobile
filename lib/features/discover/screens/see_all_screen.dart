@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../widgets/menu_item_card.dart';
 
 class SeeAllScreen extends StatelessWidget {
@@ -22,48 +25,50 @@ class SeeAllScreen extends StatelessWidget {
       backgroundColor: context.bgColor,
       appBar: AppBar(
         backgroundColor: context.bgColor,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
+          icon: const Icon(TablerIcons.chevron_left),
+          tooltip: 'Geri',
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(title, style: AppTextStyles.titleMedium),
-        titleSpacing: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Container(height: 0.5, color: context.dividerColor),
+        title: Text(
+          title,
+          style: AppTextStyles.titleMedium
+              .copyWith(color: context.textPrimaryColor),
         ),
+        titleSpacing: 0,
       ),
       body: items.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.no_meals_rounded,
-                      color: AppColors.textDisabled, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    'İçerik bulunamadı',
-                    style: AppTextStyles.titleMedium
-                        .copyWith(color: AppColors.textSecondary),
-                  ),
-                ],
+          ? const Padding(
+              padding: EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.xxl, AppSpace.screen, 0),
+              child: StateMessage(
+                title: 'İçerik bulunamadı',
+                message: 'Bu listede henüz yemek yok.',
               ),
             )
-          : GridView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 180 / 230,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) => MenuItemCard(
-                item: items[index],
-                onTap: () => onItemTap?.call(items[index]),
-              ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = AppSpace.md;
+                final cardWidth =
+                    (constraints.maxWidth - AppSpace.screen * 2 - gap) / 2;
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(AppSpace.screen,
+                      AppSpace.md, AppSpace.screen, AppSpace.xxl),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: gap,
+                    mainAxisSpacing: AppSpace.xl,
+                    // Sabit oran yerine hesaplanan yükseklik: iki satırlık
+                    // yemek adı ya da büyük yazı ölçeği kartı kesmesin.
+                    mainAxisExtent: MenuItemCard.heightFor(context, cardWidth),
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) => MenuItemCard(
+                    item: items[index],
+                    onTap: () => onItemTap?.call(items[index]),
+                  ),
+                );
+              },
             ),
     );
   }

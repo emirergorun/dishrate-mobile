@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/restaurant_model.dart';
+import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../providers/rating_flow_provider.dart';
 
 class Step1RestaurantSearch extends ConsumerStatefulWidget {
@@ -50,34 +56,39 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
       children: [
         // ── Başlık ──────────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-          child: Text('Nerede yedin?', style: AppTextStyles.headlineLarge),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
+          child: Text(
+            'Nerede yedin?',
+            style: AppTextStyles.displayLarge
+                .copyWith(color: context.textPrimaryColor),
+          ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpace.screen, 6, AppSpace.screen, AppSpace.screen),
           child: Text(
             'Restoran adını yaz, listeden seç.',
-            style: AppTextStyles.bodySmall,
+            style: AppTextStyles.bodyMedium
+                .copyWith(color: context.textSecondaryColor),
           ),
         ),
 
         // ── Arama Kutusu ─────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
           child: TextField(
             controller: _controller,
             autofocus: true,
+            textInputAction: TextInputAction.search,
             style: AppTextStyles.bodyLarge,
             decoration: InputDecoration(
-              hintText: 'Restoran adı...',
-              prefixIcon: const Icon(
-                Icons.search_rounded,
-                color: AppColors.textSecondary,
-              ),
+              hintText: 'Restoran adı',
+              prefixIcon: const Icon(TablerIcons.search, size: 20),
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary),
+                      tooltip: 'Temizle',
+                      icon: const Icon(TablerIcons.x, size: 18),
                       onPressed: () {
                         _controller.clear();
                         setState(() {
@@ -95,7 +106,7 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpace.sm),
 
         // ── Sonuçlar ─────────────────────────────────────────────────────
         Expanded(
@@ -113,8 +124,11 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
 
   Widget _buildResults() {
     if (_isSearching) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return ListView(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
+        children: const [
+          SkeletonPulse(child: SkeletonRows(count: 4, leadingSize: 44)),
+        ],
       );
     }
 
@@ -123,28 +137,23 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
     }
 
     if (_results.isEmpty && _controller.text.length >= 2) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.storefront_outlined,
-                color: AppColors.textDisabled, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              '"${_controller.text}" ile eşleşen\nrestoran bulunamadı.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium
-                  .copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpace.screen, AppSpace.lg, AppSpace.screen, 0),
+        children: [
+          StateMessage(
+            title: 'Restoran bulunamadı',
+            message:
+                '"${_controller.text}" ile eşleşen bir restoran yok. Adın bir kısmını yazmayı dene.',
+          ),
+        ],
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, 0, AppSpace.screen, AppSpace.screen),
       itemCount: _results.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final restaurant = _results[index];
         return _RestaurantTile(
@@ -166,21 +175,21 @@ class _EmptySearchHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Önceden en soluk gri tondaydı; koyu zeminde neredeyse okunmuyordu.
           Text(
             'Örnek aramalar',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textDisabled,
-              letterSpacing: 0.5,
-            ),
+            style: AppTextStyles.caption
+                .copyWith(color: context.textSecondaryColor),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
             children: ['Burger', 'Sushi', 'Pizza', 'Ocakbaşı', 'Noodle']
                 .map((hint) => _HintChip(
                       label: hint,
@@ -201,21 +210,22 @@ class _HintChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
+      semanticLabel: '$label ara',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        // Sabit koyu zemin açık temada kara lekeler gibi duruyordu. Marka
-        // turuncusunun soluk hâli iki temada da zeminle uyumlu kalıyor.
+        // Yarı saydam metin rengi zemin: panelin tonu ne olursa olsun bir
+        // kademe üstünde durur. Sabit koyu zemin açık temada kara leke, turuncu
+        // zemin de ekranın asıl eylemiyle yarışan bir vurgu oluyordu.
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
+          color: context.textPrimaryColor.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
           label,
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+          style: AppTextStyles.label
+              .copyWith(fontSize: 14, color: context.textPrimaryColor),
         ),
       ),
     );
@@ -232,43 +242,67 @@ class _RestaurantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    final hasLogo =
+        restaurant.logoUrl != null && restaurant.logoUrl!.isNotEmpty;
+
+    return Pressable(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: restaurant.logoUrl != null && restaurant.logoUrl!.isNotEmpty
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(restaurant.logoUrl!, fit: BoxFit.cover),
-              )
-            : Center(
-                child: Text(
-                  restaurant.name.isNotEmpty
-                      ? restaurant.name[0].toUpperCase()
-                      : '?',
-                  style: AppTextStyles.titleMedium
-                      .copyWith(color: AppColors.primary),
-                ),
+      semanticLabel: restaurant.name,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            // Harf kutusu temaya duyarlı: önceden koyu tema sabitiyle
+            // çizildiği için açık temada siyah kare olarak görünüyordu.
+            hasLogo
+                ? DishPhoto(
+                    url: restaurant.logoUrl,
+                    width: 44,
+                    height: 44,
+                    radius: AppRadius.sm,
+                    iconSize: 18,
+                  )
+                : Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: context.textPrimaryColor.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Text(
+                      restaurant.name.isNotEmpty
+                          ? restaurant.name.characters.first
+                          : '?',
+                      style: AppTextStyles.titleMedium
+                          .copyWith(color: context.textSecondaryColor),
+                    ),
+                  ),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    restaurant.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.titleSmall
+                        .copyWith(color: context.textPrimaryColor),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    restaurant.district != null
+                        ? '${restaurant.district}, ${restaurant.city}'
+                        : restaurant.city,
+                    style: AppTextStyles.caption
+                        .copyWith(color: context.textSecondaryColor),
+                  ),
+                ],
               ),
-      ),
-      title: Text(restaurant.name, style: AppTextStyles.titleSmall),
-      subtitle: Text(
-        restaurant.district != null
-            ? '${restaurant.district}, ${restaurant.city}'
-            : restaurant.city,
-        style: AppTextStyles.bodySmall,
-      ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: AppColors.textSecondary,
-        size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }

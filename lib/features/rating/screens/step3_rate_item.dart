@@ -1,14 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/rating_request_model.dart';
+import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/rating_stars.dart';
 import '../providers/rating_flow_provider.dart';
+
+/// "Kaydedildi" görünümünün panelde kalma süresi. Panel hemen kapanınca puanın
+/// gidip gitmediği ancak alttan çıkan bildirimden anlaşılıyordu; kısa bir onay
+/// anı döngüye "tamamlandı" hissini veriyor, uzun olursa da akışı yavaşlatıyor.
+const Duration _savedHold = Duration(milliseconds: 1100);
+
+/// Giriş yıldızlarının boyutu. Parmakla yarım yıldız seçmek için her yıldızın
+/// yarısı en az ~22 pt olmalı.
+const double _starSize = 46;
 
 class Step3RateItem extends ConsumerStatefulWidget {
   const Step3RateItem({super.key, required this.onSuccess});
@@ -22,6 +35,10 @@ class Step3RateItem extends ConsumerStatefulWidget {
 class _Step3RateItemState extends ConsumerState<Step3RateItem> {
   final _commentController = TextEditingController();
 
+  /// Puan seçmeden kaydete basıldı mı — uyarı puan alanının kendisinde.
+  bool _scoreMissing = false;
+  bool _saved = false;
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -32,12 +49,10 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
     final state = ref.read(ratingFlowProvider);
 
     if (state.score == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lütfen bir puan ver.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      // Kırmızı bildirim yerine yıldızların altındaki satır uyarıyor: sorun
+      // tam orada, göz de oraya gitsin.
+      HapticFeedback.lightImpact();
+      setState(() => _scoreMissing = true);
       return;
     }
 
@@ -65,6 +80,10 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
         userId,
         state.selectedMenuItem!.menuItemId,
       );
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      setState(() => _saved = true);
+      await Future<void>.delayed(_savedHold);
       if (mounted) widget.onSuccess();
     } catch (e) {
       ref.read(ratingFlowProvider.notifier).showError(
@@ -76,208 +95,333 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(ratingFlowProvider);
-    final item = state.selectedMenuItem!;
-    final restaurant = state.selectedRestaurant!;
+    final item = state.selectedMenuItem;
+    final restaurant = state.selectedRestaurant;
+    // Kayıttan sonra akış sıfırlanırken panel kapanana kadar bir kare daha
+    // çizilebiliyor; seçimler o anda boş.
+    if (item == null || restaurant == null) return const SizedBox.shrink();
 
-    return SingleChildScrollView(
-      // Yorum yazarken listeyi aşağı çekmek klavyeyi kapatsın — "Puanı
-      // Kaydet"e basmadan klavyeden kurtulmanın başka yolu yoktu.
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Başlık ────────────────────────────────────────────────────
-          Text('Nasıldı?', style: AppTextStyles.headlineLarge),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.storefront_rounded,
-                  color: AppColors.primary, size: 14),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  '${restaurant.name} · ${item.name}',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.primary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+    // Boş yıldız çerçevesinin rengi — bkz. aşağıdaki RatingBar yorumu.
+    final emptyStar = context.starColor.withValues(alpha: 0.55);
 
-          const SizedBox(height: 32),
-
-          // ── Ürün Görseli ──────────────────────────────────────────────
-          _ItemPreview(item: item),
-
-          const SizedBox(height: 32),
-
-          // ── Puan Alanı ────────────────────────────────────────────────
-          Center(
-            child: Column(
-              children: [
-                Text(
-                  state.score == 0
-                      ? '—'
-                      : state.score.toStringAsFixed(1),
-                  style: AppTextStyles.ratingLarge.copyWith(fontSize: 52),
-                ),
-                const SizedBox(height: 12),
-                // Boş yıldızlar dolu olanla aynı ikonun soluk hâli değil,
-                // ÇERÇEVELİ yıldız. Koyu temada dolgu rengi zeminle
-                // karıştığı için puanlanmamış yıldızlar görünmüyordu —
-                // kullanıcı orada tıklanacak bir şey olduğunu anlamıyor.
-                RatingBar(
-                  initialRating: state.score,
-                  minRating: 0.5,
-                  allowHalfRating: true,
-                  itemCount: 5,
-                  itemSize: 42,
-                  glow: false,
-                  ratingWidget: RatingWidget(
-                    full: const Icon(Icons.star_rounded,
-                        color: AppColors.star),
-                    half: const Icon(Icons.star_half_rounded,
-                        color: AppColors.star),
-                    empty: Icon(Icons.star_border_rounded,
-                        color: AppColors.star.withValues(alpha: 0.55)),
-                  ),
-                  onRatingUpdate: (rating) {
-                    ref
-                        .read(ratingFlowProvider.notifier)
-                        .updateScore(rating);
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _scoreLabel(state.score),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // ── Yorum Alanı ───────────────────────────────────────────────
-          Text('Yorum (opsiyonel)', style: AppTextStyles.titleSmall),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _commentController,
-            maxLines: 4,
-            maxLength: 500,
-            style: AppTextStyles.bodyMedium,
-            decoration: const InputDecoration(
-              hintText: 'Bu yemek hakkında ne düşünüyorsun?',
-              alignLabelWithHint: true,
-              counterStyle: TextStyle(color: AppColors.textDisabled),
-            ),
-            onChanged: (val) =>
-                ref.read(ratingFlowProvider.notifier).updateComment(val),
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── Hata mesajı ───────────────────────────────────────────────
-          if (state.errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                state.errorMessage!,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.error),
-              ),
-            ),
-
-          // ── Kaydet Butonu ─────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: state.isLoading ? null : _submit,
-              child: state.isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text('Puanı Kaydet'),
-            ),
-          ),
-        ],
+    return AnimatedSwitcher(
+      duration: AppMotion.base,
+      // Varsayılan düzen çocukları ortalanmış bir Stack'e koyuyor; form kendi
+      // yüksekliği kadar küçülüp panelin ortasına düşüyordu. Genişletilmiş
+      // Stack formu yukarıdan başlatıyor, onay görünümü de ortada kalıyor.
+      layoutBuilder: (current, previous) => Stack(
+        fit: StackFit.expand,
+        children: [...previous, if (current != null) current],
       ),
+      child: _saved
+          ? _SavedView(
+              key: const ValueKey('saved'),
+              score: state.score,
+              itemName: item.name,
+            )
+          : SingleChildScrollView(
+              key: const ValueKey('form'),
+              // Yorum yazarken listeyi aşağı çekmek klavyeyi kapatsın — "Puanı
+              // Kaydet"e basmadan klavyeden kurtulmanın başka yolu yoktu.
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.md, AppSpace.screen, AppSpace.xxl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Neyi puanlıyorsun ─────────────────────────────────
+                  // Önceden 180 px'lik fotoğraf + yemek adı üç kez yazıyordu ve
+                  // "Puanı Kaydet" ekranın altına itiliyordu. Küçük özet yetiyor.
+                  Row(
+                    children: [
+                      DishPhoto(
+                        url: item.photoUrl,
+                        width: 48,
+                        height: 48,
+                        radius: AppRadius.sm,
+                        iconSize: 18,
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.titleSmall
+                                  .copyWith(color: context.textPrimaryColor),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              restaurant.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption
+                                  .copyWith(color: context.textSecondaryColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpace.xxl),
+
+                  Text(
+                    'Nasıldı?',
+                    style: AppTextStyles.displayLarge
+                        .copyWith(color: context.textPrimaryColor),
+                  ),
+
+                  const SizedBox(height: AppSpace.xl),
+
+                  // ── Puan Alanı ────────────────────────────────────────
+                  Center(
+                    child: Column(
+                      children: [
+                        // Boş yıldızlar dolu olanla aynı ikonun soluk hâli
+                        // değil, ÇERÇEVELİ yıldız. Koyu temada dolgu rengi
+                        // zeminle karıştığı için puanlanmamış yıldızlar
+                        // görünmüyordu — kullanıcı orada tıklanacak bir şey
+                        // olduğunu anlamıyor.
+                        RatingBar(
+                          initialRating: state.score,
+                          minRating: 0.5,
+                          allowHalfRating: true,
+                          itemCount: 5,
+                          itemSize: _starSize,
+                          itemPadding: const EdgeInsets.symmetric(horizontal: 2),
+                          glow: false,
+                          ratingWidget: RatingWidget(
+                            full: const StarGlyph(fill: 1, size: _starSize),
+                            half: StarGlyph(
+                              fill: 0.5,
+                              size: _starSize,
+                              emptyColor: emptyStar,
+                            ),
+                            empty: StarGlyph(
+                              fill: 0,
+                              size: _starSize,
+                              emptyColor: emptyStar,
+                            ),
+                          ),
+                          onRatingUpdate: (rating) {
+                            // Her yarım yıldız adımında hafif tık: puan
+                            // parmağın altında kalıyor, değişimi hissetmek
+                            // bakmaktan hızlı.
+                            if (rating != state.score) {
+                              HapticFeedback.selectionClick();
+                            }
+                            if (_scoreMissing) {
+                              setState(() => _scoreMissing = false);
+                            }
+                            ref
+                                .read(ratingFlowProvider.notifier)
+                                .updateScore(rating);
+                          },
+                        ),
+                        const SizedBox(height: AppSpace.lg),
+                        SizedBox(
+                          height: 36,
+                          child: AnimatedSwitcher(
+                            duration: AppMotion.fast,
+                            child: _scoreLine(context, state.score),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpace.xxl),
+
+                  // ── Yorum Alanı ───────────────────────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        'Yorum',
+                        style: AppTextStyles.titleSmall
+                            .copyWith(color: context.textPrimaryColor),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'isteğe bağlı',
+                        style: AppTextStyles.caption
+                            .copyWith(color: context.textTertiaryColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                  TextField(
+                    controller: _commentController,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 500,
+                    style: AppTextStyles.bodyMedium,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'Bu yemek hakkında ne düşünüyorsun?',
+                      alignLabelWithHint: true,
+                    ),
+                    onChanged: (val) => ref
+                        .read(ratingFlowProvider.notifier)
+                        .updateComment(val),
+                  ),
+
+                  const SizedBox(height: AppSpace.sm),
+
+                  // ── Hata mesajı ───────────────────────────────────────
+                  if (state.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpace.md),
+                      child: Text(
+                        state.errorMessage!,
+                        style: AppTextStyles.bodyMedium
+                            .copyWith(color: context.errorTextColor),
+                      ),
+                    ),
+
+                  // ── Kaydet Butonu ─────────────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: state.isLoading ? null : _submit,
+                      child: state.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: AppColors.onPrimary,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Puanı kaydet'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
+  /// Yıldızların altındaki satır: puan + etiket, ya da ne yapılacağı.
+  ///
+  /// Önceden puan yokken 52 px'lik sarı bir "—" duruyordu ve ekranda çizgi
+  /// gibi okunuyordu.
+  Widget _scoreLine(BuildContext context, double score) {
+    if (score == 0) {
+      return Text(
+        _scoreMissing ? 'Kaydetmeden önce bir puan seç' : 'Yıldızlara dokun',
+        key: ValueKey('empty-$_scoreMissing'),
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: _scoreMissing
+              ? context.errorTextColor
+              : context.textSecondaryColor,
+        ),
+      );
+    }
+    return Row(
+      key: ValueKey(score),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          score.toStringAsFixed(1),
+          style: AppTextStyles.ratingLarge
+              .copyWith(fontSize: 28, color: context.textPrimaryColor),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          _scoreLabel(score),
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w400,
+            color: context.textSecondaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Her yarım yıldızın kendi etiketi var. Önceden 1.5 ile 2 aynı etiketi
+  /// alıyordu; yarım yıldız seçen kullanıcı değişikliği yazıda görmüyordu.
   String _scoreLabel(double score) {
-    if (score == 0) return 'Puan seç';
     if (score <= 1.0) return 'Berbat';
-    if (score <= 2.0) return 'İdare eder';
+    if (score <= 1.5) return 'Çok kötü';
+    if (score <= 2.0) return 'Kötü';
+    if (score <= 2.5) return 'İdare eder';
     if (score <= 3.0) return 'Fena değil';
     if (score <= 3.5) return 'İyi';
-    if (score <= 4.0) return 'Güzel';
+    if (score <= 4.0) return 'Çok iyi';
     if (score <= 4.5) return 'Harika';
-    return 'Mükemmel!';
+    return 'Mükemmel';
   }
 }
 
-// ── Ürün önizleme ─────────────────────────────────────────────────────────────
+// ── Kaydedildi ────────────────────────────────────────────────────────────────
 
-class _ItemPreview extends StatelessWidget {
-  const _ItemPreview({required this.item});
-  final MenuItemModel item;
+class _SavedView extends StatelessWidget {
+  const _SavedView({
+    super.key,
+    required this.score,
+    required this.itemName,
+  });
+
+  final double score;
+  final String itemName;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (item.photoUrl != null && item.photoUrl!.isNotEmpty)
-            Image.network(
-              item.photoUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _placeholder(),
-            )
-          else
-            _placeholder(),
-          // Alt gradient + isim
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Color(0xDD0D0D0D), Colors.transparent],
+    final animate = !MediaQuery.disableAnimationsOf(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: animate ? 0.6 : 1, end: 1),
+              duration: const Duration(milliseconds: 380),
+              curve: Curves.easeOutBack,
+              builder: (_, v, child) => Transform.scale(scale: v, child: child),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  TablerIcons.check,
+                  size: 30,
+                  color: AppColors.onPrimary,
                 ),
               ),
-              child: Text(item.name, style: AppTextStyles.onImageTitleLarge),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpace.screen),
+            Text(
+              'Puanın kaydedildi',
+              style: AppTextStyles.headlineMedium
+                  .copyWith(color: context.textPrimaryColor),
+            ),
+            const SizedBox(height: AppSpace.md),
+            StarRow(rating: score, size: 18),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              itemName,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: context.textSecondaryColor),
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  Widget _placeholder() => Container(
-        color: AppColors.divider,
-        child: const Icon(Icons.restaurant_rounded,
-            color: AppColors.textDisabled, size: 48),
-      );
 }

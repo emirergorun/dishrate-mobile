@@ -2,65 +2,77 @@ import 'package:flutter/material.dart';
 
 // ignore_for_file: avoid_classes_with_only_static_members
 
-/// Dishrate renk paleti — sabit marka renkleri + koyu tema varsayılanları.
+/// Dishrate renk paleti.
+///
+/// Turuncu ve yıldız sarısı logodan gelir. Nötrler tek bir aileden (hafif
+/// sıcak kömür) türetildi: önceki palette soğuk iOS grileri ile nötr griler
+/// yan yana duruyordu ve yüzeyler farklı uygulamalardan toplanmış gibiydi.
+///
+/// **Ekranlarda sabit değil `context.*Color` erişimcisi kullan.** Sabitin
+/// kendisi rengi tek temaya kilitler; açık modda koyu leke olarak dönen
+/// hataların hepsi `AppColors.surface` gibi doğrudan kullanımlardan çıktı.
+/// Sabitler, henüz taşınmamış eski ekranlar derlenmeye devam etsin diye duruyor.
 abstract final class AppColors {
-  // ─── Arka plan katmanları ──────────────────────────────────────────────────
-  /// Ana sayfa arka planı: en derin siyah
-  static const Color background = Color(0xFF0D0D0D);
-
-  /// Kart / bileşen yüzeyi
-  static const Color surface = Color(0xFF1A1A1A);
-
-  /// Hafif yükseltilmiş yüzey (bottom sheet, modal)
-  static const Color surfaceElevated = Color(0xFF242424);
-
-  /// Ayırıcı çizgiler / ince kenarlıklar
-  static const Color divider = Color(0xFF2C2C2C);
-
-  // ─── Marka rengi ──────────────────────────────────────────────────────────
-  /// Dishrate ana turuncu — puan yıldızları, CTA butonları
+  // ─── Marka ────────────────────────────────────────────────────────────────
+  /// Ana eylem, seçili sekme, kelime markası. Başka hiçbir yerde "süs" olarak
+  /// kullanılmaz — her yerde turuncu olunca hiçbir şey öne çıkmıyordu.
   static const Color primary = Color(0xFFFF6B35);
 
-  /// Hover / pressed durumu için koyulaştırılmış turuncu
-  static const Color primaryDark = Color(0xFFD45A28);
+  /// Turuncu dolgunun üstündeki yazı. Beyaz bu turuncunun üstünde 2.8:1
+  /// kalıyordu (AA 4.5 ister); koyu yazı 6.9:1 veriyor.
+  static const Color onPrimary = Color(0xFF140B06);
 
-  /// Puan yıldızlarının dolgu rengi (amber tonu)
+  /// Yıldız glifi (koyu tema). Puan RAKAMLARI bu renkte yazılmaz: sarı metin
+  /// açık zeminde 1.5:1 kalıyor, okunmuyordu.
   static const Color star = Color(0xFFFFC107);
 
-  // ─── Metin ────────────────────────────────────────────────────────────────
-  /// Birincil metin: başlıklar, önemli içerik
-  static const Color textPrimary = Color(0xFFF5F5F5);
-
-  /// İkincil metin: açıklamalar, meta bilgiler
-  static const Color textSecondary = Color(0xFF8A8A8E);
-
-  /// Devre dışı / yer tutucu metin
-  static const Color textDisabled = Color(0xFF48484A);
-
-  // ─── Durum renkleri ───────────────────────────────────────────────────────
+  // ─── Durum ────────────────────────────────────────────────────────────────
   static const Color success = Color(0xFF30D158);
   static const Color error = Color(0xFFFF453A);
-  static const Color warning = Color(0xFFFFD60A);
 
-  // ─── Bottom nav ───────────────────────────────────────────────────────────
-  static const Color navBackground = Color(0xFF141414);
-  static const Color navSelected = Color(0xFFFF6B35);
-  static const Color navUnselected = Color(0xFF636366);
+  // ─── Koyu tema ────────────────────────────────────────────────────────────
+  /// Açılış ekranıyla birebir aynı; splash'ten uygulamaya geçişte ton kaymasın.
+  static const Color background = Color(0xFF0D0D0D);
+  static const Color surface = Color(0xFF171615);
+  static const Color surfaceElevated = Color(0xFF211F1D);
+  static const Color divider = Color(0xFF2B2926);
+  static const Color textPrimary = Color(0xFFF3F1EE);
 
-  // ─── Açık tema eşdeğerleri ────────────────────────────────────────────────
-  static const Color lightBackground = Color(0xFFF5F5F5);
-  static const Color lightSurface = Colors.white;
-  static const Color lightSurfaceElevated = Color(0xFFEFEFEF);
-  static const Color lightDivider = Color(0xFFE0E0E0);
-  static const Color lightTextPrimary = Color(0xFF111111);
-  static const Color lightTextSecondary = Color(0xFF6B6B6B);
-  static const Color lightTextDisabled = Color(0xFFBBBBBB);
-  static const Color lightNavBackground = Colors.white;
-  static const Color lightNavUnselected = Color(0xFF9E9E9E);
+  /// Zemin üstünde 5.7:1. Eski ekranlar bu sabiti iki temada da kullandığı
+  /// için açık zeminde de önceki değerden (3.15:1) geri kalmayacak ton seçildi.
+  static const Color textSecondary = Color(0xFF8F8A84);
+
+  /// Yer tutucu, pasif ikon. İkincil metinden bilerek daha soluk.
+  static const Color textDisabled = Color(0xFF6F6A64);
+
+  static const Color navBackground = background;
+  static const Color navSelected = primary;
+  static const Color navUnselected = Color(0xFF7A756F);
+
+  // ─── Açık tema ────────────────────────────────────────────────────────────
+  static const Color lightBackground = Color(0xFFF6F6F5);
+  static const Color lightSurface = Color(0xFFFDFDFC);
+  static const Color lightSurfaceElevated = Color(0xFFEDECEA);
+  static const Color lightDivider = Color(0xFFE2E0DD);
+  static const Color lightTextPrimary = Color(0xFF161412);
+  static const Color lightTextSecondary = Color(0xFF5E5953);
+  static const Color lightTextDisabled = Color(0xFF8A847E);
+  static const Color lightNavBackground = lightBackground;
+  static const Color lightNavUnselected = Color(0xFF8A847E);
+
+  /// Açık zeminde küçük turuncu metin. Marka turuncusu burada 2.6:1 kalıyordu;
+  /// bu ton 4.8:1 veriyor ve yan yana görüldüğünde hâlâ "aynı turuncu" okunuyor.
+  static const Color lightAccentText = Color(0xFFC2410C);
+
+  /// Açık zeminde yıldız glifi. Parlak sarı beyaza yakın zeminde şekil olarak
+  /// eriyordu; bu kehribar tonu yıldızın biçimini koruyor.
+  static const Color lightStar = Color(0xFFBF8700);
+
+  /// Açık zeminde hata metni. [error] burada 3.3:1 kalıyor, küçük yazı için az.
+  static const Color lightErrorText = Color(0xFFD70015);
 }
 
-/// Tema'ya duyarlı renk erişimi — widget build metodlarında kullanılır.
-/// Örn: `context.scheme.surface`
+/// Temaya duyarlı renk erişimi — widget build metodlarında kullanılır.
 extension ThemeColors on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
@@ -81,6 +93,26 @@ extension ThemeColors on BuildContext {
 
   Color get textSecondaryColor =>
       isDark ? AppColors.textSecondary : AppColors.lightTextSecondary;
+
+  /// Üçüncül metin: yer tutucu, pasif ikon, sıra numarası.
+  Color get textTertiaryColor =>
+      isDark ? AppColors.textDisabled : AppColors.lightTextDisabled;
+
+  /// Küçük boyutta turuncu yazı (bağlantı, "Sen" etiketi). Dolgu için değil —
+  /// dolgu her iki temada da [AppColors.primary].
+  Color get accentTextColor =>
+      isDark ? AppColors.primary : AppColors.lightAccentText;
+
+  Color get starColor => isDark ? AppColors.star : AppColors.lightStar;
+
+  Color get errorTextColor =>
+      isDark ? AppColors.error : AppColors.lightErrorText;
+
+  /// Alt panel zemini. Koyu temada zeminden bir ton açık ki panel sayfadan
+  /// ayrılsın; açık temada beyaza yakın ki içindeki dolgulu giriş alanları
+  /// (elevated tonunda) panelin üstünde seçilebilsin.
+  Color get sheetColor =>
+      isDark ? AppColors.surfaceElevated : AppColors.lightSurface;
 
   Color get navBgColor =>
       isDark ? AppColors.navBackground : AppColors.lightNavBackground;

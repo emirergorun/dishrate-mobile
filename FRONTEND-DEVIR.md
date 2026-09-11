@@ -37,22 +37,38 @@ döngünün destekçisidir. Tasarım bütçesi buna göre dağıtılmalı.
 
 ## Mevcut tasarım sistemi
 
-Üç dosya, hepsi `lib/core/theme/` altında. **Renk ve font hiçbir ekranda elle
+Dört dosya, hepsi `lib/core/theme/` altında. **Renk ve font hiçbir ekranda elle
 yazılmaz**, buradan okunur:
 
 | Dosya | Ne tutar |
 |---|---|
 | `app_colors.dart` | Palet + `context.bgColor` gibi temaya duyarlı erişimciler |
-| `app_text_styles.dart` | Tipografi ölçeği |
+| `app_text_styles.dart` | Tipografi ölçeği (stillerin çoğu renksiz, rengi ekran verir) |
 | `app_fonts.dart` | Font ailesi **ve** ağırlık adları — tek anahtar noktası |
+| `app_metrics.dart` | Köşe yuvarlaklığı (`AppRadius`), boşluk (`AppSpace`), hareket süresi (`AppMotion`) |
 
 Marka turuncusu `#FF6B35`, yıldız sarısı `#FFC107`. Logo bu ikisini kullanıyor,
-palet logodan türetildi.
+palet logodan türetildi. Kurallar:
+
+- Turuncu yalnızca ana eylemde (Değerlendir, +, seçili sekme). Turuncu dolgu
+  üstündeki yazı **koyu** (`AppColors.onPrimary`) — beyaz yazı 2.8:1 kalıyordu.
+- Puan **rakamları** metin renginde; sarı yalnızca yıldız glifinde.
+- Ekranda `AppColors.surface` gibi sabit değil `context.surfaceColor` gibi
+  erişimci kullan. Açık temada küçük turuncu yazı için `context.accentTextColor`,
+  yıldız için `context.starColor`, panel zemini için `context.sheetColor`.
+  Eski ekranlarda sabitler hâlâ duruyor; taşındıkça kalkacak.
 
 `AppFonts` kasıtlı olarak ağırlıkları da adlandırıyor (`display`, `heading`,
 `title`, `body`). Sebebi: Poppins ve Urbanist aynı sayısal ağırlıkta farklı
 kalınlıkta çiziyor. Ekranlarda `FontWeight.w600` yazmak yerine
 `AppFonts.title` yazılıyor ki font değişince skala tek yerden kaysın.
+
+Ortak bileşenler `lib/shared/widgets/` altında: `DishPhoto` (önbellekli
+fotoğraf), `DishSheet` (yemek paneli), `ReviewTile`, `StarGlyph`/`StarRow`/
+`RatingInline`, `StateMessage` (boş/hata), `SkeletonPulse`/`SkeletonRows`,
+`Pressable` (basılma geri bildirimi). İkonlar **Tabler**
+(`flutter_tabler_icons`). Phosphor denendi ama paketi Flutter 3.44 ile
+derlenmiyor (`IconData` artık `final`).
 
 ### Açık/koyu tema
 
@@ -75,7 +91,7 @@ Yeniden tasarım bunları koruyarak yapılmalı.
 | Klavye açılınca panelin küçülmesi | `shared/widgets/rating_sheet.dart` | Sabit yükseklikte yorum alanı klavyenin altında kalıyordu. Üç ekran bu paneli paylaşıyor |
 | Kaydırınca klavyenin kapanması | `rating/screens/step3_rate_item.dart` | `keyboardDismissBehavior: onDrag` — yoksa klavyeden kurtulmanın yolu yok |
 | Görsel üstü metin renkleri | `core/theme/app_text_styles.dart` | Açık modda kontrast hatası |
-| Boş yıldızın çerçeveli olması | `rating/screens/step3_rate_item.dart` | Soluk dolgu koyu temada zeminle kayboluyordu |
+| Boş yıldızın çerçeveli olması | `rating/screens/step3_rate_item.dart`, çizimi `shared/widgets/rating_stars.dart` (`StarGlyph`) | Soluk dolgu koyu temada zeminle kayboluyordu |
 | Türkçe alfabe sıralaması | `core/utils/turkce.dart` | `List.sort()` Ç/Ğ/İ/Ö/Ş/Ü'yü Z'den sonraya atıyor |
 | Türkçe büyük harf | aynı dosya (`Turkce.buyuk`) | `toUpperCase()` "Diğer"i DIĞER yapıyor |
 | GPS izninin **açılışta sorulmaması** | `discover/screens/discover_screen.dart` | iOS izin penceresi ömür boyu bir kez açılıyor. Kullanıcı faydasını görmeden reddederse şans kalıcı olarak gidiyor. İzin, konuma dokunulduğunda isteniyor |
@@ -89,15 +105,19 @@ Bu listedeki bir davranışı bilerek değiştirmen gerekiyorsa önce sor.
 
 ## Bekleyen kararlar
 
-**Font.** Şu an Poppins. Kullanıcı "fazla kalın" buluyor, üç seçenek karşılaştırıldı
-ama karar verilmedi. Kodu değiştirmeden denemek için:
+**Font.** Arayüz **Urbanist**; logo yazısı "dishrate" Poppins SemiBold olarak
+kaldı (`AppFonts.wordmark`, arayüz fontundan bağımsız). Urbanist'te Türkçe
+harflerin tamamı var ve fi/fl bitişik harfi yok. "Fazla kalın" şikâyeti için
+skaladan 900 ve 700 çıkarıldı, en ağır seviye 600. Geist denendi, karşılaştırma
+için `assets/fonts/` altında duruyor. Kodu değiştirmeden karşılaştırmak için:
 
 ```bash
-flutter run --dart-define=LIGHT_WEIGHTS=true      # Poppins inceltilmiş
-flutter run --dart-define=APP_FONT=Urbanist       # Urbanist'e dön
+flutter run --dart-define=APP_FONT=Geist          # Geist
+flutter run --dart-define=APP_FONT=Poppins        # Poppins (skala ona göre inceliyor)
 ```
 
-Kalıcı hâle getirmek `app_fonts.dart` içinde tek satır.
+Kalıcı hâle getirmek ya da geri almak `app_fonts.dart` içinde tek satır.
+Eski `LIGHT_WEIGHTS` bayrağı kaldırıldı; incelik artık varsayılan.
 
 **Logo.** Bilinçli olarak ertelendi. Mevcut logo (tabak + yıldız, turuncu)
 yerinde kalacak. `assets/branding/` altındaki 6 PNG ile ikon/açılış ekranı

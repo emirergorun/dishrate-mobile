@@ -3,49 +3,61 @@ import 'package:flutter/material.dart' show FontWeight;
 /// Dishrate font aileleri.
 ///
 /// Uygulamadaki **tek** font tanımı burasıdır. `AppTextStyles` ve `AppTheme`
-/// bu sınıfı okur; hiçbir yerde font adı elle yazılmaz. Font değiştirmek için
-/// tek yapman gereken [active] değerini değiştirmektir.
+/// bu sınıfı okur; hiçbir yerde font adı elle yazılmaz.
 ///
-/// Her iki aile de `pubspec.yaml` içinde aynı ağırlık skalasıyla tanımlıdır:
-///   300 Light · 400 Regular (+italic) · 500 Medium (+italic)
-///   600 SemiBold · 700 Bold (+italic) · 900 Black
+/// Arayüz fontu [active], logo yazısı [wordmark]. İkisi bilerek ayrı: arayüz
+/// fontu değişse de "dishrate" yazısı logonun kendisiyle yan yana geldiği
+/// yerlerde (açılış, giriş, keşfet başlığı) birebir aynı görünmeli.
 ///
-/// Kalıcı olarak değiştirmek: aşağıdaki `defaultValue` değerini düzenle.
-/// Geçici olarak denemek (kodu değiştirmeden):
+/// Kalıcı olarak değiştirmek: [active] içindeki `defaultValue`.
+/// Kodu değiştirmeden karşılaştırmak:
 /// ```
-/// flutter run --dart-define=APP_FONT=Urbanist
+/// flutter run --dart-define=APP_FONT=Geist
+/// flutter run --dart-define=APP_FONT=Poppins
 /// ```
 abstract final class AppFonts {
-  /// Logo kelime markasıyla aynı aile (logo "dishrate" yazısı Poppins SemiBold).
-  static const String poppins = 'Poppins';
-
-  /// Önceki font — karşılaştırma için duruyor.
+  /// Arayüz fontu. Türkçe harflerin tamamı var (Ç Ğ İ Ö Ş Ü ı) ve fi/fl
+  /// bitişik harfi yok — "Profil", "fit" gibi kelimelerde i'nin noktası
+  /// f'nin kancasına yapışıp "ı" gibi okunmuyor.
   static const String urbanist = 'Urbanist';
 
-  /// Uygulamanın kullandığı aktif font ailesi.
+  /// Logo kelime markasının ailesi (Poppins SemiBold, harf aralığı −%2).
+  static const String poppins = 'Poppins';
+
+  /// Denendi; karşılaştırma için duruyor.
+  static const String geist = 'Geist';
+
+  /// Arayüzün kullandığı aktif font ailesi.
   static const String active = String.fromEnvironment(
     'APP_FONT',
-    defaultValue: poppins,
+    defaultValue: urbanist,
   );
 
+  /// Logo yazısı — [active] ne olursa olsun değişmez.
+  static const String wordmark = poppins;
+
   // ── Ağırlık skalası ────────────────────────────────────────────────────────
-  // Poppins aynı sayıda Urbanist'ten belirgin daha kalın çizer; aynı skala
-  // iki fontta aynı ağırlıkta durmaz. Bu yüzden ağırlıklar sabit sayı olarak
-  // değil, buradaki adlar üzerinden veriliyor.
+  // Ekranlarda `FontWeight.w600` yerine bu adlar yazılır ki skala tek yerden
+  // kaysın. Poppins aynı sayıda Urbanist'ten belirgin kalın çizdiği için skala
+  // fonta göre seçiliyor; `APP_FONT=Poppins` ile karşılaştırırken "fazla kalın"
+  // hissi geri gelmesin.
   //
-  // İnce skalayı denemek (kodu değiştirmeden):
-  //   flutter run --dart-define=LIGHT_WEIGHTS=true
-  static const bool _light = bool.fromEnvironment('LIGHT_WEIGHTS');
+  // 900 (Black) ve 700 skalada yok: 26px'lik başlıkların Black olması "fazla
+  // kalın" şikâyetinin asıl kaynağıydı. Hiyerarşi artık ağırlıkla değil boyut
+  // ve renkle kuruluyor.
+  static const bool _poppins = active == poppins;
 
-  /// En ağır seviye — büyük başlıklar.
-  static const FontWeight display = _light ? FontWeight.w700 : FontWeight.w900;
+  /// Büyük başlıklar ("Nerede yedin?", yemek adı).
+  static const FontWeight display =
+      _poppins ? FontWeight.w500 : FontWeight.w600;
 
-  /// Ekran başlıkları.
-  static const FontWeight heading = _light ? FontWeight.w600 : FontWeight.w700;
+  /// Ekran ve bölüm başlıkları.
+  static const FontWeight heading =
+      _poppins ? FontWeight.w500 : FontWeight.w600;
 
-  /// Kart/bölüm başlıkları, buton yazıları.
-  static const FontWeight title = _light ? FontWeight.w500 : FontWeight.w600;
+  /// Liste öğesi adları, buton yazıları, sayılar.
+  static const FontWeight title = FontWeight.w500;
 
-  /// Gövde metni — zaten hafif, iki skalada da aynı.
+  /// Gövde metni.
   static const FontWeight body = FontWeight.w400;
 }
