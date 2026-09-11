@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/pressable.dart';
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
@@ -15,15 +16,21 @@ class SectionHeader extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onSeeAll;
 
+  /// Başlığın üstünde, dokunma alanına katılan boşluk. Bölümler arası boşluk
+  /// bunu düşerek veriliyor; başlık görünüşte yerinden oynamıyor.
+  static const double tapInset = AppSpace.sm;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      // Sağ boşluk küçük: "Tümünü gör" butonunun kendi dokunma alanı var,
-      // yazısı yine de ekran kenarıyla hizalı duruyor.
+    final header = Padding(
       padding: const EdgeInsets.fromLTRB(
-          AppSpace.screen, 0, AppSpace.sm, AppSpace.md + 2),
+          AppSpace.screen, tapInset, AppSpace.screen, AppSpace.md),
+      // "Tümünü gör" başlığın satırına hizalı. Önceden son satıra (alt
+      // başlığa) hizalıydı; alt başlığı olan ve olmayan bölümler yan yana
+      // gelince bağlantı her bölümde başka yükseklikte duruyordu.
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
           // Başlık bloğu genişleyebilir alanda: uzun alt başlık önceden
           // "Tümünü gör" ile çakışıyordu.
@@ -37,7 +44,7 @@ class SectionHeader extends StatelessWidget {
                       .copyWith(color: context.textPrimaryColor),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 3),
+                  const SizedBox(height: AppSpace.xxs),
                   Text(
                     subtitle!,
                     style: AppTextStyles.caption
@@ -47,21 +54,32 @@ class SectionHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (onSeeAll != null)
-            TextButton(
-              onPressed: onSeeAll,
-              style: TextButton.styleFrom(
-                // Turuncu yalnızca ana eylemde; altı bölümde altı turuncu
-                // bağlantı ekranın vurgusunu dağıtıyordu.
-                foregroundColor: context.textSecondaryColor,
-                textStyle: AppTextStyles.label,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(0, 36),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Tümünü gör'),
+          if (onSeeAll != null) ...[
+            const SizedBox(width: AppSpace.md),
+            // Turuncu yalnızca ana eylemde; altı bölümde altı turuncu
+            // bağlantı ekranın vurgusunu dağıtıyordu.
+            Text(
+              'Tümünü gör',
+              style: AppTextStyles.label
+                  .copyWith(color: context.textSecondaryColor),
             ),
+          ],
         ],
+      ),
+    );
+
+    if (onSeeAll == null) return header;
+
+    // Dokunma hedefi yalnızca "Tümünü gör" yazısı değil, başlığın tamamı.
+    // Yazı 36 pt'lik bir butondu; onu 44'e büyütmek başlık satırını uzatıp
+    // alt başlıksız bölümlerde ritmi bozuyordu.
+    return Pressable(
+      onTap: onSeeAll,
+      scale: 1,
+      semanticLabel: '$title, tümünü gör',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppSize.minTap),
+        child: header,
       ),
     );
   }

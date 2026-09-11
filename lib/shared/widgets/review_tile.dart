@@ -114,9 +114,7 @@ class _Initials extends StatelessWidget {
       height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        // Yarı saydam metin rengi: panelde de sayfada da zeminin bir ton
-        // üstünde durur, iki ayrı renk tanımlamaya gerek kalmaz.
-        color: context.textPrimaryColor.withValues(alpha: 0.08),
+        color: context.fillColor,
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(

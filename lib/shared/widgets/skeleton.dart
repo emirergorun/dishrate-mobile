@@ -111,7 +111,9 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
+        // Nötr dolgu. `surfaceElevated` koyu temada panel zemininin kendisiydi;
+        // yemek panelinde ve değerlendirme akışında iskelet görünmüyordu.
+        color: context.fillColor,
         borderRadius: BorderRadius.circular(radius),
       ),
     );

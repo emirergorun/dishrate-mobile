@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
@@ -15,6 +15,9 @@ import 'menu_item_card.dart';
 // Altı bölümün hepsi aynı yatay kart şeridiyle dizilince ekranda göze ilk
 // çarpan bir yer kalmıyor ve her bölüm bir öncekinin kopyası gibi okunuyordu.
 // Bölümlerin sayısı ve verisi aynı; yalnızca kompozisyon değişiyor.
+//
+// Kart dili ise değişmiyor: şeritler de ızgara da aynı [MenuItemCard]'ı
+// kullanıyor, fark fotoğraf oranında ve dizilişte.
 
 typedef DishTap = void Function(MenuItemModel item);
 
@@ -101,7 +104,7 @@ class _LeadItem extends StatelessWidget {
                       style: AppTextStyles.titleMedium
                           .copyWith(color: context.textPrimaryColor),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpace.xxs),
                     Text(
                       _meta(item),
                       maxLines: 1,
@@ -114,7 +117,7 @@ class _LeadItem extends StatelessWidget {
               ),
               const SizedBox(width: AppSpace.md),
               Padding(
-                padding: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.only(top: AppSpace.xxs),
                 child: RatingInline(rating: item.averageRating),
               ),
             ],
@@ -148,6 +151,12 @@ class DishRankRow extends StatelessWidget {
   /// Adın üstünde küçük vurgulu not ("Önerilen" gibi).
   final String? note;
 
+  /// Sıra numarası sütununun genişliği ve satır fotoğrafının kenarı. Keşfet
+  /// iskeleti de bunları okuyor; ayrı ayrı yazılınca biri değişip öbürü
+  /// geride kalıyor, içerik gelince liste zıplıyordu.
+  static const double rankWidth = 28;
+  static const double photoSize = 56;
+
   @override
   Widget build(BuildContext context) {
     final meta = showRestaurant ? _meta(item) : (item.categoryName ?? '');
@@ -156,14 +165,14 @@ class DishRankRow extends StatelessWidget {
       onTap: onTap,
       semanticLabel: rank == null ? item.name : '$rank. ${item.name}',
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
         child: Row(
           children: [
             _RankNumber(rank: rank),
             DishPhoto(
               url: item.photoUrl,
-              width: 56,
-              height: 56,
+              width: photoSize,
+              height: photoSize,
               radius: AppRadius.sm,
               iconSize: 20,
             ),
@@ -180,7 +189,7 @@ class DishRankRow extends StatelessWidget {
                         color: context.accentTextColor,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: AppSpace.xxs),
                   ],
                   Text(
                     item.name,
@@ -190,7 +199,7 @@ class DishRankRow extends StatelessWidget {
                         .copyWith(color: context.textPrimaryColor),
                   ),
                   if (meta.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpace.xxs),
                     Text(
                       meta,
                       maxLines: 1,
@@ -218,11 +227,12 @@ class _RankNumber extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 28,
+      width: DishRankRow.rankWidth,
       child: Text(
         rank == null ? '' : '$rank',
         style: AppTextStyles.titleMedium.copyWith(
-          fontWeight: FontWeight.w500,
+          // Numara yemek adının önüne geçmesin: başlık değil liste ağırlığı.
+          fontWeight: AppFonts.title,
           fontFeatures: AppTextStyles.tabular,
           color: context.textTertiaryColor,
         ),
@@ -266,6 +276,8 @@ class DishPosterCarousel extends StatelessWidget {
 
 // ── Geniş kart şeridi ─────────────────────────────────────────────────────────
 
+/// Yatay fotoğraflı şerit. Dikey poster şeridinden kartın kendisiyle değil,
+/// oran ve genişlikle ayrılıyor.
 class DishWideCarousel extends StatelessWidget {
   const DishWideCarousel({
     super.key,
@@ -276,10 +288,17 @@ class DishWideCarousel extends StatelessWidget {
   final List<MenuItemModel> items;
   final DishTap onTap;
 
+  static const double _cardWidth = 264;
+  static const double _photoAspect = 16 / 10;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 176,
+      height: MenuItemCard.heightFor(
+        context,
+        _cardWidth,
+        photoAspect: _photoAspect,
+      ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -287,8 +306,12 @@ class DishWideCarousel extends StatelessWidget {
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
         itemBuilder: (context, i) => SizedBox(
-          width: 264,
-          child: DishOverlayCard(item: items[i], onTap: () => onTap(items[i])),
+          width: _cardWidth,
+          child: MenuItemCard(
+            item: items[i],
+            onTap: () => onTap(items[i]),
+            photoAspect: _photoAspect,
+          ),
         ),
       ),
     );
@@ -314,110 +337,34 @@ class DishTileGrid extends StatelessWidget {
     final count = items.length >= 4 ? 4 : (items.length >= 2 ? 2 : 1);
     final shown = items.take(count).toList();
 
-    Widget tile(MenuItemModel item, double aspect) => AspectRatio(
-          aspectRatio: aspect,
-          child: DishOverlayCard(item: item, onTap: () => onTap(item)),
+    Widget card(MenuItemModel item, double aspect) => MenuItemCard(
+          item: item,
+          onTap: () => onTap(item),
+          photoAspect: aspect,
         );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
       child: count == 1
-          ? tile(shown[0], 16 / 10)
+          ? card(shown[0], 16 / 10)
           : Column(
               children: [
                 for (var r = 0; r < count; r += 2) ...[
-                  if (r > 0) const SizedBox(height: AppSpace.md),
+                  // Satır arası sütun arasından geniş: bilgi fotoğrafın
+                  // altında, sıkı dursa üst kartın puan satırı alttaki kartın
+                  // fotoğrafına yapışır. "Tümünü gör" ızgarasıyla aynı değer.
+                  if (r > 0) const SizedBox(height: AppSpace.xl),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: tile(shown[r], 1)),
+                      Expanded(child: card(shown[r], 1)),
                       const SizedBox(width: AppSpace.md),
-                      Expanded(child: tile(shown[r + 1], 1)),
+                      Expanded(child: card(shown[r + 1], 1)),
                     ],
                   ),
                 ],
               ],
             ),
-    );
-  }
-}
-
-// ── Görsel üstü yazılı kart ───────────────────────────────────────────────────
-
-/// Fotoğrafın üzerine koyu degradeyle ad ve puan yazılan kart. Rozet yok:
-/// fotoğrafın köşelerine yapışan kutucuklar yemeği örtüyordu.
-class DishOverlayCard extends StatelessWidget {
-  const DishOverlayCard({super.key, required this.item, required this.onTap});
-
-  final MenuItemModel item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      semanticLabel: item.name,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            DishPhoto(url: item.photoUrl, iconSize: 28),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 36, 12, 12),
-                decoration: const BoxDecoration(
-                  // Degrade her iki temada da koyu — üstündeki yazılar bu
-                  // yüzden AppTextStyles.onImage* ile sabit renkte.
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0xE60D0D0D), Color(0x000D0D0D)],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.onImageTitle,
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.restaurantName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.onImageCaption,
-                          ),
-                        ),
-                        if (item.averageRating > 0) ...[
-                          const SizedBox(width: AppSpace.sm),
-                          const Icon(TablerIcons.star_filled,
-                              size: 12, color: AppColors.star),
-                          const SizedBox(width: 3),
-                          Text(
-                            item.averageRating.toStringAsFixed(1),
-                            style: AppTextStyles.ratingSmall
-                                .copyWith(color: Colors.white),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

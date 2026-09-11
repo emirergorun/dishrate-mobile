@@ -85,6 +85,15 @@ extension ThemeColors on BuildContext {
   Color get surfaceElevatedColor =>
       isDark ? AppColors.surfaceElevated : AppColors.lightSurfaceElevated;
 
+  /// Nötr dolgu: çip, iskelet, fotoğraf yer tutucusu, baş harf kutusu.
+  ///
+  /// Metin renginin yarı saydam hâli, bu yüzden sayfada da alt panelde de
+  /// zeminin bir kademe üstünde durur. Sabit yüzey tonları bunu yapamıyordu:
+  /// `surfaceElevated` koyu temada panel zemininin kendisi olduğu için
+  /// panellerdeki iskelet görünmüyordu; `surface` de sayfa zemininden ancak
+  /// 1.06–1.08:1 ayrıldığı için çipin şekli kayboluyordu.
+  Color get fillColor => textPrimaryColor.withValues(alpha: 0.08);
+
   Color get dividerColor =>
       isDark ? AppColors.divider : AppColors.lightDivider;
 

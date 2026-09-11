@@ -14,6 +14,14 @@ class CategoryChips extends StatefulWidget {
   final List<String> categories;
   final ValueChanged<String?>? onSelected;
 
+  /// Çipin görünen yüksekliği.
+  static const double _chipHeight = 36;
+
+  /// Dokunma alanının çipin üstünden ve altından taşan kısmı. Şerit bu kadar
+  /// uzuyor; çevresindeki boşluklar bunu düşerek veriliyor ki çip görünüşte
+  /// yerinden oynamasın.
+  static const double tapInset = (AppSize.minTap - _chipHeight) / 2;
+
   @override
   State<CategoryChips> createState() => _CategoryChipsState();
 }
@@ -24,7 +32,9 @@ class _CategoryChipsState extends State<CategoryChips> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 36,
+      // Şerit dokunma alanı kadar yüksek, çip ortada: parmak çipin biraz
+      // üstüne ya da altına denk gelse de seçim kaçmıyor.
+      height: AppSize.minTap,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -71,20 +81,23 @@ class _Chip extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       semanticLabel: label,
-      child: AnimatedContainer(
-        duration: AppMotion.base,
-        curve: AppMotion.curve,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? context.textPrimaryColor : context.surfaceColor,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.label.copyWith(
-            fontSize: 14,
-            color: isSelected ? context.bgColor : context.textPrimaryColor,
+      child: Center(
+        child: AnimatedContainer(
+          duration: AppMotion.base,
+          curve: AppMotion.curve,
+          height: CategoryChips._chipHeight,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          decoration: BoxDecoration(
+            color: isSelected ? context.textPrimaryColor : context.fillColor,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.label.copyWith(
+              fontSize: 14,
+              color: isSelected ? context.bgColor : context.textPrimaryColor,
+            ),
           ),
         ),
       ),

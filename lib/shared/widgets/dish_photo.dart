@@ -71,10 +71,9 @@ class _Placeholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      // Yarı saydam metin rengi: sayfada da alt panelde de zeminin bir kademe
-      // üstünde durur. Sabit "elevated" ton, koyu temada panel zeminiyle
-      // aynı olduğu için kutu kayboluyor, ortada yalnızca ikon kalıyordu.
-      color: context.textPrimaryColor.withValues(alpha: 0.07),
+      // Sabit "elevated" ton koyu temada panel zeminiyle aynı olduğu için kutu
+      // kayboluyor, ortada yalnızca ikon kalıyordu.
+      color: context.fillColor,
       child: iconSize == null
           ? const SizedBox.expand()
           : Center(

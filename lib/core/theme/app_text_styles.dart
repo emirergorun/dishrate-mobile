@@ -132,6 +132,19 @@ abstract final class AppTextStyles {
         letterSpacing: 0.2,
       );
 
+  // ─── Kelime markası ───────────────────────────────────────────────────────
+  /// "dishrate" yazısı. Arayüz fontundan ve ağırlık skalasından bilerek
+  /// bağımsız: ayar logonun kendisinden (Poppins SemiBold, harf aralığı −%2).
+  /// Harf aralığı puntoya oranlı, punto değişse de logoyla oran korunur.
+  /// Rengi ekran verir.
+  static TextStyle wordmark(double size) => TextStyle(
+        fontFamily: AppFonts.wordmark,
+        fontSize: size,
+        fontWeight: FontWeight.w600,
+        height: 1,
+        letterSpacing: size * -0.02,
+      );
+
   // ─── Görsel üstü metin ────────────────────────────────────────────────────
   // Fotoğrafın üzerine koyu degradeyle yerleştirilen yazılar. Zemin her iki
   // temada da koyu olduğundan renkler SABİTTİR. Buraya tema rengi miras alan

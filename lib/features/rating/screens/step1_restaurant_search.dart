@@ -215,11 +215,10 @@ class _HintChip extends StatelessWidget {
       semanticLabel: '$label ara',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        // Yarı saydam metin rengi zemin: panelin tonu ne olursa olsun bir
-        // kademe üstünde durur. Sabit koyu zemin açık temada kara leke, turuncu
-        // zemin de ekranın asıl eylemiyle yarışan bir vurgu oluyordu.
+        // Nötr dolgu: sabit koyu zemin açık temada kara leke, turuncu zemin de
+        // ekranın asıl eylemiyle yarışan bir vurgu oluyordu.
         decoration: BoxDecoration(
-          color: context.textPrimaryColor.withValues(alpha: 0.07),
+          color: context.fillColor,
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
@@ -267,7 +266,7 @@ class _RestaurantTile extends StatelessWidget {
                     height: 44,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: context.textPrimaryColor.withValues(alpha: 0.07),
+                      color: context.fillColor,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Text(

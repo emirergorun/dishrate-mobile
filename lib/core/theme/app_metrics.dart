@@ -21,6 +21,9 @@ abstract final class AppRadius {
 
 /// Boşluk ölçeği — 4'ün katları. Ekran kenarı her yerde [screen].
 abstract final class AppSpace {
+  /// Yalnızca birbirine ait metin satırları arasında (yemek adı → restoran).
+  /// Ölçekte yokken ekranlara 1, 2, 3, 5, 6 gibi elle değerler yazılıyordu.
+  static const double xxs = 2;
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 12;
@@ -32,6 +35,14 @@ abstract final class AppSpace {
   /// Keşfet'teki bölümler arası. Başlıklar bölümü ayırmaya yetmediği için
   /// kutu/çizgi yerine boşlukla ayrılıyor.
   static const double section = 40;
+}
+
+/// Bileşen ölçüleri.
+abstract final class AppSize {
+  /// En küçük dokunma alanı (iOS 44 pt). Görünen boyuttan bağımsız: çip ya da
+  /// tek satırlık bir bağlantı görünüşte küçük kalabilir, parmağın hedeflediği
+  /// alan bundan küçük olmamalı.
+  static const double minTap = 44;
 }
 
 /// Hareket süreleri. Uzun animasyon puanlama gibi hızlı bir döngüyü

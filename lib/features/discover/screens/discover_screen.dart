@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
@@ -20,8 +19,7 @@ import '../../../shared/widgets/searchable_picker.dart';
 import '../../../core/location/location_service.dart';
 import 'see_all_screen.dart';
 
-/// Başlıktaki "dishrate" kelime markasının punto'su. Harf aralığı buna
-/// oranla (−%2) hesaplanır, böylece punto değişse de logoyla oran korunur.
+/// Başlıktaki "dishrate" kelime markasının punto'su.
 ///
 /// Başlık artık genişleyip daralmıyor: genişken yazı 1.5 kat büyüyüp konum
 /// yazısını da büyütüyor, kaydırınca ikisi birden zıplıyordu.
@@ -33,7 +31,7 @@ enum _Layout { ranked, posters, wide, grid, list }
 
 typedef _Section = ({
   String title,
-  String subtitle,
+  String? subtitle,
   List<MenuItemModel> items,
   _Layout layout,
 });
@@ -189,6 +187,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   ///
   /// Başlıklar cümle düzeninde: Her Kelimesi Büyük Başlık altı bölümde üst
   /// üste gelince ekran bir menü tabelası gibi okunuyordu.
+  ///
+  /// Alt başlık yalnızca bölümün neye göre dizildiğini söylüyorsa var.
+  /// Başlığı başka sözlerle tekrar eden alt başlıklar altı bölümde altı gri
+  /// satır ediyordu; ekran fotoğraflardan önce metin olarak okunuyordu.
   List<_Section> get _sections {
     final loc = ref.watch(selectedLocationProvider);
     final yer = loc.hasIlce ? loc.ilce! : loc.il;
@@ -207,25 +209,25 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       ),
       (
         title: 'Herkes denemek istiyor',
-        subtitle: 'Merak uyandıran özel lezzetler',
+        subtitle: null,
         items: _mostWanted,
         layout: _Layout.wide,
       ),
       (
         title: 'Diyeti bozmaya değer',
-        subtitle: 'Pişman olmayacağın kalorili şaheserler',
+        subtitle: null,
         items: _cheatMeal,
         layout: _Layout.grid,
       ),
       (
         title: 'Sağlıklı & fit seçenekler',
-        subtitle: 'Hem lezzetli hem de hafif alternatifler',
+        subtitle: null,
         items: _healthy,
         layout: _Layout.posters,
       ),
       (
         title: 'Şehrin gizli mücevherleri',
-        subtitle: 'Az bilinen ama çok sevilecek lezzetler',
+        subtitle: null,
         items: _hidden,
         layout: _Layout.list,
       ),
@@ -292,7 +294,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             // ── Kategori Chip'leri ───────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: AppSpace.xs),
+                // Şeridin dokunma alanı çipten uzun; taşan kısım üst boşluktan
+                // düşülüyor ki çip görünüşte yerinden oynamasın.
+                padding: const EdgeInsets.only(
+                    top: AppSpace.xs - CategoryChips.tapInset),
                 child: CategoryChips(
                   categories: _categories,
                   onSelected: (category) {
@@ -345,8 +350,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 itemBuilder: (context, index) {
                   final s = sections[index];
                   return Padding(
+                    // Başlığın dokunma alanı üstüne, çiplerinki altına
+                    // taşıyor; ikisi düşülünce görünen boşluk yine xl/section.
                     padding: EdgeInsets.only(
-                      top: index == 0 ? AppSpace.xl : AppSpace.section,
+                      top: (index == 0
+                              ? AppSpace.xl - CategoryChips.tapInset
+                              : AppSpace.section) -
+                          SectionHeader.tapInset,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,18 +391,22 @@ class _DiscoverSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget row() => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.symmetric(vertical: AppSpace.md),
           child: Row(
             children: [
-              SizedBox(width: 28),
-              SkeletonBox(width: 56, height: 56, radius: AppRadius.sm),
+              SizedBox(width: DishRankRow.rankWidth),
+              SkeletonBox(
+                width: DishRankRow.photoSize,
+                height: DishRankRow.photoSize,
+                radius: AppRadius.sm,
+              ),
               SizedBox(width: AppSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SkeletonBox(width: 160, height: 14),
-                    SizedBox(height: 6),
+                    SizedBox(height: AppSpace.sm),
                     SkeletonBox(width: 110, height: 12),
                   ],
                 ),
@@ -402,14 +416,14 @@ class _DiscoverSkeleton extends StatelessWidget {
         );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpace.screen, AppSpace.xl, AppSpace.screen, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpace.screen,
+          AppSpace.xl - CategoryChips.tapInset, AppSpace.screen, 0),
       child: SkeletonPulse(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SkeletonBox(width: 180, height: 20),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpace.sm),
             const SkeletonBox(width: 240, height: 12),
             const SizedBox(height: AppSpace.lg),
             const AspectRatio(
@@ -566,20 +580,11 @@ class _DiscoverAppBar extends ConsumerWidget {
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Logo kelime markası — ayarlar logonun kendisinden alınmıştır
-          // ("Dishrate logo/OKUBENI.md": Poppins SemiBold 600, harf aralığı
-          // −%2, hep küçük harf). Arayüz fontu Geist olsa da bu yazı logoyla
-          // yan yana geldiğinde (açılış, giriş ekranı) aynı görünmeli.
-          const Text(
+          // Logo kelime markası — hep küçük harf; ayarı token katmanında.
+          Text(
             'dishrate',
-            style: TextStyle(
-              fontFamily: AppFonts.wordmark,
-              fontSize: _wordmarkSize,
-              fontWeight: FontWeight.w600,
-              height: 1,
-              color: AppColors.primary,
-              letterSpacing: _wordmarkSize * -0.02,
-            ),
+            style: AppTextStyles.wordmark(_wordmarkSize)
+                .copyWith(color: AppColors.primary),
           ),
           const Spacer(),
           // Konum — dokunulunca il/ilçe seçilir; GPS seçeneği de o listenin
@@ -588,8 +593,10 @@ class _DiscoverAppBar extends ConsumerWidget {
           Pressable(
             onTap: () => _onLocationTap(context, ref),
             semanticLabel: 'Konum: ${loc.isUnset ? 'seçilmedi' : loc.etiket}',
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            // Yazı tek satır, görünen yükseklik 34 pt'de kalıyor; dokunma
+            // alanı yine de en az 44.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: AppSize.minTap),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -600,7 +607,7 @@ class _DiscoverAppBar extends ConsumerWidget {
                     color: context.textSecondaryColor,
                     size: 16,
                   ),
-                  const SizedBox(width: 5),
+                  const SizedBox(width: AppSpace.xs),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 170),
                     child: Text(
@@ -616,7 +623,7 @@ class _DiscoverAppBar extends ConsumerWidget {
                   // Konum GPS'ten geliyorsa seçim yapmaya gerek yok — ok
                   // işareti "burada seçilecek bir şey var" diye çağırmasın.
                   if (loc.source != LocationSource.gps) ...[
-                    const SizedBox(width: 3),
+                    const SizedBox(width: AppSpace.xxs),
                     Icon(
                       TablerIcons.chevron_down,
                       color: context.textSecondaryColor,
