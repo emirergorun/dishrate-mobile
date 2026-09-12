@@ -21,7 +21,7 @@ class DishrateWordmark extends StatelessWidget {
   const DishrateWordmark({super.key, this.width = 180});
 
   /// Kaynak görselin en-boy oranı (1070 × 242).
-  static const double _aspectRatio = 1070 / 242;
+  static const double _aspectRatio = 2400 / 764;
 
   final double width;
 
