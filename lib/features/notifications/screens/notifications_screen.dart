@@ -248,7 +248,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Text(msg,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
             if (action != null) ...[const SizedBox(height: 20), action],
           ],
         ),

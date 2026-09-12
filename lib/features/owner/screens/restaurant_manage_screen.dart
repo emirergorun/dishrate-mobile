@@ -195,8 +195,8 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.location_on_rounded,
-                  size: 16, color: AppColors.textSecondary),
+              Icon(Icons.location_on_rounded,
+                  size: 16, color: context.textSecondaryColor),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -218,7 +218,7 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
             const SizedBox(width: 8),
             Text('(${_menu.length})',
                 style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
           ],
         ),
         const SizedBox(height: 8),
@@ -228,7 +228,7 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
             child: Center(
               child: Text('Henüz ürün yok. "Ürün Ekle" ile başla.',
                   style: AppTextStyles.bodyMedium
-                      .copyWith(color: AppColors.textSecondary)),
+                      .copyWith(color: context.textSecondaryColor)),
             ),
           )
         else
@@ -262,7 +262,7 @@ class _RestaurantManageScreenState extends State<RestaurantManageScreen> {
             Text(msg,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
             if (action != null) ...[const SizedBox(height: 20), action],
           ],
         ),
@@ -333,8 +333,8 @@ class _MenuManageRow extends StatelessWidget {
             ),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded,
-                color: AppColors.textSecondary),
+            icon: Icon(Icons.more_vert_rounded,
+                color: context.textSecondaryColor),
             onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
@@ -801,8 +801,8 @@ class _RestaurantEditSheetState extends State<_RestaurantEditSheet> {
                                     height: 64,
                                     fit: BoxFit.cover),
                               )
-                            : const Icon(Icons.add_a_photo_outlined,
-                                color: AppColors.textSecondary, size: 22),
+                            : Icon(Icons.add_a_photo_outlined,
+                                color: context.textSecondaryColor, size: 22),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -810,7 +810,7 @@ class _RestaurantEditSheetState extends State<_RestaurantEditSheet> {
                   child: Text(
                     'Restoran logosu\nDeğiştirmek için tıkla',
                     style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.textSecondary),
+                        .copyWith(color: context.textSecondaryColor),
                   ),
                 ),
               ],

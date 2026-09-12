@@ -222,7 +222,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                       Icons.tune_rounded,
                       color: _hasActiveFilter
                           ? AppColors.primary
-                          : AppColors.textSecondary,
+                          : context.textSecondaryColor,
                     ),
                   ),
                   if (_hasActiveFilter)
@@ -242,8 +242,8 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
               ),
               IconButton(
                 onPressed: _load,
-                icon: const Icon(Icons.refresh_rounded,
-                    color: AppColors.textSecondary),
+                icon: Icon(Icons.refresh_rounded,
+                    color: context.textSecondaryColor),
               ),
             ],
             bottom: PreferredSize(
@@ -439,7 +439,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('Sırala',
                 style: AppTextStyles.titleSmall
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
           ),
           const SizedBox(height: 8),
           ..._SortBy.values.map((s) => _SortOption(
@@ -458,7 +458,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text('Kategori',
                   style: AppTextStyles.titleSmall
-                      .copyWith(color: AppColors.textSecondary)),
+                      .copyWith(color: context.textSecondaryColor)),
             ),
             const SizedBox(height: 10),
             SingleChildScrollView(
@@ -537,7 +537,7 @@ class _SortOption extends StatelessWidget {
               style: AppTextStyles.bodyMedium.copyWith(
                 color: isSelected
                     ? context.textPrimaryColor
-                    : AppColors.textSecondary,
+                    : context.textSecondaryColor,
               ),
             ),
           ],
@@ -711,9 +711,9 @@ class _RatingCard extends StatelessWidget {
                           value: 'edit',
                           child: Row(
                             children: [
-                              const Icon(Icons.edit_rounded,
+                              Icon(Icons.edit_rounded,
                                   size: 16,
-                                  color: AppColors.textSecondary),
+                                  color: context.textSecondaryColor),
                               const SizedBox(width: 10),
                               Text('Düzenle',
                                   style: AppTextStyles.bodySmall.copyWith(
@@ -755,7 +755,7 @@ class _RatingCard extends StatelessWidget {
                 '"${rating.comment}"',
                 style: AppTextStyles.bodySmall.copyWith(
                   fontStyle: FontStyle.italic,
-                  color: AppColors.textSecondary,
+                  color: context.textSecondaryColor,
                 ),
               ),
             ),
@@ -782,7 +782,7 @@ class _EmptyDiary extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Henüz puan vermedin.',
               style: AppTextStyles.titleMedium
-                  .copyWith(color: AppColors.textSecondary)),
+                  .copyWith(color: context.textSecondaryColor)),
           const SizedBox(height: 8),
           Text(
             '+ butonuna basarak ilk puanını ekle.',
@@ -810,7 +810,7 @@ class _NoFilterResults extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Bu filtreye uyan puan yok.',
               style: AppTextStyles.titleMedium
-                  .copyWith(color: AppColors.textSecondary)),
+                  .copyWith(color: context.textSecondaryColor)),
           const SizedBox(height: 16),
           TextButton(
             onPressed: onClear,

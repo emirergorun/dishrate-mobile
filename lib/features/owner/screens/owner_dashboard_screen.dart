@@ -124,8 +124,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               [r.district, r.city].where((e) => e != null && e.isNotEmpty).join(', '),
               style: AppTextStyles.bodySmall,
             ),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
+            trailing: Icon(Icons.chevron_right_rounded,
+                color: context.textSecondaryColor),
             onTap: () => _openManage(r),
           ),
         );
@@ -145,7 +145,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             Text(msg,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
             if (action != null) ...[const SizedBox(height: 20), action],
           ],
         ),

@@ -325,7 +325,7 @@ class _AdminClaimCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text('Talep eden: @${claim.username}',
                   style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.textSecondary)),
+                      .copyWith(color: context.textSecondaryColor)),
             ],
             if (claim.isRejected && (claim.adminNote?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 8),
@@ -461,7 +461,7 @@ class _UsersTabState extends State<_UsersTab> {
                         : Icons.radio_button_unchecked_rounded,
                     color: user.role == role
                         ? AppColors.primary
-                        : AppColors.textSecondary,
+                        : context.textSecondaryColor,
                   ),
                   title: Text(_roleLabels[role]!),
                   onTap: () => Navigator.pop(context, role),
@@ -513,7 +513,7 @@ class _UsersTabState extends State<_UsersTab> {
         final roleColor = switch (u.role) {
           UserRole.admin => AppColors.error,
           UserRole.restaurantOwner => AppColors.primary,
-          UserRole.user => AppColors.textSecondary,
+          UserRole.user => context.textSecondaryColor,
         };
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
@@ -569,7 +569,7 @@ class _CenteredMessage extends StatelessWidget {
             Text(message,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),

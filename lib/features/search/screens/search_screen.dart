@@ -442,8 +442,8 @@ class _SearchBar extends StatelessWidget {
           hintText: 'Yemek veya restoran ara...',
           hintStyle:
               AppTextStyles.bodyMedium.copyWith(color: AppColors.textDisabled),
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: AppColors.textSecondary, size: 22),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: context.textSecondaryColor, size: 22),
           suffixIcon: isLoading
               ? const Padding(
                   padding: EdgeInsets.all(12),
@@ -713,7 +713,7 @@ class _RestaurantPopup extends StatelessWidget {
               child: Text(
                 'Eşleşen ürünler',
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
+                  color: context.textSecondaryColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -892,7 +892,7 @@ class _ItemActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bgColor =
         isPrimary ? AppColors.primary : context.surfaceElevatedColor;
-    final fgColor = isPrimary ? Colors.white : context.textPrimaryColor;
+    final fgColor = isPrimary ? AppColors.onPrimary : context.textPrimaryColor;
     final borderColor = isPrimary ? AppColors.primary : context.dividerColor;
 
     return GestureDetector(
@@ -951,7 +951,7 @@ class _EmptySearch extends StatelessWidget {
           Text(
             'Yemek veya restoran ara',
             style:
-                AppTextStyles.titleMedium.copyWith(color: AppColors.textSecondary),
+                AppTextStyles.titleMedium.copyWith(color: context.textSecondaryColor),
           ),
           const SizedBox(height: 6),
           Text(
@@ -979,7 +979,7 @@ class _NoResults extends StatelessWidget {
           const SizedBox(height: 12),
           Text('Sonuç bulunamadı',
               style: AppTextStyles.titleMedium
-                  .copyWith(color: AppColors.textSecondary)),
+                  .copyWith(color: context.textSecondaryColor)),
         ],
       ),
     );

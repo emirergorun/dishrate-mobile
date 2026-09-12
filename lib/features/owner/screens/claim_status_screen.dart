@@ -199,10 +199,10 @@ class _ClaimCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
                   child: Icon(Icons.location_on_rounded,
-                      size: 13, color: AppColors.textSecondary),
+                      size: 13, color: context.textSecondaryColor),
                 ),
                 const SizedBox(width: 3),
                 Expanded(
@@ -286,7 +286,7 @@ class _CenteredMessage extends StatelessWidget {
             Text(message,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: context.textSecondaryColor)),
             if (action != null) ...[
               const SizedBox(height: 20),
               action!,

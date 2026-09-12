@@ -427,8 +427,8 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
@@ -441,7 +441,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: context.dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -457,7 +457,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceElevated,
+                    color: context.surfaceElevatedColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.storefront_rounded,
@@ -486,7 +486,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.divider),
+          Divider(height: 1, color: context.dividerColor),
           const SizedBox(height: 4),
 
           // ── Menü içeriği ──────────────────────────────────────────
@@ -502,7 +502,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
               padding: const EdgeInsets.all(40),
               child: Text(_error!,
                   style: AppTextStyles.bodyMedium
-                      .copyWith(color: AppColors.textSecondary)),
+                      .copyWith(color: context.textSecondaryColor)),
             )
           else if (_items == null || _items!.isEmpty)
             Padding(
@@ -514,7 +514,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                   const SizedBox(height: 12),
                   Text('Henüz menü eklenmemiş',
                       style: AppTextStyles.bodyMedium
-                          .copyWith(color: AppColors.textSecondary)),
+                          .copyWith(color: context.textSecondaryColor)),
                 ],
               ),
             )
@@ -525,7 +525,7 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 itemCount: _items!.length,
                 separatorBuilder: (_, __) =>
-                    const Divider(height: 1, color: AppColors.divider),
+                    Divider(height: 1, color: context.dividerColor),
                 itemBuilder: (context, i) => _MenuItemRow(
                   item: _items![i],
                   restaurant: widget.restaurant,
@@ -627,7 +627,7 @@ class _MenuItemRowState extends State<_MenuItemRow> {
                     errorBuilder: (_, __, ___) => Container(
                       width: 56,
                       height: 56,
-                      color: AppColors.surfaceElevated,
+                      color: context.surfaceElevatedColor,
                       child: const Icon(Icons.fastfood_rounded,
                           color: AppColors.textDisabled, size: 22),
                     ),
@@ -638,7 +638,7 @@ class _MenuItemRowState extends State<_MenuItemRow> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceElevated,
+                    color: context.surfaceElevatedColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.fastfood_rounded,
@@ -769,17 +769,17 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          color: isPrimary ? AppColors.primary : AppColors.surfaceElevated,
+          color: isPrimary ? AppColors.primary : context.surfaceElevatedColor,
           borderRadius: BorderRadius.circular(10),
         ),
         child: isLoading
-            ? const Center(
+            ? Center(
                 child: SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: AppColors.textSecondary,
+                    color: context.textSecondaryColor,
                   ),
                 ),
               )
@@ -789,7 +789,7 @@ class _ActionButton extends StatelessWidget {
                   Icon(
                     icon,
                     size: 15,
-                    color: isPrimary ? Colors.white : AppColors.textSecondary,
+                    color: isPrimary ? AppColors.onPrimary : context.textSecondaryColor,
                   ),
                   const SizedBox(width: 5),
                   Text(
@@ -798,7 +798,7 @@ class _ActionButton extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color:
-                          isPrimary ? Colors.white : AppColors.textSecondary,
+                          isPrimary ? AppColors.onPrimary : context.textSecondaryColor,
                     ),
                   ),
                 ],

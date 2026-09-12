@@ -538,9 +538,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       // ── Oturumu kapat ───────────────────────────────
                       _ProfileItem(
                         icon: Icons.logout_rounded,
-                        iconColor: AppColors.textSecondary,
+                        iconColor: context.textSecondaryColor,
                         label: 'Oturumu Kapat',
-                        labelColor: AppColors.textSecondary,
+                        labelColor: context.textSecondaryColor,
                         onTap: _confirmSignOut,
                         showChevron: false,
                       ),
@@ -946,7 +946,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     return InputDecoration(
       labelText: label,
       labelStyle: AppTextStyles.bodySmall,
-      prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
+      prefixIcon: Icon(icon, size: 18, color: context.textSecondaryColor),
       filled: true,
       fillColor:
           _canChangeName ? context.surfaceElevatedColor : context.surfaceColor,
@@ -1139,14 +1139,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.lock_clock_rounded,
-                          size: 14, color: AppColors.textSecondary),
+                      Icon(Icons.lock_clock_rounded,
+                          size: 14, color: context.textSecondaryColor),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'İsim ve soyisim 15 günde bir değiştirilebilir. ',
                           style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary),
+                              .copyWith(color: context.textSecondaryColor),
                         ),
                       ),
                     ],
@@ -1160,8 +1160,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   decoration: InputDecoration(
                     labelText: 'Kullanıcı adı',
                     labelStyle: AppTextStyles.bodySmall,
-                    prefixIcon: const Icon(Icons.alternate_email_rounded,
-                        size: 18, color: AppColors.textSecondary),
+                    prefixIcon: Icon(Icons.alternate_email_rounded,
+                        size: 18, color: context.textSecondaryColor),
                     filled: true,
                     fillColor: context.surfaceElevatedColor,
                     border: OutlineInputBorder(
@@ -1192,10 +1192,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     hintText: 'Kendinizi tanıtın...',
                     hintStyle: AppTextStyles.bodySmall
                         .copyWith(color: AppColors.textDisabled),
-                    prefixIcon: const Padding(
-                      padding: EdgeInsets.only(bottom: 44),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(bottom: 44),
                       child: Icon(Icons.short_text_rounded,
-                          size: 18, color: AppColors.textSecondary),
+                          size: 18, color: context.textSecondaryColor),
                     ),
                     filled: true,
                     fillColor: context.surfaceElevatedColor,
@@ -1713,7 +1713,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 ? Center(
                     child: Text('İstek listesi boş',
                         style: AppTextStyles.bodyMedium
-                            .copyWith(color: AppColors.textSecondary)),
+                            .copyWith(color: context.textSecondaryColor)),
                   )
                 : ListView.builder(
                     controller: controller,
@@ -2081,8 +2081,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   InputDecoration _dec(String label) => InputDecoration(
         labelText: label,
         labelStyle: AppTextStyles.bodySmall,
-        prefixIcon: const Icon(Icons.lock_outline_rounded,
-            size: 18, color: AppColors.textSecondary),
+        prefixIcon: Icon(Icons.lock_outline_rounded,
+            size: 18, color: context.textSecondaryColor),
         filled: true,
         fillColor: context.surfaceElevatedColor,
         border: OutlineInputBorder(
@@ -2340,15 +2340,15 @@ class _ProfileRatingSheet extends StatelessWidget {
         color: context.surfaceElevatedColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           SizedBox(
             width: 40,
             height: 4,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: context.dividerColor,
                 borderRadius: BorderRadius.all(Radius.circular(2)),
               ),
             ),
