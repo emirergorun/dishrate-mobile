@@ -87,7 +87,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Artık yediğin her yemeği puanlayabilir, '
+                        'Artık yeni yemekler keşfedebilir, '
                         'kendi yemek günlüğünü oluşturabilirsin.',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.bodyMedium.copyWith(

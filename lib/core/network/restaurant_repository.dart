@@ -4,6 +4,9 @@ import 'dio_client.dart';
 import '../../shared/models/restaurant_model.dart';
 import '../../shared/models/menu_item_model.dart';
 import '../../shared/models/category_model.dart';
+import '../../shared/models/feed_section_model.dart';
+
+export '../../shared/models/feed_section_model.dart';
 
 class RestaurantRepository {
   RestaurantRepository._();
@@ -31,6 +34,73 @@ class RestaurantRepository {
     final list = response.data as List<dynamic>;
     return list
         .map((e) => RestaurantModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Keşfet akışı: konuma (ve seçiliyse kategoriye) göre bölümler, her biri
+  /// en fazla [limit] öğe. Tüm katalogu indirmek yerine bu kullanılır.
+  Future<List<FeedSection>> getFeed({
+    String? city,
+    String? district,
+    String? category,
+    int limit = 10,
+  }) async {
+    if (MockData.enabled) {
+      final items = MockData.searchMenuItems('')
+          .where((i) => category == null || i.categoryName == category)
+          .toList()
+        ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
+      return [
+        FeedSection(
+          key: 'top-rated',
+          items: items.take(limit).toList(),
+          hasMore: items.length > limit,
+        ),
+      ];
+    }
+    final response = await _dio.get(
+      '${ApiConstants.menuItems}/feed',
+      queryParameters: {
+        if (city != null) 'city': city,
+        if (district != null) 'district': district,
+        if (category != null) 'category': category,
+        'limit': limit,
+      },
+    );
+    return (response.data as List<dynamic>)
+        .map((e) => FeedSection.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// "Tümünü gör" — bir bölümün [page]. sayfası.
+  Future<List<MenuItemModel>> getFeedSection(
+    String key, {
+    String? city,
+    String? district,
+    String? category,
+    int page = 0,
+    int size = 20,
+  }) async {
+    if (MockData.enabled) {
+      final all = (await getFeed(category: category, limit: 1000))
+          .firstWhere((s) => s.key == key,
+              orElse: () =>
+                  const FeedSection(key: '', items: [], hasMore: false))
+          .items;
+      return all.skip(page * size).take(size).toList();
+    }
+    final response = await _dio.get(
+      '${ApiConstants.menuItems}/feed/$key',
+      queryParameters: {
+        if (city != null) 'city': city,
+        if (district != null) 'district': district,
+        if (category != null) 'category': category,
+        'page': page,
+        'size': size,
+      },
+    );
+    return (response.data as List<dynamic>)
+        .map((e) => MenuItemModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

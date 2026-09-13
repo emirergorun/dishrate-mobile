@@ -30,11 +30,16 @@ const double _wordmarkSize = 24;
 enum _Layout { ranked, posters, wide, grid, list }
 
 typedef _Section = ({
+  String key,
   String title,
   String? subtitle,
   List<MenuItemModel> items,
+  bool hasMore,
   _Layout layout,
 });
+
+/// Sıralı liste düzenlerinde ekranda gösterilen satır sayısı.
+const int _listRows = 5;
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -46,31 +51,45 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String? _selectedCategory; // null veya 'Tümü' → hepsi gösterilir
 
-  List<MenuItemModel> _allItems = [];
+  List<FeedSection> _feed = [];
   bool _loading = true;
   String? _error;
+
+  /// Son isteğin sırası: konum ya da çip hızlı değişince eski yanıt yenisinin
+  /// üzerine yazılmasın.
+  int _request = 0;
 
   @override
   void initState() {
     super.initState();
+    // Akış konuma bağlı: il ya da ilçe değişince yeniden istenir.
+    ref.listenManual(selectedLocationProvider, (prev, next) {
+      if (prev?.il != next.il || prev?.ilce != next.ilce) _load();
+    });
     _load();
   }
 
   Future<void> _load() async {
+    final loc = ref.read(selectedLocationProvider);
+    final request = ++_request;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final items = await RestaurantRepository.instance.getAllMenuItems();
-      if (mounted) {
+      final feed = await RestaurantRepository.instance.getFeed(
+        city: _city(loc),
+        district: _district(loc),
+        category: _category,
+      );
+      if (mounted && request == _request) {
         setState(() {
-          _allItems = items;
+          _feed = feed;
           _loading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && request == _request) {
         setState(() {
           _error = 'İçerikler yüklenemedi';
           _loading = false;
@@ -78,6 +97,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       }
     }
   }
+
+  static String? _city(SelectedLocation loc) =>
+      loc.il.trim().isEmpty ? null : loc.il;
+  static String? _district(SelectedLocation loc) =>
+      loc.hasIlce ? loc.ilce : null;
+  String? get _category => _allSelected ? null : _selectedCategory;
 
   static const List<String> _categories = [
     'Tümü',
@@ -97,85 +122,25 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   bool get _allSelected =>
       _selectedCategory == null || _selectedCategory == 'Tümü';
 
-  // ── Bölüm üretimi ─────────────────────────────────────────────────────────
-  // Backend henüz "trend / en çok istek listesinde / bu hafta" gibi sorguları
-  // sunmadığından bölümler, mevcut alanlardan (puan, fiyat, kategori) istemci
-  // tarafında türetilir. Backend feed endpoint'leri gelince burası sadeleşecek.
+  // ── Bölümler ──────────────────────────────────────────────────────────────
+  // Bölümlerin içeriği (hangi kategori, hangi sıralama, ilçe → il geneline
+  // düşme) sunucuda `FeedService`'te. Burada yalnızca anahtar → başlık ve
+  // düzen eşlemesi var.
 
-  static const Set<String> _indulgentCats = {
-    'Burger', 'Pizza', 'Tatlı', 'Kebap', 'İtalyan', 'Noodle', 'Sandviç',
-  };
-  static const Set<String> _healthyCats = {
-    'Vegan', 'Salata', 'Kahvaltı', 'Meze',
-  };
-
-  List<MenuItemModel> _filtered(List<MenuItemModel> src) {
-    if (_allSelected) return src;
-    return src
-        .where((item) => item.categoryName == _selectedCategory)
-        .toList();
-  }
-
-  /// Seçili kategoriye göre filtrelenmiş tüm öğeler — bölümlerin kaynağı.
-  List<MenuItemModel> get _baseItems => _filtered(_allItems);
-
-  /// Seçili konum. İlçe seçiliyse önce o ilçe denenir; orada hiç sonuç
-  /// yoksa il geneline düşülür — kullanıcı boş ekranla karşılaşmasın.
-  List<MenuItemModel> get _localItems {
-    final loc = ref.watch(selectedLocationProvider);
-    final ilGeneli = _baseItems
-        .where((i) => i.city == null || _esit(i.city!, loc.il))
-        .toList();
-    if (!loc.hasIlce) return ilGeneli;
-    final ilceIcinde = ilGeneli
-        .where((i) => i.district != null && _esit(i.district!, loc.ilce!))
-        .toList();
-    return ilceIcinde.isEmpty ? ilGeneli : ilceIcinde;
-  }
-
-  static bool _esit(String a, String b) =>
-      TurkiyeAdres.aramaAnahtari(a.trim()) ==
-      TurkiyeAdres.aramaAnahtari(b.trim());
-
-  List<MenuItemModel> _byRatingDesc(Iterable<MenuItemModel> src) {
-    final l = src.toList()
-      ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
-    return l.take(12).toList();
-  }
-
-  List<MenuItemModel> get _topRated => _byRatingDesc(_localItems);
-
-  // "Bu hafta" için yaklaşık: en yeni eklenen (yüksek ID) yüksek puanlılar.
-  List<MenuItemModel> get _weeklyTop {
-    final l = _baseItems.where((i) => i.averageRating >= 4.5).toList()
-      ..sort((a, b) => b.menuItemId.compareTo(a.menuItemId));
-    return l.take(12).toList();
-  }
-
-  // "Herkes denemek istiyor": en sevilenler (en yüksek puanlıların ardından gelenler).
-  List<MenuItemModel> get _mostWanted {
-    final l = _baseItems.toList()
-      ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
-    return l.skip(3).take(12).toList();
-  }
-
-  List<MenuItemModel> get _cheatMeal => _byRatingDesc(
-      _baseItems.where((i) => _indulgentCats.contains(i.categoryName)));
-
-  List<MenuItemModel> get _healthy => _byRatingDesc(
-      _baseItems.where((i) => _healthyCats.contains(i.categoryName)));
-
-  // "Gizli mücevherler": az bilinen kategorilerde yüksek puanlılar.
-  static const Set<String> _nicheCats = {'Meze', 'Noodle', 'Vegan', 'Tavuk'};
-  List<MenuItemModel> get _hidden => _byRatingDesc(
-      _baseItems.where((i) => _nicheCats.contains(i.categoryName)));
-
-  void _seeAll(String title, List<MenuItemModel> items) {
+  void _seeAll(_Section s) {
+    final loc = ref.read(selectedLocationProvider);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            SeeAllScreen(title: title, items: items, onItemTap: _openDish),
+        builder: (_) => SeeAllScreen(
+          title: s.title,
+          items: s.items,
+          sectionKey: s.key,
+          city: _city(loc),
+          district: _district(loc),
+          category: _category,
+          onItemTap: _openDish,
+        ),
       ),
     );
   }
@@ -194,46 +159,60 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   List<_Section> get _sections {
     final loc = ref.watch(selectedLocationProvider);
     final yer = loc.hasIlce ? loc.ilce! : loc.il;
-    final List<_Section> all = [
-      (
+    final Map<String, ({String title, String? subtitle, _Layout layout})>
+        meta = {
+      'top-rated': (
         title: '${_bulunmaEki(yer)} en iyiler',
         subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
-        items: _topRated,
         layout: _Layout.ranked,
       ),
-      (
-        title: 'Bu haftanın favorileri',
-        subtitle: 'Yeni eklenen, en çok beğenilen menü öğeleri',
-        items: _weeklyTop,
+      'weekly': (
+        title: 'Haftanın Yıldızları',
+        subtitle: 'Bu hafta en çok beğenilen menü öğeleri',
         layout: _Layout.posters,
       ),
-      (
-        title: 'Herkes denemek istiyor',
+      'most-wanted': (
+        title: 'Herkes Denemek İstiyor',
         subtitle: null,
-        items: _mostWanted,
         layout: _Layout.wide,
       ),
-      (
-        title: 'Diyeti bozmaya değer',
+      'cheat-meal': (
+        title: 'Cheat Meal Önerileri',
         subtitle: null,
-        items: _cheatMeal,
         layout: _Layout.grid,
       ),
-      (
-        title: 'Sağlıklı & fit seçenekler',
+      'healthy': (
+        title: 'Diyet Dostu',
         subtitle: null,
-        items: _healthy,
         layout: _Layout.posters,
       ),
-      (
-        title: 'Şehrin gizli mücevherleri',
+      'hidden-gems': (
+        title: 'Şehrin Gizli Cevherleri',
         subtitle: null,
-        items: _hidden,
         layout: _Layout.list,
       ),
+    };
+    // Sunucunun sırası korunur; tanımadığımız (daha yeni) anahtarlar atlanır.
+    return [
+      for (final f in _feed)
+        if (meta[f.key] != null && f.items.isNotEmpty)
+          (
+            key: f.key,
+            title: meta[f.key]!.title,
+            subtitle: meta[f.key]!.subtitle,
+            items: f.items,
+            hasMore: f.hasMore,
+            layout: meta[f.key]!.layout,
+          ),
     ];
-    return all.where((s) => s.items.isNotEmpty).toList();
   }
+
+  /// Sıralı listeler ekranda yalnızca [_listRows] satır gösteriyor; sunucuda
+  /// devamı olmasa da gizli kalan satırlar için "Tümünü gör" gerekir.
+  static bool _canSeeAll(_Section s) =>
+      s.hasMore ||
+      ((s.layout == _Layout.ranked || s.layout == _Layout.list) &&
+          s.items.length > _listRows);
 
   /// "Kadıköy" → "Kadıköy'de", "Beşiktaş" → "Beşiktaş'ta". Önceden her yere
   /// "'da" ekleniyordu ("Kadıköy'da", "Beşiktaş'da").
@@ -257,12 +236,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     switch (s.layout) {
       case _Layout.ranked:
         return DishRankedList(
-          items: s.items.take(5).toList(),
+          items: s.items.take(_listRows).toList(),
           onTap: _openDish,
           withLead: true,
         );
       case _Layout.list:
-        return DishRankedList(items: s.items.take(5).toList(), onTap: _openDish);
+        return DishRankedList(
+            items: s.items.take(_listRows).toList(), onTap: _openDish);
       case _Layout.posters:
         return DishPosterCarousel(items: s.items, onTap: _openDish);
       case _Layout.wide:
@@ -301,7 +281,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 child: CategoryChips(
                   categories: _categories,
                   onSelected: (category) {
+                    if (category == _selectedCategory) return;
                     setState(() => _selectedCategory = category);
+                    _load();
                   },
                 ),
               ),
@@ -334,10 +316,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       AppSpace.screen, 48, AppSpace.screen, 0),
                   child: StateMessage(
                     title: _allSelected
-                        ? 'Henüz içerik yok'
+                        ? 'Bu bölgede henüz içerik yok'
                         : 'Bu kategoride içerik yok',
                     message: _allSelected
-                        ? 'Restoranlar menülerini ekledikçe yemekler burada görünecek.'
+                        ? 'Konumu değiştirerek başka bir şehre göz atabilirsin.'
                         : 'Başka bir kategori seç ya da Tümü\'ne dön.',
                   ),
                 ),
@@ -364,7 +346,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         SectionHeader(
                           title: s.title,
                           subtitle: s.subtitle,
-                          onSeeAll: () => _seeAll(s.title, s.items),
+                          onSeeAll: _canSeeAll(s) ? () => _seeAll(s) : null,
                         ),
                         _sectionBody(s),
                       ],
@@ -471,8 +453,10 @@ class _DiscoverAppBar extends ConsumerWidget {
         if (!context.mounted) return;
         if (r.isOk) return;
         if (r.outcome == LocationOutcome.serviceDisabled) {
-          _snack(context, 'Cihazının konum servisi kapalı. '
-              'Açıp tekrar dene ya da şehri kendin seç.');
+          _snack(
+              context,
+              'Konum izni kapalı gözüküyor. '
+              'Ayarlardan açarak tekrar deneyebilirsin.');
         }
       }
     }
@@ -487,7 +471,7 @@ class _DiscoverAppBar extends ConsumerWidget {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Konumunu kullanalım mı?'),
+        title: const Text('Yakınındaki restoranları keşfet.'),
         content: const Text(
           'Sana en yakın restoranları gösterebilmemiz için konumuna '
           'ihtiyacımız var.',
@@ -495,8 +479,8 @@ class _DiscoverAppBar extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            style: TextButton.styleFrom(
-                foregroundColor: ctx.textSecondaryColor),
+            style:
+                TextButton.styleFrom(foregroundColor: ctx.textSecondaryColor),
             child: const Text('Şimdi değil'),
           ),
           FilledButton(

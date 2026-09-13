@@ -73,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const DishrateWordmark(width: 200),
                     const SizedBox(height: 10),
                     Text(
-                      'Yemek günlüğüne hoşgeldin!',
+                      'Yemek günlüğü ve keşfi',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: context.textSecondaryColor,
                       ),
@@ -95,8 +95,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // E-posta veya kullanıcı adı
                     _AuthTextField(
                       controller: _emailController,
-                      label: 'E-posta veya kullanıcı adı',
-                      hint: 'ornek@email.com / kullanici_adi',
+                      label: null,
+                      hint: 'Kullanıcı adı veya e-posta',
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
@@ -111,8 +111,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // Şifre
                     _AuthTextField(
                       controller: _passwordController,
-                      label: 'Şifre',
-                      hint: '••••••••',
+                      label: null,
+                      hint: 'Şifre',
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _login(),
@@ -249,12 +249,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-
 
     await ref.read(authProvider.notifier).register(
           username: _usernameController.text.trim(),
@@ -315,13 +313,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 12),
               const Text('Hesap Oluştur', style: AppTextStyles.headlineLarge),
               const SizedBox(height: 8),
-              Text(
-                'Yemek günlüğünü oluşturmaya başla!',
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: context.textSecondaryColor),
-              ),
               const SizedBox(height: 28),
-
               Form(
                 key: _formKey,
                 child: Column(
@@ -333,8 +325,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         Expanded(
                           child: _AuthTextField(
                             controller: _firstNameController,
-                            label: 'İsim',
-                            hint: 'Adın',
+                            label: null,
+                            hint: 'İsim',
                             keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
                             validator: (v) {
@@ -349,8 +341,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         Expanded(
                           child: _AuthTextField(
                             controller: _lastNameController,
-                            label: 'Soyisim',
-                            hint: 'Soyadın',
+                            label: null,
+                            hint: 'Soyisim',
                             keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
                             validator: (v) {
@@ -366,8 +358,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 16),
                     _AuthTextField(
                       controller: _usernameController,
-                      label: 'Kullanıcı Adı',
-                      hint: 'ornek_kullanici',
+                      label: null,
+                      hint: 'Kullanıcı Adı',
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         final t = (v ?? '').trim();
@@ -385,8 +377,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 16),
                     _AuthTextField(
                       controller: _emailController,
-                      label: 'E-posta',
-                      hint: 'ornek@email.com',
+                      label: null,
+                      hint: 'E-posta',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: EmailValidator.validate,
@@ -394,12 +386,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 16),
                     _AuthTextField(
                       controller: _passwordController,
-                      label: 'Şifre',
-                      hint: 'En az 8 karakter',
+                      label: null,
+                      hint: 'Şifre',
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _submit(),
-                      onChanged: (_) => setState(() {}), // kural listesi güncellensin
+                      onChanged: (_) =>
+                          setState(() {}), // kural listesi güncellensin
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -489,11 +482,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                       ),
                     ),
-
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
               Center(
                 child: Row(
@@ -532,7 +523,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 class _AuthTextField extends StatelessWidget {
   const _AuthTextField({
     required this.controller,
-    required this.label,
+    this.label,
     required this.hint,
     this.obscureText = false,
     this.keyboardType,
@@ -544,7 +535,7 @@ class _AuthTextField extends StatelessWidget {
   });
 
   final TextEditingController controller;
-  final String label;
+  final String? label;
   final String hint;
   final bool obscureText;
   final TextInputType? keyboardType;
@@ -559,13 +550,14 @@ class _AuthTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            fontWeight: FontWeight.w600,
-            color: context.textSecondaryColor,
+        if (label != null)
+          Text(
+            label!,
+            style: AppTextStyles.bodySmall.copyWith(
+              fontWeight: FontWeight.w600,
+              color: context.textSecondaryColor,
+            ),
           ),
-        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -575,7 +567,7 @@ class _AuthTextField extends StatelessWidget {
           onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
           validator: validator,
-              style: AppTextStyles.bodyMedium.copyWith(
+          style: AppTextStyles.bodyMedium.copyWith(
             color: context.textPrimaryColor,
           ),
           decoration: InputDecoration(
