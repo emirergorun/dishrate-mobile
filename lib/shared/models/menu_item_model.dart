@@ -4,6 +4,10 @@ class MenuItemModel {
   // Fiyat artık kullanılmıyor (ürün puanlama odaklı); geriye dönük uyum için tutuluyor.
   final double? price;
   final double averageRating;
+
+  /// Kaç kişi puanladı — restoran menüsünü "en çok değerlendirilen"e göre
+  /// sıralamak için.
+  final int ratingCount;
   final String? photoUrl;
   final int restaurantId;
   final String restaurantName;
@@ -18,6 +22,7 @@ class MenuItemModel {
     required this.name,
     this.price,
     required this.averageRating,
+    this.ratingCount = 0,
     this.photoUrl,
     required this.restaurantId,
     required this.restaurantName,
@@ -34,6 +39,7 @@ class MenuItemModel {
       name: json['name'] as String,
       price: (json['price'] as num?)?.toDouble(),
       averageRating: (json['averageRating'] as num).toDouble(),
+      ratingCount: json['ratingCount'] as int? ?? 0,
       photoUrl: json['photoUrl'] as String?,
       restaurantId: json['restaurantId'] as int,
       restaurantName: json['restaurantName'] as String,

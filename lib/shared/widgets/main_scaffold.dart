@@ -8,6 +8,8 @@ import '../../features/discover/screens/discover_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/rating/providers/rating_flow_provider.dart';
+import '../providers/data_refresh.dart';
 import 'pressable.dart';
 import 'rating_sheet.dart';
 
@@ -52,14 +54,15 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
     // Profil sekmesi → güncel veriyi sessizce yenile (IndexedStack canlı tutuyor)
     if (screenIndex == 3) {
-      ref.read(profileRefreshProvider.notifier).state++;
+      ref.read(userDataRefreshProvider.notifier).state++;
     }
   }
 
   Future<void> _openAddRatingModal() async {
     await RatingSheet.show(context);
-    // Puan eklenmiş olabilir → profil verisini tazele
-    if (mounted) ref.read(profileRefreshProvider.notifier).state++;
+    // Panel sürükleyerek kapatılırsa akış yarım kalıyor; bir sonraki "+"
+    // eski yemeğin puanlama adımında açılmasın.
+    if (mounted) ref.read(ratingFlowProvider.notifier).reset();
   }
 
   @override
@@ -115,7 +118,11 @@ class _DishRateBottomNav extends StatelessWidget {
             children: [
               _NavItem(
                 icon: TablerIcons.home,
-                activeIcon: TablerIcons.home_filled,
+                // Dolu ev simgesi (home_filled) bu font sürümünde bozuk:
+                // kendi kutusunun 7 pt soluna, 10 pt genişlikte çiziliyor ve
+                // seçilince simge sola kayıyordu. Seçim rengi zaten belli
+                // ediyor; Ara ve Günlük de aynı simgeyi kullanıyor.
+                activeIcon: TablerIcons.home,
                 label: 'Keşfet',
                 isSelected: _activeNavIndex == 0,
                 onTap: () => onTap(0),

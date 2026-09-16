@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
@@ -6,7 +8,14 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
+import 'splash_screen.dart';
 import 'welcome_screen.dart';
+
+/// Giriş ekranındaki logonun genişliği.
+const double _logoWidth = 200;
+
+/// Logo görselinin en-boy oranı (bkz. [DishrateWordmark]).
+const double _wordmarkAspect = 2400 / 764;
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,24 +24,109 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
+  /// Giriş denemesi başarısızsa formun içinde gösterilen mesaj.
+  String? _error;
+
+  // ── Açılıştan geçiş ─────────────────────────────────────────────────────
+  // Açılış ekranında logo ortada ve büyük; giriş ekranı açılınca bir anda
+  // yukarı sıçrayıp küçülüyordu. Artık logo açılıştaki yerinden kendi yerine
+  // kayarak küçülüyor, form arkasından beliriyor.
+
+  late final AnimationController _intro;
+  late final Animation<double> _contentFade;
+  bool _introDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _intro = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _contentFade = CurvedAnimation(
+      parent: _intro,
+      curve: const Interval(0.45, 1, curve: Curves.easeOut),
+    );
+    // Yalnızca açılış ekranından gelindiyse oynat; çıkış yapıp girişe dönünce
+    // logonun ortadan gelmesi için sebep yok.
+    if (!SplashScreen.gosterildi) {
+      _intro.value = 1;
+      _introDone = true;
+      return;
+    }
+    SplashScreen.gosterildi = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        setState(() {
+          _intro.value = 1;
+          _introDone = true;
+        });
+        return;
+      }
+      _intro.forward().whenComplete(() {
+        if (mounted) setState(() => _introDone = true);
+      });
+    });
+  }
+
+  /// Logonun formdaki yeri. Ölçmek yerine düzenden hesaplanıyor: güvenli
+  /// alanın üstü + 60 boşluk + logonun yarısı, yatayda orta.
+  ///
+  /// Önceden konum GlobalKey ile ölçülüyordu; ölçüm bir sebeple boş dönünce
+  /// animasyon sessizce atlanıyor ve logo ortadan kaybolup yukarıda yeniden
+  /// beliriyordu (cihazda tam olarak bu oluyordu).
+  Offset _logoTarget(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final h = _logoWidth / _wordmarkAspect;
+    return Offset(mq.size.width / 2, mq.padding.top + 60 + h / 2);
+  }
+
   @override
   void dispose() {
+    _intro.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  /// Açılıştaki yerinden (ekranın ortası) formdaki yerine kayan logo.
+  Widget _flyingLogo() {
+    return AnimatedBuilder(
+      animation: _intro,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic
+            .transform((_intro.value / 0.6).clamp(0.0, 1.0));
+        final start = MediaQuery.sizeOf(context).center(Offset.zero);
+        final c = Offset.lerp(start, _logoTarget(context), t)!;
+        final w = lerpDouble(splashLogoWidth, _logoWidth, t)!;
+        final h = w / _wordmarkAspect;
+        return Positioned(
+          left: c.dx - w / 2,
+          top: c.dy - h / 2,
+          width: w,
+          height: h,
+          child: DishrateWordmark(width: w),
+        );
+      },
+    );
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     await ref.read(authProvider.notifier).login(
           email: _emailController.text.trim(),
@@ -40,25 +134,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
-
     final authState = ref.read(authProvider);
-    if (authState.status == AuthStatus.unauthenticated &&
-        authState.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authState.errorMessage!),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
+    final hata = authState.status == AuthStatus.unauthenticated
+        ? (authState.errorMessage ?? 'Giriş yapılamadı, tekrar dene')
+        : null;
+
+    setState(() {
+      _isLoading = false;
+      _error = hata;
+    });
+
+    // Hata mesajı formun içinde kalıyor (alttan çıkan bildirim yerine) ve
+    // ekran yeniden kurulmuyor: kullanıcı adı yazdığı gibi duruyor, yalnızca
+    // şifre temizleniyor — yanlış olan büyük ihtimalle o.
+    if (hata != null) _passwordController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          FadeTransition(
+            opacity: _contentFade,
+            child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
@@ -70,7 +170,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: Column(
                   children: [
-                    const DishrateWordmark(width: 200),
+                    // Geçiş sürerken gerçek logo gizli; yerine üstte kayan
+                    // kopyası görünüyor.
+                    Opacity(
+                      opacity: _introDone ? 1 : 0,
+                      child: const DishrateWordmark(width: _logoWidth),
+                    ),
                     const SizedBox(height: 10),
                     Text(
                       'Yemek günlüğü ve keşfi',
@@ -132,6 +237,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'Şifre gerekli' : null,
                     ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      _ErrorBox(message: _error!),
+                    ],
+
                     const SizedBox(height: 28),
 
                     // Giriş Butonu
@@ -209,6 +319,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+          ),
+          if (!_introDone) _flyingLogo(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Form içinde kalan hata kutusu.
+///
+/// Önceden hata alttan çıkan bir bildirimdi ve giriş ekranı baştan kuruluyordu;
+/// kullanıcı yazdıklarını kaybediyordu.
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded,
+              size: 18, color: context.errorTextColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: context.errorTextColor),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -234,6 +386,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
 
+  /// Kayıt denemesi başarısızsa formun içinde gösterilen mesaj.
+  String? _error;
+
   // Hesap türü
 
   // Restoran alanları
@@ -252,7 +407,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     await ref.read(authProvider.notifier).register(
           username: _usernameController.text.trim(),
@@ -281,14 +439,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    if (authState.status == AuthStatus.unauthenticated &&
-        authState.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authState.errorMessage!),
-          backgroundColor: AppColors.error,
-        ),
-      );
+    // Hata formun içinde kalıyor: alttan çıkan bildirim yerine, yazdıkları
+    // silinmeden.
+    if (authState.status == AuthStatus.unauthenticated) {
+      setState(() => _error =
+          authState.errorMessage ?? 'Kayıt tamamlanamadı, tekrar dene');
     }
   }
 
@@ -444,6 +599,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           }).toList(),
                         ),
                       ),
+                    ],
+
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      _ErrorBox(message: _error!),
                     ],
 
                     const SizedBox(height: 28),

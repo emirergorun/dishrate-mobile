@@ -78,11 +78,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Giriş yap
+  /// Giriş sırasında genel durum "loading" YAPILMAZ: o durumda uygulama
+  /// açılış ekranına dönüyor, giriş ekranı baştan kuruluyor ve kullanıcının
+  /// yazdıkları siliniyordu. Ekranın kendi bekleme göstergesi var.
   Future<void> login({
     required String email,
     required String password,
   }) async {
-    state = const AuthState.loading();
     try {
       final authResponse = await _repo.login(email: email, password: password);
       await _storage.saveTokens(
@@ -97,6 +99,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Normal kullanıcı kaydı
+  /// Kayıt da giriş gibi: hata olursa form yerinde kalsın.
   Future<void> register({
     required String username,
     required String firstName,
@@ -104,7 +107,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = const AuthState.loading();
     try {
       final authResponse = await _repo.register(
         username: username,

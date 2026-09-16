@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
+import '../../../core/data/turkiye_adres.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/dish_sheet.dart';
+import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
 import '../../discover/widgets/dish_layouts.dart';
@@ -38,6 +40,47 @@ class _RestaurantDetailScreenState
   List<MenuItemModel> _menu = [];
   bool _loading = true;
   String? _error;
+  _MenuSort _sort = _MenuSort.rating;
+
+  /// Menü içi arama. Uzun menülerde aradığın yemeği kaydırarak aramak
+  /// zorunda kalmayasın diye; kısa menüde kutu hiç gösterilmiyor.
+  final _aramaCtrl = TextEditingController();
+  String _arama = '';
+  static const int _aramaEsigi = 8;
+
+  @override
+  void dispose() {
+    _aramaCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Arama metnine uyan yemekler (Türkçe karakter ve harf büyüklüğü yok sayılır).
+  List<MenuItemModel> get _filtreliMenu {
+    if (_arama.trim().isEmpty) return _menu;
+    final anahtar = TurkiyeAdres.aramaAnahtari(_arama.trim());
+    return _menu
+        .where((m) => TurkiyeAdres.aramaAnahtari(m.name).contains(anahtar))
+        .toList();
+  }
+
+  /// Seçili sıralamaya göre menü. Eşitlikte öbür ölçüt devreye giriyor:
+  /// tek kişinin 5 verdiği yemek, 40 kişinin 5 verdiğinin önüne geçmesin.
+  List<MenuItemModel> get _sortedMenu {
+    final l = [..._filtreliMenu];
+    switch (_sort) {
+      case _MenuSort.rating:
+        l.sort((a, b) {
+          final c = b.averageRating.compareTo(a.averageRating);
+          return c != 0 ? c : b.ratingCount.compareTo(a.ratingCount);
+        });
+      case _MenuSort.count:
+        l.sort((a, b) {
+          final c = b.ratingCount.compareTo(a.ratingCount);
+          return c != 0 ? c : b.averageRating.compareTo(a.averageRating);
+        });
+    }
+    return l;
+  }
 
   static const _pad = EdgeInsets.fromLTRB(
       AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.xxl);
@@ -60,8 +103,6 @@ class _RestaurantDetailScreenState
     try {
       final menu = await RestaurantRepository.instance
           .getRestaurantMenu(widget.restaurantId);
-      // En yüksek puanlı üstte ("Önerilen")
-      menu.sort((a, b) => b.averageRating.compareTo(a.averageRating));
       if (mounted) {
         setState(() {
           _menu = menu;
@@ -162,16 +203,37 @@ class _RestaurantDetailScreenState
           style: AppTextStyles.titleLarge
               .copyWith(color: context.textPrimaryColor),
         ),
+        // Önceden burada "12 yemek, puana göre sıralı" yazıyordu; sıralama
+        // artık seçilebildiği için yerini seçici aldı.
+        if (_menu.length >= _aramaEsigi) ...[
+          const SizedBox(height: AppSpace.md),
+          TextField(
+            controller: _aramaCtrl,
+            style: AppTextStyles.bodyMedium,
+            decoration: const InputDecoration(
+              hintText: 'Menüde ara',
+              prefixIcon: Icon(TablerIcons.search, size: 20),
+            ),
+            onChanged: (v) => setState(() => _arama = v),
+          ),
+        ],
         if (_menu.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          Text(
-            '${_menu.length} yemek, puana göre sıralı',
-            style: AppTextStyles.caption
-                .copyWith(color: context.textSecondaryColor),
+          const SizedBox(height: AppSpace.md),
+          _SortToggle(
+            value: _sort,
+            onChanged: (s) => setState(() => _sort = s),
           ),
         ],
         const SizedBox(height: AppSpace.sm),
-        if (_menu.isEmpty)
+        if (_menu.isNotEmpty && _sortedMenu.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: AppSpace.sm),
+            child: StateMessage(
+              title: 'Eşleşen yemek yok',
+              message: 'Farklı bir kelimeyle aramayı dene.',
+            ),
+          )
+        else if (_menu.isEmpty)
           const Padding(
             padding: EdgeInsets.only(top: AppSpace.sm),
             child: StateMessage(
@@ -181,17 +243,77 @@ class _RestaurantDetailScreenState
             ),
           )
         else
-          for (var i = 0; i < _menu.length; i++)
-            DishRankRow(
-              // Liste puana göre sıralı; puanlılar hep üstte olduğundan
-              // numaralar kesintisiz ilerliyor.
-              rank: _menu[i].averageRating > 0 ? i + 1 : null,
-              item: _menu[i],
-              showRestaurant: false,
-              note: i == 0 && _menu[i].averageRating > 0 ? 'Önerilen' : null,
-              onTap: () => _openDish(_menu[i]),
-            ),
+          ..._rows(_sortedMenu),
       ],
+    );
+  }
+
+  List<Widget> _rows(List<MenuItemModel> menu) {
+    final byCount = _sort == _MenuSort.count;
+    return [
+      for (var i = 0; i < menu.length; i++)
+        DishRankRow(
+          // Sıralama ölçütü sıfır olanlar hep altta; numaralar kesintisiz.
+          rank: (byCount ? menu[i].ratingCount > 0 : menu[i].averageRating > 0)
+              ? i + 1
+              : null,
+          item: menu[i],
+          showRestaurant: false,
+          note: byCount
+              ? (menu[i].ratingCount > 0
+                  ? '${menu[i].ratingCount} değerlendirme'
+                  : null)
+              : (i == 0 && menu[i].averageRating > 0 ? 'Önerilen' : null),
+          onTap: () => _openDish(menu[i]),
+        ),
+    ];
+  }
+}
+
+enum _MenuSort { rating, count }
+
+/// Menü sıralaması: puana göre ya da kaç kişinin değerlendirdiğine göre.
+class _SortToggle extends StatelessWidget {
+  const _SortToggle({required this.value, required this.onChanged});
+
+  final _MenuSort value;
+  final ValueChanged<_MenuSort> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget pill(String label, _MenuSort option) {
+      final selected = value == option;
+      return Pressable(
+        onTap: () => onChanged(option),
+        semanticLabel: label,
+        child: AnimatedContainer(
+          duration: AppMotion.fast,
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : context.fillColor,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.label.copyWith(
+              color: selected ? AppColors.onPrimary : context.textPrimaryColor,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          pill('Puana göre', _MenuSort.rating),
+          const SizedBox(width: AppSpace.sm),
+          pill('Değerlendirme sayısına göre', _MenuSort.count),
+        ],
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +9,10 @@ import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
+import 'shared/widgets/dishrate_logo.dart';
 import 'shared/widgets/main_scaffold.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   SystemChrome.setPreferredOrientations([
@@ -17,7 +20,40 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
+  await _logoyuOnceCoz();
   runApp(const ProviderScope(child: DishrateApp()));
+}
+
+/// Açılış logosunu uygulama çizilmeden önce çözer.
+///
+/// Logo büyük bir PNG; çözülmesi birkaç kare sürüyordu. O arada sistem açılış
+/// ekranı kaybolup Flutter'ın boş ilk karesi görünüyor, logo bir an sönüp
+/// yeniden yanıyordu. Bu süre boyunca sistem açılış ekranı ekranda kalıyor.
+Future<void> _logoyuOnceCoz() async {
+  Future<void> coz(bool dark) {
+    final tamam = Completer<void>();
+    // Ekranda kullanılan sağlayıcının aynısı: önbellek anahtarı tutsun.
+    final stream =
+        DishrateWordmark.provider(dark).resolve(ImageConfiguration.empty);
+    late final ImageStreamListener dinleyici;
+    dinleyici = ImageStreamListener(
+      (_, __) {
+        if (!tamam.isCompleted) tamam.complete();
+        stream.removeListener(dinleyici);
+      },
+      onError: (_, __) {
+        if (!tamam.isCompleted) tamam.complete();
+        stream.removeListener(dinleyici);
+      },
+    );
+    stream.addListener(dinleyici);
+    return tamam.future;
+  }
+
+  // Tema henüz bilinmiyor; iki sürüm de çözülüyor. Bir sorun olursa açılışı
+  // bekletmemek için süre sınırı var.
+  await Future.wait([coz(true), coz(false)])
+      .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
 }
 
 class DishrateApp extends ConsumerWidget {

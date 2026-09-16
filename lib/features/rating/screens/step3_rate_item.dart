@@ -3,13 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/file_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/rating_request_model.dart';
+import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/rating_stars.dart';
 import '../providers/rating_flow_provider.dart';
@@ -17,7 +20,15 @@ import '../providers/rating_flow_provider.dart';
 /// "Kaydedildi" görünümünün panelde kalma süresi. Panel hemen kapanınca puanın
 /// gidip gitmediği ancak alttan çıkan bildirimden anlaşılıyordu; kısa bir onay
 /// anı döngüye "tamamlandı" hissini veriyor, uzun olursa da akışı yavaşlatıyor.
+///
+/// Onay ekranı kendi giriş animasyonunu (380 ms) bitiriyor, sonra puanın
+/// okunması için kısa bir an kalıyor. 1,7 sn'de kullanıcı bekletilmiş
+/// hissediyordu; 1,1 sn'de tik yerine oturuyor ama bekleme hissi yok.
 const Duration _savedHold = Duration(milliseconds: 1100);
+
+/// Onay ekranı kapanırken solma süresi — panel bir anda "kesilmiş" gibi
+/// kaybolmasın.
+const Duration _savedFade = Duration(milliseconds: 260);
 
 /// Giriş yıldızlarının boyutu. Parmakla yarım yıldız seçmek için her yıldızın
 /// yarısı en az ~22 pt olmalı.
@@ -39,10 +50,58 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
   bool _scoreMissing = false;
   bool _saved = false;
 
+  /// Onay ekranı kapanmak üzere — panel solarak gitsin.
+  bool _closing = false;
+
+  /// İsteğe bağlı fotoğraf; kaydederken yüklenir.
+  XFile? _photo;
+  Uint8List? _photoBytes;
+
   @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: context.sheetColor,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(TablerIcons.camera),
+              title: const Text('Fotoğraf çek'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(TablerIcons.photo),
+              title: const Text('Galeriden seç'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      // Telefon fotoğrafları 4000 px'i aşıyor; yorumda 1600 px fazlasıyla yetiyor.
+      final file = await ImagePicker()
+          .pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _photo = file;
+        _photoBytes = bytes;
+      });
+    } catch (_) {
+      ref.read(ratingFlowProvider.notifier).showError(
+            'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.',
+          );
+    }
   }
 
   Future<void> _submit() async {
@@ -66,6 +125,18 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
 
     ref.read(ratingFlowProvider.notifier).setLoading(true);
 
+    String? photoUrl;
+    if (_photo != null) {
+      try {
+        photoUrl = await FileRepository.instance.uploadImage(_photo!);
+      } catch (_) {
+        ref.read(ratingFlowProvider.notifier).showError(
+              'Fotoğraf yüklenemedi. Fotoğrafı kaldırıp tekrar deneyebilirsin.',
+            );
+        return;
+      }
+    }
+
     try {
       await RatingRepository.instance.submitRating(
         RatingRequestModel(
@@ -73,6 +144,9 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
           menuItemId: state.selectedMenuItem!.menuItemId,
           score: state.score,
           comment: _commentController.text.trim(),
+          // Fotoğraf seçilmediyse gönderilmez: aynı yemeği yeniden
+          // puanlamak önceki fotoğrafı silmesin.
+          photoUrl: photoUrl,
         ),
       );
       // Değerlendirilen yemek istek listesindeyse otomatik kaldır
@@ -80,10 +154,15 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
         userId,
         state.selectedMenuItem!.menuItemId,
       );
+      // Profil ve günlük, hangi ekrandan puanlanırsa puanlansın tazelensin.
+      ref.read(userDataRefreshProvider.notifier).state++;
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       setState(() => _saved = true);
       await Future<void>.delayed(_savedHold);
+      if (!mounted) return;
+      setState(() => _closing = true);
+      await Future<void>.delayed(_savedFade);
       if (mounted) widget.onSuccess();
     } catch (e) {
       ref.read(ratingFlowProvider.notifier).showError(
@@ -104,7 +183,11 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
     // Boş yıldız çerçevesinin rengi — bkz. aşağıdaki RatingBar yorumu.
     final emptyStar = context.starColor.withValues(alpha: 0.55);
 
-    return AnimatedSwitcher(
+    return AnimatedOpacity(
+      opacity: _closing ? 0 : 1,
+      duration: _savedFade,
+      curve: Curves.easeOut,
+      child: AnimatedSwitcher(
       duration: AppMotion.base,
       // Varsayılan düzen çocukları ortalanmış bir Stack'e koyuyor; form kendi
       // yüksekliği kadar küçülüp panelin ortasına düşüyordu. Genişletilmiş
@@ -118,14 +201,18 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
               key: const ValueKey('saved'),
               score: state.score,
               itemName: item.name,
+              restaurantName: restaurant.name,
             )
-          : SingleChildScrollView(
+          : Column(
               key: const ValueKey('form'),
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
               // Yorum yazarken listeyi aşağı çekmek klavyeyi kapatsın — "Puanı
               // Kaydet"e basmadan klavyeden kurtulmanın başka yolu yoktu.
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(
-                  AppSpace.screen, AppSpace.md, AppSpace.screen, AppSpace.xxl),
+                  AppSpace.screen, AppSpace.md, AppSpace.screen, AppSpace.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -271,39 +358,36 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
                         .updateComment(val),
                   ),
 
-                  const SizedBox(height: AppSpace.sm),
+                  const SizedBox(height: AppSpace.lg),
 
-                  // ── Hata mesajı ───────────────────────────────────────
-                  if (state.errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpace.md),
-                      child: Text(
-                        state.errorMessage!,
-                        style: AppTextStyles.bodyMedium
-                            .copyWith(color: context.errorTextColor),
-                      ),
-                    ),
-
-                  // ── Kaydet Butonu ─────────────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: state.isLoading ? null : _submit,
-                      child: state.isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: AppColors.onPrimary,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text('Puanı kaydet'),
-                    ),
+                  // ── Fotoğraf ──────────────────────────────────────────
+                  _PhotoField(
+                    bytes: _photoBytes,
+                    onPick: _pickPhoto,
+                    onRemove: () => setState(() {
+                      _photo = null;
+                      _photoBytes = null;
+                    }),
                   ),
+
                 ],
               ),
+                  ),
+                ),
+
+                // ── Sabit alt çubuk ───────────────────────────────────
+                // "Puanı kaydet" kaydırılan içeriğin en altındaydı; fotoğraf
+                // alanı eklenince klavye açıkken görüş alanının dışında
+                // kalıyordu. Artık panelin altına sabit; klavye açılınca
+                // panel küçüldüğü için klavyenin hemen üstünde duruyor.
+                _SaveBar(
+                  error: state.errorMessage,
+                  loading: state.isLoading,
+                  onSave: _submit,
+                ),
+              ],
             ),
+    ),
     );
   }
 
@@ -361,6 +445,133 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
   }
 }
 
+// ── Sabit alt çubuk ───────────────────────────────────────────────────────────
+
+class _SaveBar extends StatelessWidget {
+  const _SaveBar({
+    required this.error,
+    required this.loading,
+    required this.onSave,
+  });
+
+  final String? error;
+  final bool loading;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.sheetColor,
+        border: Border(
+          top: BorderSide(color: context.dividerColor, width: 0.5),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.md, AppSpace.screen, AppSpace.md),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (error != null) ...[
+            Text(
+              error!,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: context.errorTextColor),
+            ),
+            const SizedBox(height: AppSpace.sm),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: loading ? null : onSave,
+              child: loading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: AppColors.onPrimary,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Puanı kaydet'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Fotoğraf alanı ────────────────────────────────────────────────────────────
+
+class _PhotoField extends StatelessWidget {
+  const _PhotoField({
+    required this.bytes,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final Uint8List? bytes;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              'Fotoğraf',
+              style: AppTextStyles.titleSmall
+                  .copyWith(color: context.textPrimaryColor),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'isteğe bağlı',
+              style: AppTextStyles.caption
+                  .copyWith(color: context.textTertiaryColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.sm),
+        if (bytes == null)
+          OutlinedButton.icon(
+            onPressed: onPick,
+            icon: const Icon(TablerIcons.camera, size: 18),
+            label: const Text('Fotoğraf ekle'),
+          )
+        else
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Image.memory(
+                  bytes!,
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: AppSpace.md),
+              TextButton(onPressed: onPick, child: const Text('Değiştir')),
+              TextButton(
+                onPressed: onRemove,
+                style: TextButton.styleFrom(
+                    foregroundColor: context.textSecondaryColor),
+                child: const Text('Kaldır'),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
 // ── Kaydedildi ────────────────────────────────────────────────────────────────
 
 class _SavedView extends StatelessWidget {
@@ -368,10 +579,14 @@ class _SavedView extends StatelessWidget {
     super.key,
     required this.score,
     required this.itemName,
+    required this.restaurantName,
   });
 
   final double score;
   final String itemName;
+
+  /// Puan düz "Margherita"ya değil, bu restoranın Margherita'sına veriliyor.
+  final String restaurantName;
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +630,15 @@ class _SavedView extends StatelessWidget {
               itemName,
               textAlign: TextAlign.center,
               maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.titleSmall
+                  .copyWith(color: context.textPrimaryColor),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              restaurantName,
+              textAlign: TextAlign.center,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.bodyMedium
                   .copyWith(color: context.textSecondaryColor),

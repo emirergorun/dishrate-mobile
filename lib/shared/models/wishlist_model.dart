@@ -7,6 +7,10 @@ class WishlistModel {
   final double averageRating;
   final double? price;
 
+  /// Yemeğin fotoğrafı. Sunucu hep gönderiyordu ama okunmuyordu; istek
+  /// listesindeki yemekler bu yüzden ikonla görünüyordu.
+  final String? photoUrl;
+
   const WishlistModel({
     required this.wishId,
     required this.menuItemId,
@@ -15,6 +19,7 @@ class WishlistModel {
     required this.restaurantName,
     required this.averageRating,
     this.price,
+    this.photoUrl,
   });
 
   factory WishlistModel.fromJson(Map<String, dynamic> json) {
@@ -27,6 +32,7 @@ class WishlistModel {
       restaurantName: item['restaurantName'] as String,
       averageRating: (item['averageRating'] as num?)?.toDouble() ?? 0.0,
       price: (item['price'] as num?)?.toDouble(),
+      photoUrl: item['photoUrl'] as String?,
     );
   }
 }

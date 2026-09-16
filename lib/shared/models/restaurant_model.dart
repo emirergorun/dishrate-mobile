@@ -7,8 +7,8 @@ class RestaurantModel {
   final String fullAddress;
   final double? latitude;
   final double? longitude;
-  /// Restoran türü — harita marker emoji'si için kullanılır.
-  /// Gerçek API'da bu alan yoksa null gelir ve varsayılan emoji gösterilir.
+  /// Restoran türü (menüde en çok yemeği olan kategori) — harita ikonu için.
+  /// Menüsü boşsa null; genel ikon gösterilir.
   final String? categoryName;
 
   const RestaurantModel({
@@ -34,6 +34,7 @@ class RestaurantModel {
       fullAddress: address['fullAddress'] as String? ?? '',
       latitude: (address['latitude'] as num?)?.toDouble(),
       longitude: (address['longitude'] as num?)?.toDouble(),
+      categoryName: json['categoryName'] as String?,
     );
   }
 }

@@ -4,7 +4,13 @@ class RatingModel {
   final String username;
   final int menuItemId;
   final String menuItemName;
+
+  /// Yemeğin kendi fotoğrafı.
   final String? photoUrl;
+
+  /// Kullanıcının değerlendirmeye eklediği fotoğraf (varsa).
+  final String? reviewPhotoUrl;
+  final int? restaurantId;
   final String restaurantName;
   final String? categoryName;
   final double score;
@@ -18,6 +24,8 @@ class RatingModel {
     required this.menuItemId,
     required this.menuItemName,
     this.photoUrl,
+    this.reviewPhotoUrl,
+    this.restaurantId,
     required this.restaurantName,
     this.categoryName,
     required this.score,
@@ -33,6 +41,8 @@ class RatingModel {
       menuItemId: json['menuItemId'] as int,
       menuItemName: json['menuItemName'] as String,
       photoUrl: json['photoUrl'] as String?,
+      reviewPhotoUrl: json['reviewPhotoUrl'] as String?,
+      restaurantId: json['restaurantId'] as int?,
       restaurantName: json['restaurantName'] as String,
       categoryName: json['categoryName'] as String?,
       score: (json['score'] as num).toDouble(),
@@ -42,4 +52,20 @@ class RatingModel {
           : null,
     );
   }
+
+  RatingModel copyWith({double? score, String? comment}) => RatingModel(
+        ratingId: ratingId,
+        userId: userId,
+        username: username,
+        menuItemId: menuItemId,
+        menuItemName: menuItemName,
+        photoUrl: photoUrl,
+        reviewPhotoUrl: reviewPhotoUrl,
+        restaurantId: restaurantId,
+        restaurantName: restaurantName,
+        categoryName: categoryName,
+        score: score ?? this.score,
+        comment: comment,
+        ratedAt: ratedAt,
+      );
 }

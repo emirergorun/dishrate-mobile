@@ -6,7 +6,10 @@ import '../../shared/models/menu_item_model.dart';
 import '../../shared/models/category_model.dart';
 import '../../shared/models/feed_section_model.dart';
 
+import '../../shared/models/search_result_model.dart';
+
 export '../../shared/models/feed_section_model.dart';
+export '../../shared/models/search_result_model.dart';
 
 class RestaurantRepository {
   RestaurantRepository._();
@@ -101,6 +104,15 @@ class RestaurantRepository {
     );
     return (response.data as List<dynamic>)
         .map((e) => MenuItemModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Arama ekranı: yemek, restoran ve kategori adında arar. Türkçe karakter
+  /// ve harf büyüklüğü sunucuda yok sayılır ("sisli" → Şişli).
+  Future<List<SearchResult>> search(String query) async {
+    final response = await _dio.get('/search', queryParameters: {'q': query});
+    return (response.data as List<dynamic>)
+        .map((e) => SearchResult.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

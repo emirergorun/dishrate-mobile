@@ -271,8 +271,10 @@ class _MenuItemTile extends StatelessWidget {
                     style: AppTextStyles.titleSmall
                         .copyWith(color: context.textPrimaryColor),
                   ),
-                  const SizedBox(height: 4),
-                  RatingInline(rating: item.averageRating),
+                  // Puan bilerek gösterilmiyor: kullanıcı kendi puanını
+                  // vermeden önce başkalarının ortalamasını görürse o sayıya
+                  // yanaşıyor. Keşfet, arama ve haritada puanlar duruyor —
+                  // orada iş keşfetmek, burada değerlendirmek.
                 ],
               ),
             ),

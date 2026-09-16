@@ -4,6 +4,7 @@ class MenuItemReviewModel {
   final bool mine;
   final double score;
   final String? comment;
+  final String? photoUrl;
   final DateTime? ratedAt;
 
   const MenuItemReviewModel({
@@ -12,6 +13,7 @@ class MenuItemReviewModel {
     required this.mine,
     required this.score,
     this.comment,
+    this.photoUrl,
     this.ratedAt,
   });
 
@@ -22,6 +24,7 @@ class MenuItemReviewModel {
       mine: json['mine'] as bool? ?? false,
       score: (json['score'] as num).toDouble(),
       comment: json['comment'] as String?,
+      photoUrl: json['photoUrl'] as String?,
       ratedAt: json['ratedAt'] != null
           ? DateTime.tryParse(json['ratedAt'].toString())
           : null,

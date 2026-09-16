@@ -5,6 +5,9 @@ import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/tarih.dart';
 import '../models/menu_item_review_model.dart';
+import 'dish_photo.dart';
+import 'photo_viewer.dart';
+import 'pressable.dart';
 import 'rating_stars.dart';
 
 /// Tek bir değerlendirme. Yemek paneli önizlemesi ve tüm yorumlar ekranı aynı
@@ -81,6 +84,19 @@ class ReviewTile extends StatelessWidget {
                   overflow: maxLines == null ? null : TextOverflow.ellipsis,
                   style: AppTextStyles.bodyMedium
                       .copyWith(color: context.textPrimaryColor),
+                ),
+              ],
+              if ((review.photoUrl ?? '').isNotEmpty) ...[
+                const SizedBox(height: AppSpace.sm),
+                Pressable(
+                  onTap: () => PhotoViewer.open(context, review.photoUrl!),
+                  semanticLabel: 'Değerlendirme fotoğrafını büyüt',
+                  child: DishPhoto(
+                    url: review.photoUrl,
+                    width: 96,
+                    height: 96,
+                    radius: AppRadius.sm,
+                  ),
                 ),
               ],
             ],

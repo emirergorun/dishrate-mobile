@@ -16,6 +16,8 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
+import '../../../shared/providers/data_refresh.dart';
+import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
 
@@ -29,9 +31,6 @@ import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 
-/// Değeri her arttığında profil verisi sessizce yeniden yüklenir.
-/// (Puan verince / profil sekmesine geçince MainScaffold tetikler.)
-final profileRefreshProvider = StateProvider<int>((ref) => 0);
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -344,7 +343,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     // Dışarıdan (puanlama, sekme değişimi) tetiklenen sessiz yenileme.
-    ref.listen<int>(profileRefreshProvider, (_, __) => _load(silent: true));
+    ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -1764,15 +1763,12 @@ class _WishlistItemRow extends StatelessWidget {
           // ── Yemek bilgisi ─────────────────────────────────────────────
           Row(
             children: [
-              Container(
+              DishPhoto(
+                url: item.photoUrl,
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
-                  color: context.surfaceColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.restaurant_rounded,
-                    color: AppColors.textDisabled, size: 18),
+                radius: 10,
+                iconSize: 18,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2221,6 +2217,9 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
 // ── Ortak yardımcı widget'lar ─────────────────────────────────────────────────
 
 /// Değerlendirme/yemek fotoğrafı küçük resmi — yoksa ikon gösterir.
+///
+/// Önbellekli [DishPhoto] kullanıyor: `Image.network` her açılışta yeniden
+/// indiriyor, yavaş bağlantıda bazı küçük resimler hiç gelmiyordu.
 class _RatingThumb extends StatelessWidget {
   const _RatingThumb({required this.photoUrl, this.size = 44});
   final String? photoUrl;
@@ -2228,24 +2227,12 @@ class _RatingThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
+    return DishPhoto(
+      url: photoUrl,
       width: size,
       height: size,
-      color: context.surfaceColor,
-      child: const Icon(Icons.restaurant_rounded,
-          color: AppColors.textDisabled, size: 20),
-    );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: (photoUrl != null && photoUrl!.isNotEmpty)
-          ? Image.network(
-              photoUrl!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => placeholder,
-            )
-          : placeholder,
+      radius: 10,
+      iconSize: 20,
     );
   }
 }

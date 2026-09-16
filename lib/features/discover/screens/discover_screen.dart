@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import '../../../core/constants/app_categories.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
@@ -104,20 +105,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       loc.hasIlce ? loc.ilce : null;
   String? get _category => _allSelected ? null : _selectedCategory;
 
-  static const List<String> _categories = [
-    'Tümü',
-    'Burger',
-    'Pizza',
-    'Kebap',
-    'Sushi',
-    'Tatlı',
-    'Kahvaltı',
-    'İtalyan',
-    'Vegan',
-    'Meze',
-    'Sandviç',
-    'Noodle',
-  ];
+  static const List<String> _categories = ['Tümü', ...AppCategories.all];
 
   bool get _allSelected =>
       _selectedCategory == null || _selectedCategory == 'Tümü';
@@ -162,7 +150,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     final Map<String, ({String title, String? subtitle, _Layout layout})>
         meta = {
       'top-rated': (
-        title: '${_bulunmaEki(yer)} en iyiler',
+        title: '${_bulunmaEki(yer)} En İyiler',
         subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
         layout: _Layout.ranked,
       ),
@@ -584,9 +572,13 @@ class _DiscoverAppBar extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Konum cihazdan geldiyse dolu konum işareti, elle
+                  // seçildiyse boş işaret + aşağı ok. Önceden GPS'te ok
+                  // biçimli bir navigasyon ikonu vardı; iki durum da "ok"
+                  // gibi okunuyordu.
                   Icon(
                     loc.source == LocationSource.gps
-                        ? TablerIcons.navigation_filled
+                        ? TablerIcons.map_pin_filled
                         : TablerIcons.map_pin,
                     color: context.textSecondaryColor,
                     size: 16,

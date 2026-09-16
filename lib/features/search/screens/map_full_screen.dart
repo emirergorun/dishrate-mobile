@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/auth/auth_provider.dart';
+import '../../../core/constants/app_categories.dart';
 import '../../../core/data/turkiye_adres.dart';
-import '../../discover/providers/location_provider.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/network/rating_repository.dart';
 import '../../../core/network/restaurant_repository.dart';
-import '../../../core/auth/token_storage.dart';
-import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/models/menu_item_model.dart';
-import '../../rating/providers/rating_flow_provider.dart';
-import '../../../shared/widgets/rating_sheet.dart';
+import '../../../shared/models/rating_model.dart';
+import '../../../shared/models/restaurant_model.dart';
+import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/map_tiles.dart';
+import '../../../shared/widgets/rating_stars.dart';
+import '../../discover/providers/location_provider.dart';
+import '../../restaurant/screens/restaurant_detail_screen.dart';
 
 class MapFullScreen extends ConsumerStatefulWidget {
   final List<RestaurantModel> initialRestaurants;
@@ -31,6 +34,19 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
 
   /// Konum şeridi kapatıldı mı? (Bu oturum için.)
   bool _konumSeridiKapali = false;
+
+  /// Cihazın konum izni. `null` → henüz bakılmadı; şerit gösterilmez.
+  ///
+  /// Şerit önceden keşfetteki konumun *kaynağına* bakıyordu: konum elle
+  /// seçildiyse izin verilmiş olsa bile "konumunu aç" diyordu. Artık yalnızca
+  /// cihaz izni yoksa çıkıyor.
+  bool? _izinVar;
+
+  /// Kullanıcının puanladığı yemekler, restoran kimliğine göre.
+  Map<int, List<RatingModel>> _puanlarim = const {};
+
+  /// Yalnızca puanlanan restoranlar mı gösteriliyor?
+  bool _sadecePuanladiklarim = false;
 
   /// Harita nereye ortalansın?
   ///
@@ -59,11 +75,6 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     return LatLng(lat, lng);
   }
 
-  static const _categories = [
-    'Burger', 'Pizza', 'Kebap', 'Sushi', 'Tavuk',
-    'Kahvaltı', 'Tatlı', 'İtalyan', 'Vegan', 'Meze', 'Noodle',
-  ];
-
   String? _selectedCategory;
   List<RestaurantModel> _visibleRestaurants = [];
   bool _isFiltering = false;
@@ -72,6 +83,32 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   void initState() {
     super.initState();
     _visibleRestaurants = widget.initialRestaurants;
+    _izniKontrolEt();
+    _puanlarimiYukle();
+  }
+
+  Future<void> _izniKontrolEt() async {
+    final izin = await LocationService.hasPermission();
+    if (mounted) setState(() => _izinVar = izin);
+  }
+
+  Future<void> _puanlarimiYukle() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    try {
+      final list = await RatingRepository.instance.getRatingsByUser(userId);
+      final map = <int, List<RatingModel>>{};
+      for (final r in list) {
+        final id = r.restaurantId;
+        if (id != null) (map[id] ??= []).add(r);
+      }
+      for (final l in map.values) {
+        l.sort((a, b) => b.score.compareTo(a.score));
+      }
+      if (mounted) setState(() => _puanlarim = map);
+    } catch (_) {
+      // Puan işaretleri olmadan da harita çalışır.
+    }
   }
 
   Future<void> _onCategoryTap(String label) async {
@@ -131,96 +168,110 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     return result;
   }
 
-  static String _categoryEmoji(String? category) {
-    switch (category) {
-      case 'Burger':
-        return '🍔';
-      case 'Pizza':
-        return '🍕';
-      case 'Sushi':
-        return '🍣';
-      case 'Kebap':
-        return '🥙';
-      case 'Tavuk':
-        return '🍗';
-      case 'Kahvaltı':
-        return '🍳';
-      case 'Tatlı':
-        return '🍰';
-      case 'İtalyan':
-        return '🍝';
-      case 'Noodle':
-        return '🍜';
-      case 'Vegan':
-        return '🥗';
-      case 'Meze':
-        return '🫙';
-      case 'Kahve':
-        return '☕';
-      default:
-        return '🍽️';
-    }
-  }
-
   List<Marker> _buildMarkers() {
-    return _visibleRestaurants
+    final shown = _sadecePuanladiklarim
+        ? _visibleRestaurants
+            .where((r) => _puanlarim.containsKey(r.restaurantId))
+        : _visibleRestaurants;
+    return shown
         .where((r) => r.latitude != null && r.longitude != null)
-        .map((r) => Marker(
-              point: LatLng(r.latitude!, r.longitude!),
-              width: 48,
-              height: 48,
-              child: GestureDetector(
-                onTap: () => _showRestaurantMenu(r),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      _categoryEmoji(r.categoryName),
-                      style: const TextStyle(fontSize: 22),
+        .map((r) {
+      final rated = _puanlarim.containsKey(r.restaurantId);
+      return Marker(
+        point: LatLng(r.latitude!, r.longitude!),
+        width: 52,
+        height: 52,
+        child: GestureDetector(
+          onTap: () => _onizlemeAc(r),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                margin: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  // Puanladığın restoranlar turuncu halkalı.
+                  border: rated
+                      ? Border.all(color: AppColors.primary, width: 3)
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
+                  ],
+                ),
+                // Restoranın türü (menüsündeki çoğunluk kategori) sade ikonla.
+                child: Center(
+                  child: Icon(
+                    AppCategories.icon(r.categoryName),
+                    size: 22,
+                    color: const Color(0xFF1A1A1A),
                   ),
                 ),
               ),
-            ))
-        .toList();
+              if (rated)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.star_rounded,
+                        size: 12, color: AppColors.onPrimary),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
   }
 
-  /// Restorana ait menüyü göster; kullanıcı "Değerlendir" seçerse
-  /// rating ekranına yönlendir.
-  Future<void> _showRestaurantMenu(RestaurantModel restaurant) async {
-    final selectedItem = await showModalBottomSheet<MenuItemModel?>(
+  /// İşarete dokununca küçük bir önizleme kartı açılır: restoran, varsa
+  /// puanladığın yemekler ve "Menüyü aç".
+  ///
+  /// Önceden burada haritaya özel bir mini menü açılıyordu: arama kutusu yok,
+  /// sıralama yok, uzun menüde aradığın yemeğe ulaşmak için hepsini kaydırmak
+  /// gerekiyordu. Artık menü tek yerde — restoran sayfasında.
+  Future<void> _onizlemeAc(RestaurantModel restaurant) async {
+    final ac = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _RestaurantMenuSheet(restaurant: restaurant),
+      builder: (_) => _OnizlemeKarti(
+        restaurant: restaurant,
+        ratings: _puanlarim[restaurant.restaurantId] ?? const [],
+      ),
     );
+    if (ac == true && mounted) await _restoranSayfasiniAc(restaurant);
+  }
 
-    if (selectedItem != null && mounted) {
-      ref
-          .read(ratingFlowProvider.notifier)
-          .jumpToRateItem(restaurant, selectedItem);
-
-      await RatingSheet.show(context);
-
-      ref.read(ratingFlowProvider.notifier).reset();
-    }
+  Future<void> _restoranSayfasiniAc(RestaurantModel restaurant) async {
+    final yer = [restaurant.district, restaurant.city]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RestaurantDetailScreen(
+          restaurantId: restaurant.restaurantId,
+          restaurantName: restaurant.name,
+          locationText: yer,
+        ),
+      ),
+    );
+    // Sayfada puan verilmiş olabilir; işaretler güncellensin.
+    if (mounted) _puanlarimiYukle();
   }
 
   Widget _buildKonumSeridi() {
-    final loc = ref.watch(selectedLocationProvider);
-    // Konum zaten GPS'ten geliyorsa şeride gerek yok.
-    if (loc.source == LocationSource.gps) return const SizedBox.shrink();
-
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
@@ -243,8 +294,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                   child: Text(
                     'Sana en yakınındaki yemekleri gösterebilmemiz için '
                     'konumunu aç.',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: Colors.white),
+                    style:
+                        AppTextStyles.bodySmall.copyWith(color: Colors.white),
                   ),
                 ),
                 TextButton(
@@ -256,8 +307,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                 IconButton(
                   icon: Icon(Icons.close_rounded,
                       size: 18, color: Colors.white.withValues(alpha: 0.7)),
-                  onPressed: () =>
-                      setState(() => _konumSeridiKapali = true),
+                  onPressed: () => setState(() => _konumSeridiKapali = true),
                 ),
               ],
             ),
@@ -272,14 +322,17 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     final r = await notifier.requestGps();
     if (!mounted) return;
     if (r.isOk) {
-      setState(() => _konumSeridiKapali = true);
+      setState(() {
+        _izinVar = true;
+        _konumSeridiKapali = true;
+      });
       return;
     }
     final mesaj = switch (r.outcome) {
       LocationOutcome.serviceDisabled =>
         'Cihazının konum servisi kapalı. Ayarlardan açabilirsin.',
       LocationOutcome.deniedForever =>
-        'Konum izni kapalı. Ayarlar\u2019dan açabilirsin.',
+        'Konum izni kapalı. Ayarlar’dan açabilirsin.',
       _ => 'Konum alınamadı. Şehri kendin seçebilirsin.',
     };
     ScaffoldMessenger.of(context).showSnackBar(
@@ -310,14 +363,9 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
               initialZoom: 12,
             ),
             children: [
-              TileLayer(
-                urlTemplate: context.isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'dishrate_mobile',
-              ),
+              const AppTileLayer(),
               MarkerLayer(markers: _buildMarkers()),
+              const MapAttribution(),
             ],
           ),
 
@@ -325,19 +373,28 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
           // Engellemez, kapatılabilir. Konum izni olmayan kullanıcı
           // haritayı yine de kullanabilsin diye böyle: haritanın işi
           // "restoranlar nerede", "ben neredeyim" değil.
-          if (!_konumSeridiKapali) _buildKonumSeridi(),
+          if (!_konumSeridiKapali && _izinVar == false) _buildKonumSeridi(),
 
-          // ── Geri butonu ─────────────────────────────────────────────
+          // ── Üst sıra: geri + "Puanladıklarım" ────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: _MapButton(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white, size: 20),
-                ),
+              child: Row(
+                children: [
+                  _MapButton(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                  const Spacer(),
+                  if (_puanlarim.isNotEmpty)
+                    _CategoryChip(
+                      label: '★ Puanladıklarım',
+                      isSelected: _sadecePuanladiklarim,
+                      onTap: () => setState(() =>
+                          _sadecePuanladiklarim = !_sadecePuanladiklarim),
+                    ),
+                ],
               ),
             ),
           ),
@@ -349,24 +406,27 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
             ),
 
           // ── Sağ taraf: kategori butonları ────────────────────────────
+          // Kaydırılabilir: küçük ekranda 13 kategori sığmıyor.
           SafeArea(
             child: Align(
               alignment: Alignment.centerRight,
               child: Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _categories.map((label) {
-                    final isSelected = _selectedCategory == label;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: _CategoryChip(
-                        label: label,
-                        isSelected: isSelected,
-                        onTap: () => _onCategoryTap(label),
-                      ),
-                    );
-                  }).toList(),
+                padding: const EdgeInsets.only(right: 12, top: 64, bottom: 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: AppCategories.all.map((label) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: _CategoryChip(
+                          label: label,
+                          isSelected: _selectedCategory == label,
+                          onTap: () => _onCategoryTap(label),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
             ),
@@ -377,64 +437,33 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   }
 }
 
-// ── Restoran menü sheet'i ──────────────────────────────────────────────────────
+// ── Önizleme kartı ────────────────────────────────────────────────────────────
 
-class _RestaurantMenuSheet extends StatefulWidget {
-  const _RestaurantMenuSheet({required this.restaurant});
+/// Harita işaretinin kartı: restoran künyesi, varsa puanladığın yemekler ve
+/// menüye giden düğme. Uzun değil — menünün kendisi restoran sayfasında.
+class _OnizlemeKarti extends StatelessWidget {
+  const _OnizlemeKarti({required this.restaurant, required this.ratings});
+
   final RestaurantModel restaurant;
-
-  @override
-  State<_RestaurantMenuSheet> createState() => _RestaurantMenuSheetState();
-}
-
-class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
-  List<MenuItemModel>? _items;
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchMenu();
-  }
-
-  Future<void> _fetchMenu() async {
-    try {
-      final items = await RestaurantRepository.instance
-          .getRestaurantMenu(widget.restaurant.restaurantId);
-      // En yüksek puanlı ürün en üstte ("Önerilen") çıksın.
-      final sorted = [...items]
-        ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
-      if (mounted) {
-        setState(() {
-          _items = sorted;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Menü yüklenemedi';
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  final List<RatingModel> ratings;
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.75;
+    final media = MediaQuery.of(context);
+    final location = [restaurant.district, restaurant.city]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
 
     return Container(
-      constraints: BoxConstraints(maxHeight: maxHeight),
+      constraints: BoxConstraints(maxHeight: media.size.height * 0.6),
       decoration: BoxDecoration(
         color: context.surfaceColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
           const SizedBox(height: 12),
           Center(
             child: Container(
@@ -446,11 +475,8 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // ── Restoran başlığı ──────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Row(
               children: [
                 Container(
@@ -460,349 +486,99 @@ class _RestaurantMenuSheetState extends State<_RestaurantMenuSheet> {
                     color: context.surfaceElevatedColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.storefront_rounded,
-                      color: AppColors.textDisabled, size: 22),
+                  child: Icon(
+                    AppCategories.icon(restaurant.categoryName),
+                    size: 22,
+                    color: context.textSecondaryColor,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.restaurant.name,
+                      Text(restaurant.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.titleSmall),
-                      if ((widget.restaurant.district ?? '').isNotEmpty ||
-                          widget.restaurant.city.isNotEmpty)
-                        Text(
-                          [widget.restaurant.district, widget.restaurant.city]
-                              .where((s) => s != null && s.isNotEmpty)
-                              .join(', '),
-                          style: AppTextStyles.bodySmall,
-                        ),
+                      Text(
+                        [
+                          if (restaurant.categoryName != null)
+                            restaurant.categoryName!,
+                          if (location.isNotEmpty) location,
+                        ].join(' · '),
+                        style: AppTextStyles.bodySmall,
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 12),
-          Divider(height: 1, color: context.dividerColor),
-          const SizedBox(height: 4),
-
-          // ── Menü içeriği ──────────────────────────────────────────
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else if (_error != null)
+          if (ratings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Divider(height: 1, color: context.dividerColor),
             Padding(
-              padding: const EdgeInsets.all(40),
-              child: Text(_error!,
-                  style: AppTextStyles.bodyMedium
-                      .copyWith(color: context.textSecondaryColor)),
-            )
-          else if (_items == null || _items!.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(40),
-              child: Column(
-                children: [
-                  const Icon(Icons.restaurant_menu_rounded,
-                      color: AppColors.textDisabled, size: 40),
-                  const SizedBox(height: 12),
-                  Text('Henüz menü eklenmemiş',
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: context.textSecondaryColor)),
-                ],
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Text(
+                'Puanladığın ${ratings.length} yemek',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: context.textSecondaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            )
-          else
+            ),
             Flexible(
               child: ListView.separated(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                itemCount: _items!.length,
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: ratings.length,
                 separatorBuilder: (_, __) =>
                     Divider(height: 1, color: context.dividerColor),
-                itemBuilder: (context, i) => _MenuItemRow(
-                  item: _items![i],
-                  restaurant: widget.restaurant,
-                  isRecommended: i == 0 && _items![0].averageRating > 0,
-                  onRate: () => Navigator.pop(context, _items![i]),
-                ),
-              ),
-            ),
-
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Tek menü satırı ───────────────────────────────────────────────────────────
-
-class _MenuItemRow extends StatefulWidget {
-  const _MenuItemRow({
-    required this.item,
-    required this.restaurant,
-    required this.onRate,
-    this.isRecommended = false,
-  });
-
-  final MenuItemModel item;
-  final RestaurantModel restaurant;
-  final VoidCallback onRate;
-  final bool isRecommended;
-
-  @override
-  State<_MenuItemRow> createState() => _MenuItemRowState();
-}
-
-class _MenuItemRowState extends State<_MenuItemRow> {
-  bool _wishlistLoading = false;
-  bool _inWishlist = false;
-
-  Future<void> _toggleWishlist() async {
-    if (_wishlistLoading) return;
-    setState(() => _wishlistLoading = true);
-    try {
-      final userId = await TokenStorage.instance.getUserId();
-      if (userId == null) {
-        if (mounted) setState(() => _wishlistLoading = false);
-        return;
-      }
-      if (_inWishlist) {
-        await WishlistRepository.instance
-            .removeByMenuItemId(userId, widget.item.menuItemId);
-        if (mounted) {
-          setState(() { _inWishlist = false; _wishlistLoading = false; });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('İstek listesinden çıkarıldı.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } else {
-        await WishlistRepository.instance
-            .addToWishlist(userId, widget.item.menuItemId);
-        if (mounted) {
-          setState(() { _inWishlist = true; _wishlistLoading = false; });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('İstek listene eklendi.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (_) {
-      if (mounted) setState(() => _wishlistLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Item bilgisi ──────────────────────────────────────────
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Fotoğraf
-              if (widget.item.photoUrl != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    widget.item.photoUrl!,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 56,
-                      height: 56,
-                      color: context.surfaceElevatedColor,
-                      child: const Icon(Icons.fastfood_rounded,
-                          color: AppColors.textDisabled, size: 22),
+                itemBuilder: (_, i) {
+                  final r = ratings[i];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        DishPhoto(
+                          url: r.reviewPhotoUrl ?? r.photoUrl,
+                          width: 40,
+                          height: 40,
+                          radius: 8,
+                          iconSize: 16,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            r.menuItemName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyMedium
+                                .copyWith(color: context.textPrimaryColor),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        StarRow(rating: r.score, size: 14),
+                      ],
                     ),
-                  ),
-                )
-              else
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: context.surfaceElevatedColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.fastfood_rounded,
-                      color: AppColors.textDisabled, size: 22),
-                ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.isRecommended) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.thumb_up_rounded,
-                                size: 11, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Önerilen',
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    Text(widget.item.name,
-                        style: AppTextStyles.titleSmall,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    if (widget.item.averageRating > 0)
-                      Row(
-                        children: [
-                          RatingBarIndicator(
-                            rating: widget.item.averageRating,
-                            itemBuilder: (_, __) => const Icon(
-                              Icons.star_rounded,
-                              color: AppColors.primary,
-                            ),
-                            itemCount: 5,
-                            itemSize: 13,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.item.averageRating.toStringAsFixed(1),
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── Aksiyon butonları ─────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  label: _inWishlist ? 'Listeden Çıkar' : 'İstek Listesi\'ne Ekle',
-                  icon: _inWishlist
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_add_outlined,
-                  isLoading: _wishlistLoading,
-                  isPrimary: false,
-                  onTap: _toggleWishlist,
-                ),
+            ),
+          ],
+          Padding(
+            padding:
+                EdgeInsets.fromLTRB(20, 16, 20, media.padding.bottom + 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Menüyü aç'),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ActionButton(
-                  label: 'Değerlendir',
-                  icon: Icons.star_outline_rounded,
-                  isLoading: false,
-                  isPrimary: true,
-                  onTap: widget.onRate,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Aksiyon butonu ─────────────────────────────────────────────────────────────
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.isLoading,
-    required this.isPrimary,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool isLoading;
-  final bool isPrimary;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: isPrimary ? AppColors.primary : context.surfaceElevatedColor,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: isLoading
-            ? Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: context.textSecondaryColor,
-                  ),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 15,
-                    color: isPrimary ? AppColors.onPrimary : context.textSecondaryColor,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          isPrimary ? AppColors.onPrimary : context.textSecondaryColor,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }
@@ -867,7 +643,7 @@ class _CategoryChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: Colors.white,
+            color: isSelected ? AppColors.onPrimary : Colors.white,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),

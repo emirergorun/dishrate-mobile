@@ -2,19 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/constants/app_categories.dart';
 import '../../../core/network/restaurant_repository.dart';
-import '../../../core/auth/token_storage.dart';
-import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../features/rating/providers/rating_flow_provider.dart';
-import '../../../features/rating/screens/add_rating_screen.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
+import '../../../shared/widgets/map_tiles.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
 import 'map_full_screen.dart';
 
@@ -25,39 +21,39 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-// ── Veri modeli: arama sonucu restoran + eşleşen ürünler ─────────────────────
-
-class _RestaurantResult {
-  final int restaurantId;
-  final String name;
-  final String? district;
-  final String city;
-  final List<MenuItemModel> items;
-
-  _RestaurantResult({
-    required this.restaurantId,
-    required this.name,
-    this.district,
-    required this.city,
-    required this.items,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _SearchScreenState extends State<SearchScreen> {
   static const _istanbul = LatLng(41.0082, 28.9784);
+
+  /// Bundan kısa metinle arama yapılmaz — sunucu da yapmıyor.
+  static const _minQuery = 2;
 
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
   List<RestaurantModel> _allRestaurants = [];
-  List<_RestaurantResult> _results = [];
+  List<SearchResult> _results = [];
   bool _mapLoading = true;
   bool _searching = false;
+  bool _failed = false;
   String _query = '';
   String? _selectedCategory;
   Timer? _debounce;
+
+  /// Ekrandaki sonuçların hangi arama için geldiği.
+  ///
+  /// "Sonuç bulunamadı" yalnızca şu anki aramanın sonucu gerçekten boşsa
+  /// gösteriliyor. Önceden yazarken, bekleme süresi dolmadan sonuç listesi
+  /// boş olduğu için "pizza" daha yazılırken üzgün surat çıkıyordu.
+  String? _resultsFor;
+
+  /// Son isteğin sırası: hızlı yazarken eski yanıt yenisinin üstüne yazmasın.
+  int _request = 0;
+
+  String? get _activeKey {
+    if (_selectedCategory != null) return 'kategori:$_selectedCategory';
+    final q = _query.trim();
+    return q.length >= _minQuery ? 'metin:$q' : null;
+  }
 
   @override
   void initState() {
@@ -77,9 +73,21 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final list = await RestaurantRepository.instance.getAllRestaurants();
       if (mounted) setState(() => _allRestaurants = list);
+    } catch (_) {
+      // Harita önizlemesi işaretsiz kalır; arama yine çalışır.
     } finally {
       if (mounted) setState(() => _mapLoading = false);
     }
+  }
+
+  void _clearResults() {
+    _request++;
+    setState(() {
+      _results = [];
+      _resultsFor = null;
+      _searching = false;
+      _failed = false;
+    });
   }
 
   void _onSearchChanged(String value) {
@@ -89,71 +97,83 @@ class _SearchScreenState extends State<SearchScreen> {
       _selectedCategory = null; // metin araması kategoriden bağımsız
     });
 
-    if (value.trim().isEmpty) {
-      setState(() => _results = []);
+    final q = value.trim();
+    if (q.length < _minQuery) {
+      _clearResults();
       return;
     }
-
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
-      if (!mounted) return;
-      setState(() => _searching = true);
-      try {
-        final items =
-            await RestaurantRepository.instance.searchMenuItems(value.trim());
-        if (mounted) setState(() => _results = _groupByRestaurant(items));
-      } catch (_) {
-        if (mounted) setState(() => _results = []);
-      } finally {
-        if (mounted) setState(() => _searching = false);
-      }
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _run('metin:$q', () => RestaurantRepository.instance.search(q));
     });
   }
 
   void _onCategoryTap(String label) {
-    final isAlreadySelected = _selectedCategory == label;
+    final again = _selectedCategory == label;
+    _debounce?.cancel();
     setState(() {
-      _selectedCategory = isAlreadySelected ? null : label;
+      _selectedCategory = again ? null : label;
       _controller.clear();
       _query = '';
     });
-
-    if (isAlreadySelected) {
-      setState(() => _results = []);
+    if (again) {
+      _clearResults();
       return;
     }
-    _searchByCategory(label);
-  }
-
-  Future<void> _searchByCategory(String category) async {
-    setState(() => _searching = true);
-    try {
+    _run('kategori:$label', () async {
       final items =
-          await RestaurantRepository.instance.getMenuItemsByCategory(category);
-      if (mounted) setState(() => _results = _groupByRestaurant(items));
-    } catch (_) {
-      if (mounted) setState(() => _results = []);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
+          await RestaurantRepository.instance.getMenuItemsByCategory(label);
+      return _groupByRestaurant(items);
+    });
   }
 
-  /// Menu item listesini restorana göre grupla
-  List<_RestaurantResult> _groupByRestaurant(List<MenuItemModel> items) {
-    final map = <int, _RestaurantResult>{};
-    for (final item in items) {
-      if (map.containsKey(item.restaurantId)) {
-        map[item.restaurantId]!.items.add(item);
-      } else {
-        map[item.restaurantId] = _RestaurantResult(
-          restaurantId: item.restaurantId,
-          name: item.restaurantName,
-          district: item.district,
-          city: item.city ?? '',
-          items: [item],
-        );
+  Future<void> _run(
+      String key, Future<List<SearchResult>> Function() loader) async {
+    final request = ++_request;
+    setState(() {
+      _searching = true;
+      _failed = false;
+    });
+    try {
+      final results = await loader();
+      if (!mounted || request != _request) return;
+      setState(() => _results = results);
+    } catch (_) {
+      if (!mounted || request != _request) return;
+      setState(() {
+        _results = [];
+        _failed = true;
+      });
+    } finally {
+      if (mounted && request == _request) {
+        setState(() {
+          _resultsFor = key;
+          _searching = false;
+        });
       }
     }
-    return map.values.toList();
+  }
+
+  /// Kategori çipi: menü öğelerini restoran kartlarına dönüştürür.
+  List<SearchResult> _groupByRestaurant(List<MenuItemModel> items) {
+    final groups = <int, List<MenuItemModel>>{};
+    final first = <int, MenuItemModel>{};
+    for (final item in items) {
+      (groups[item.restaurantId] ??= []).add(item);
+      first.putIfAbsent(item.restaurantId, () => item);
+    }
+    return [
+      for (final e in groups.entries)
+        SearchResult(
+          restaurantId: e.key,
+          name: first[e.key]!.restaurantName,
+          city: first[e.key]!.city,
+          district: first[e.key]!.district,
+          latitude: first[e.key]!.restaurantLatitude,
+          longitude: first[e.key]!.restaurantLongitude,
+          nameMatched: false,
+          items: e.value,
+        ),
+    ];
   }
 
   void _openMap() {
@@ -161,8 +181,7 @@ class _SearchScreenState extends State<SearchScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            MapFullScreen(initialRestaurants: _allRestaurants),
+        builder: (_) => MapFullScreen(initialRestaurants: _allRestaurants),
         fullscreenDialog: true,
       ),
     );
@@ -181,7 +200,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha:0.4),
+                      color: AppColors.primary.withValues(alpha: 0.4),
                       blurRadius: 6,
                     ),
                   ],
@@ -191,6 +210,27 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ))
         .toList();
+  }
+
+  Widget _buildResults() {
+    final key = _activeKey;
+    if (key == null) return const _EmptySearch();
+
+    final settled = _resultsFor == key && !_searching;
+    if (settled && _failed) return const _SearchFailed();
+    if (settled && _results.isEmpty) return const _NoResults();
+    if (_results.isEmpty) {
+      // İlk sonuç bekleniyor: boş durum yerine sessiz gösterge.
+      return const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: AppColors.primary),
+        ),
+      );
+    }
+    return _ResultsList(results: _results);
   }
 
   @override
@@ -216,7 +256,6 @@ class _SearchScreenState extends State<SearchScreen> {
               flex: 65,
               child: Column(
                 children: [
-                  // Kategori chips
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: _SearchCategoryChips(
@@ -224,21 +263,13 @@ class _SearchScreenState extends State<SearchScreen> {
                       onCategoryTap: _onCategoryTap,
                     ),
                   ),
-                  // Search Bar
                   _SearchBar(
                     controller: _controller,
                     focusNode: _focusNode,
                     onChanged: _onSearchChanged,
                     isLoading: _searching,
                   ),
-                  // Sonuç listesi
-                  Expanded(
-                    child: _query.isEmpty && _selectedCategory == null
-                        ? const _EmptySearch()
-                        : _results.isEmpty && !_searching
-                            ? const _NoResults()
-                            : _ResultsList(results: _results),
-                  ),
+                  Expanded(child: _buildResults()),
                 ],
               ),
             ),
@@ -260,22 +291,18 @@ class _SearchCategoryChips extends StatelessWidget {
   final String? selectedCategory;
   final ValueChanged<String> onCategoryTap;
 
-  static const _categories = [
-    'Burger', 'Pizza', 'Kebap', 'Sushi', 'Tavuk',
-    'Kahvaltı', 'Tatlı', 'İtalyan', 'Vegan', 'Meze', 'Noodle',
-  ];
-
   @override
   Widget build(BuildContext context) {
+    const categories = AppCategories.all;
     return SizedBox(
       height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _categories.length,
+        itemCount: categories.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final label = _categories[i];
+          final label = categories[i];
           final isSelected = selectedCategory == label;
           return GestureDetector(
             onTap: () => onCategoryTap(label),
@@ -297,12 +324,8 @@ class _SearchCategoryChips extends StatelessWidget {
               child: Text(
                 label,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: isSelected
-                      ? Colors.white
-                      : context.textPrimaryColor,
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.w400,
+                  color: isSelected ? Colors.white : context.textPrimaryColor,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ),
@@ -341,7 +364,6 @@ class _MapPreview extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Harita
             if (isLoading)
               Container(
                 color: context.surfaceColor,
@@ -359,13 +381,7 @@ class _MapPreview extends StatelessWidget {
                   ),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate: context.isDark
-                        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                    subdomains: const ['a', 'b', 'c', 'd'],
-                    userAgentPackageName: 'dishrate_mobile',
-                  ),
+                  const AppTileLayer(),
                   MarkerLayer(markers: markers),
                 ],
               ),
@@ -383,7 +399,7 @@ class _MapPreview extends StatelessWidget {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Colors.black.withValues(alpha:0.65),
+                      Colors.black.withValues(alpha: 0.65),
                       Colors.transparent,
                     ],
                   ),
@@ -437,6 +453,7 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         focusNode: focusNode,
         onChanged: onChanged,
+        textInputAction: TextInputAction.search,
         style: AppTextStyles.bodyMedium,
         decoration: InputDecoration(
           hintText: 'Yemek veya restoran ara...',
@@ -484,86 +501,54 @@ class _SearchBar extends StatelessWidget {
 
 class _ResultsList extends StatelessWidget {
   const _ResultsList({required this.results});
-  final List<_RestaurantResult> results;
+  final List<SearchResult> results;
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       itemCount: results.length,
       itemBuilder: (_, i) => _RestaurantCard(result: results[i]),
     );
   }
 }
 
-class _RestaurantCard extends ConsumerWidget {
+class _RestaurantCard extends StatelessWidget {
   const _RestaurantCard({required this.result});
-  final _RestaurantResult result;
+  final SearchResult result;
 
-  Future<void> _showPopup(BuildContext context, WidgetRef ref) async {
-    final selectedItem = await showModalBottomSheet<MenuItemModel?>(
-      context: context,
-      backgroundColor: context.surfaceColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _RestaurantPopup(result: result),
-    );
+  String get _location => [result.district, result.city]
+      .where((s) => s != null && s.isNotEmpty)
+      .join(', ');
 
-    if (selectedItem == null || !context.mounted) return;
-
-    final restaurant = RestaurantModel(
-      restaurantId: selectedItem.restaurantId,
-      name: result.name,
-      city: result.city,
-      district: result.district,
-      fullAddress: '',
-      latitude: selectedItem.restaurantLatitude,
-      longitude: selectedItem.restaurantLongitude,
-    );
-    ref.read(ratingFlowProvider.notifier).jumpToRateItem(restaurant, selectedItem);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.92,
-        decoration: BoxDecoration(
-          color: ctx.surfaceElevatedColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 40,
-              height: 4,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: ctx.dividerColor,
-                  borderRadius: const BorderRadius.all(Radius.circular(2)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Expanded(child: AddRatingScreen()),
-          ],
+  void _openRestaurant(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RestaurantDetailScreen(
+          restaurantId: result.restaurantId,
+          restaurantName: result.name,
+          locationText: _location,
         ),
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final location = [result.district, result.city]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(', ');
-    final itemCount = result.items.length;
+  Widget build(BuildContext context) {
+    final location = _location;
+    final count = result.items.length;
+    final subtitle = result.items.isEmpty
+        ? 'Menü henüz eklenmemiş'
+        : result.nameMatched
+            ? 'Menüye bak'
+            : '$count eşleşen ürün';
 
+    // Kart da ad da aynı yere gidiyor: restoran sayfası. Önceden burada
+    // aramaya özel bir mini menü açılıyordu; menü tek yerde olsun.
     return GestureDetector(
-      onTap: () => _showPopup(context, ref),
+      onTap: () => _openRestaurant(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
@@ -574,7 +559,6 @@ class _RestaurantCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // İkon
             Container(
               width: 44,
               height: 44,
@@ -586,7 +570,6 @@ class _RestaurantCard extends ConsumerWidget {
                   color: AppColors.textDisabled, size: 20),
             ),
             const SizedBox(width: 12),
-            // Bilgiler
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,16 +577,7 @@ class _RestaurantCard extends ConsumerWidget {
                   // Restoran adına dokunmak restoran sayfasını açar
                   // (kartın kalanı eşleşen ürünleri gösterir)
                   GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RestaurantDetailScreen(
-                          restaurantId: result.restaurantId,
-                          restaurantName: result.name,
-                          locationText: location,
-                        ),
-                      ),
-                    ),
+                    onTap: () => _openRestaurant(context),
                     child: Row(
                       children: [
                         Flexible(
@@ -624,7 +598,7 @@ class _RestaurantCard extends ConsumerWidget {
                   ],
                   const SizedBox(height: 4),
                   Text(
-                    '$itemCount eşleşen ürün',
+                    subtitle,
                     style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w500,
@@ -637,298 +611,6 @@ class _RestaurantCard extends ConsumerWidget {
                 color: AppColors.textDisabled, size: 20),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Restoran popup ────────────────────────────────────────────────────────────
-
-class _RestaurantPopup extends StatelessWidget {
-  const _RestaurantPopup({required this.result});
-  final _RestaurantResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    final location = [result.district, result.city]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(', ');
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      builder: (_, scrollController) => Column(
-        children: [
-          // Handle
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
-          // Restoran başlığı
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: context.surfaceElevatedColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.storefront_rounded,
-                      color: AppColors.textDisabled, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(result.name, style: AppTextStyles.titleSmall),
-                      if (location.isNotEmpty)
-                        Text(location, style: AppTextStyles.bodySmall),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Ayırıcı + başlık
-          Container(height: 0.5, color: context.dividerColor),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Eşleşen ürünler',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: context.textSecondaryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          // Ürün listesi
-          Expanded(
-            child: ListView.builder(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: result.items.length,
-              itemBuilder: (_, i) => _PopupItemRow(item: result.items[i]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PopupItemRow extends StatefulWidget {
-  const _PopupItemRow({required this.item});
-  final MenuItemModel item;
-
-  @override
-  State<_PopupItemRow> createState() => _PopupItemRowState();
-}
-
-class _PopupItemRowState extends State<_PopupItemRow> {
-  bool _wishlistLoading = false;
-  bool _inWishlist = false;
-
-  Future<void> _onWishlist() async {
-    if (_wishlistLoading) return;
-    setState(() => _wishlistLoading = true);
-    try {
-      final userId = await TokenStorage.instance.getUserId();
-      if (userId == null) {
-        if (mounted) setState(() => _wishlistLoading = false);
-        return;
-      }
-      if (_inWishlist) {
-        await WishlistRepository.instance
-            .removeByMenuItemId(userId, widget.item.menuItemId);
-        if (mounted) setState(() { _inWishlist = false; _wishlistLoading = false; });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('İstek listesinden çıkarıldı.'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ));
-        }
-      } else {
-        await WishlistRepository.instance
-            .addToWishlist(userId, widget.item.menuItemId);
-        if (mounted) setState(() { _inWishlist = true; _wishlistLoading = false; });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('İstek listene eklendi.'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ));
-        }
-      }
-    } catch (_) {
-      if (mounted) setState(() => _wishlistLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('İşlem başarısız, tekrar dene.'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Yemek adı + puan + fiyat
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.item.name, style: AppTextStyles.bodyMedium),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        RatingBarIndicator(
-                          rating: widget.item.averageRating,
-                          itemSize: 13,
-                          itemBuilder: (_, __) => const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.star,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          widget.item.averageRating.toStringAsFixed(1),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.star,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Divider(height: 1, color: context.dividerColor),
-          const SizedBox(height: 8),
-          // Aksiyon butonları
-          Row(
-            children: [
-              Expanded(
-                child: _ItemActionButton(
-                  icon: _inWishlist
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  label: _inWishlist ? 'Listeden Çıkar' : 'İstek Listesi\'ne Ekle',
-                  isLoading: _wishlistLoading,
-                  isPrimary: false,
-                  onTap: _onWishlist,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ItemActionButton(
-                  icon: Icons.star_rounded,
-                  label: 'Değerlendir',
-                  isPrimary: true,
-                  onTap: () => Navigator.pop(context, widget.item),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ItemActionButton extends StatelessWidget {
-  const _ItemActionButton({
-    required this.icon,
-    required this.label,
-    required this.isPrimary,
-    required this.onTap,
-    this.isLoading = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool isPrimary;
-  final VoidCallback onTap;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    final bgColor =
-        isPrimary ? AppColors.primary : context.surfaceElevatedColor;
-    final fgColor = isPrimary ? AppColors.onPrimary : context.textPrimaryColor;
-    final borderColor = isPrimary ? AppColors.primary : context.dividerColor;
-
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor),
-        ),
-        child: isLoading
-            ? Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: fgColor,
-                  ),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 15, color: fgColor),
-                  const SizedBox(width: 5),
-                  Text(
-                    label,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: fgColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }
@@ -950,8 +632,8 @@ class _EmptySearch extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Yemek veya restoran ara',
-            style:
-                AppTextStyles.titleMedium.copyWith(color: context.textSecondaryColor),
+            style: AppTextStyles.titleMedium
+                .copyWith(color: context.textSecondaryColor),
           ),
           const SizedBox(height: 6),
           Text(
@@ -981,6 +663,25 @@ class _NoResults extends StatelessWidget {
               style: AppTextStyles.titleMedium
                   .copyWith(color: context.textSecondaryColor)),
         ],
+      ),
+    );
+  }
+}
+
+class _SearchFailed extends StatelessWidget {
+  const _SearchFailed();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(
+          'Arama yapılamadı. Bağlantını kontrol edip tekrar dene.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodyMedium
+              .copyWith(color: context.textSecondaryColor),
+        ),
       ),
     );
   }

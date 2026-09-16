@@ -65,6 +65,8 @@ abstract final class DishSheet {
     ref.read(ratingFlowProvider.notifier).jumpToRateItem(restaurant, item);
     if (!context.mounted) return false;
     await RatingSheet.show(context);
+    // Panel sürüklenerek kapatıldıysa akış yarım kalır; "+" eski yemekle açılmasın.
+    if (context.mounted) ref.read(ratingFlowProvider.notifier).reset();
     return true;
   }
 }
@@ -89,6 +91,39 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
 
   List<MenuItemReviewModel>? _reviews;
   bool _reviewsFailed = false;
+
+  /// İçerik en üstteyken aşağı çekilen mesafe.
+  double _pull = 0;
+  bool _closing = false;
+
+  /// Bu kadar aşağı çekilince panel kapanır.
+  static const double _closeDistance = 72;
+
+  /// Yorumlar gelince panel kaydırılabilir oluyor ve dikey sürükleme
+  /// kaydırmaya gidiyor; panelin kendi "aşağı çekip kapat" hareketi hiç
+  /// tetiklenmiyordu. İçerik en üstteyken aşağı çekmek artık paneli kapatıyor
+  /// — yorumsuz paneldeki davranışın aynısı.
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0 || _closing) return false;
+    final top = n.metrics.minScrollExtent;
+    if (n is ScrollUpdateNotification &&
+        n.dragDetails != null &&
+        n.metrics.pixels < top) {
+      _pull = top - n.metrics.pixels;
+    } else if (n is OverscrollNotification &&
+        n.dragDetails != null &&
+        n.overscroll < 0) {
+      _pull += -n.overscroll;
+    } else if (n is ScrollEndNotification ||
+        (n is ScrollUpdateNotification && n.metrics.pixels >= top)) {
+      _pull = 0;
+    }
+    if (_pull >= _closeDistance) {
+      _closing = true;
+      Navigator.of(context).maybePop();
+    }
+    return false;
+  }
 
   @override
   void initState() {
@@ -210,7 +245,14 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Flexible(
-                child: SingleChildScrollView(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScroll,
+                  child: SingleChildScrollView(
+                  // Her platformda esneyen kaydırma: aşağı çekince içerik
+                  // parmakla birlikte gelsin, kapanacağı hissedilsin.
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -287,6 +329,7 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
 

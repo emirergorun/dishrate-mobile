@@ -1,13 +1,19 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/file_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/rating_request_model.dart';
+import '../../../shared/providers/data_refresh.dart';
+import '../../../shared/widgets/dish_photo.dart';
 
 // ── Sıralama seçenekleri ──────────────────────────────────────────────────────
 
@@ -54,7 +60,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  /// [silent] açıkken iskelet gösterilmez: başka ekranda puan verilince liste
+  /// yerinde kalıp yalnızca tazelensin.
+  Future<void> _load({bool silent = false}) async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) {
       if (mounted) {
@@ -66,7 +74,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       return;
     }
     setState(() {
-      _isLoading = true;
+      if (!silent) _isLoading = true;
       _error = null;
     });
     try {
@@ -110,10 +118,12 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   Future<void> _deleteRating(RatingModel rating) async {
     try {
       await RatingRepository.instance.deleteRating(rating.ratingId);
+      if (!mounted) return;
       setState(() {
         _allRatings.removeWhere((r) => r.ratingId == rating.ratingId);
         _applyFilters();
       });
+      ref.read(userDataRefreshProvider.notifier).state++;
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,22 +149,11 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     setState(() {
       final i = _allRatings.indexWhere((r) => r.ratingId == rating.ratingId);
       if (i != -1) {
-        _allRatings[i] = RatingModel(
-          ratingId: rating.ratingId,
-          userId: rating.userId,
-          username: rating.username,
-          menuItemId: rating.menuItemId,
-          menuItemName: rating.menuItemName,
-          photoUrl: rating.photoUrl,
-          restaurantName: rating.restaurantName,
-          categoryName: rating.categoryName,
-          score: newScore,
-          comment: newComment,
-          ratedAt: rating.ratedAt,
-        );
+        _allRatings[i] = rating.copyWith(score: newScore, comment: newComment);
         _applyFilters();
       }
     });
+    ref.read(userDataRefreshProvider.notifier).state++;
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -196,6 +195,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Başka ekranda puan verilince/silinince liste sessizce tazelenir.
+    ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
+
     return Scaffold(
       backgroundColor: context.bgColor,
       body: RefreshIndicator(
@@ -623,30 +625,13 @@ class _RatingCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Fotoğraf (varsa) veya ikon
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: (rating.photoUrl != null && rating.photoUrl!.isNotEmpty)
-                    ? Image.network(
-                        rating.photoUrl!,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 48,
-                          height: 48,
-                          color: context.surfaceElevatedColor,
-                          child: const Icon(Icons.restaurant_rounded,
-                              color: AppColors.textDisabled, size: 22),
-                        ),
-                      )
-                    : Container(
-                        width: 48,
-                        height: 48,
-                        color: context.surfaceElevatedColor,
-                        child: const Icon(Icons.restaurant_rounded,
-                            color: AppColors.textDisabled, size: 22),
-                      ),
+              // Fotoğraf (varsa) veya ikon — kendi fotoğrafını eklediysen o.
+              DishPhoto(
+                url: rating.reviewPhotoUrl ?? rating.photoUrl,
+                width: 48,
+                height: 48,
+                radius: 10,
+                iconSize: 22,
               ),
               const SizedBox(width: 12),
               // Orta: yemek adı + restoran + yıldızlar
@@ -838,11 +823,71 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
   bool _isLoading = false;
   String? _error;
 
+  /// Kayıtlı fotoğraf (varsa). Kullanıcı kaldırırsa [_fotoSilindi] açılır.
+  String? _mevcutFoto;
+  bool _fotoSilindi = false;
+
+  /// Yeni seçilen fotoğraf; kaydederken yüklenir.
+  XFile? _yeniFoto;
+  Uint8List? _yeniFotoBytes;
+
+  bool get _fotoVar => _yeniFotoBytes != null || (!_fotoSilindi && _mevcutFoto != null);
+
   @override
   void initState() {
     super.initState();
     _score = widget.rating.score;
     _commentCtrl = TextEditingController(text: widget.rating.comment ?? '');
+    _mevcutFoto = widget.rating.reviewPhotoUrl;
+  }
+
+  Future<void> _fotoSec() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: context.surfaceElevatedColor,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Fotoğraf çek'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Galeriden seç'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      final file = await ImagePicker()
+          .pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _yeniFoto = file;
+        _yeniFotoBytes = bytes;
+        _fotoSilindi = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.');
+      }
+    }
+  }
+
+  void _fotoKaldir() {
+    setState(() {
+      _yeniFoto = null;
+      _yeniFotoBytes = null;
+      _fotoSilindi = true;
+    });
   }
 
   @override
@@ -857,6 +902,26 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       return;
     }
     setState(() { _isLoading = true; _error = null; });
+
+    // Yeni fotoğraf varsa yüklenir; kaldırıldıysa boş metin gider (sunucu
+    // fotoğrafı siler); ikisi de yoksa null gider ve mevcut fotoğraf kalır.
+    String? photoUrl;
+    if (_yeniFoto != null) {
+      try {
+        photoUrl = await FileRepository.instance.uploadImage(_yeniFoto!);
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = 'Fotoğraf yüklenemedi, tekrar dene.';
+          });
+        }
+        return;
+      }
+    } else if (_fotoSilindi) {
+      photoUrl = '';
+    }
+
     try {
       await RatingRepository.instance.submitRating(
         RatingRequestModel(
@@ -864,6 +929,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
           menuItemId: widget.rating.menuItemId,
           score: _score,
           comment: _commentCtrl.text.trim(),
+          photoUrl: photoUrl,
         ),
       );
       if (mounted) {
@@ -991,6 +1057,37 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                   alignLabelWithHint: true,
                   counterStyle: TextStyle(color: AppColors.textDisabled),
                 ),
+              ),
+            ),
+
+            // ── Fotoğraf ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  if (_fotoVar)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _yeniFotoBytes != null
+                          ? Image.memory(_yeniFotoBytes!,
+                              width: 56, height: 56, fit: BoxFit.cover)
+                          : DishPhoto(
+                              url: _mevcutFoto, width: 56, height: 56),
+                    ),
+                  if (_fotoVar) const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: _fotoSec,
+                    icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                    label: Text(_fotoVar ? 'Değiştir' : 'Fotoğraf ekle'),
+                  ),
+                  if (_fotoVar)
+                    TextButton(
+                      onPressed: _fotoKaldir,
+                      style: TextButton.styleFrom(
+                          foregroundColor: context.textSecondaryColor),
+                      child: const Text('Kaldır'),
+                    ),
+                ],
               ),
             ),
 
