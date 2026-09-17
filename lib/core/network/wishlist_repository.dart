@@ -1,5 +1,4 @@
 import '../constants/api_constants.dart';
-import '../mock/mock_data.dart';
 import 'dio_client.dart';
 import '../../shared/models/wishlist_model.dart';
 
@@ -10,9 +9,6 @@ class WishlistRepository {
   final _dio = DioClient.instance;
 
   Future<List<WishlistModel>> getWishlist(int userId) async {
-    if (MockData.enabled) {
-      return MockData.getMockWishlist();
-    }
     final response =
         await _dio.get('${ApiConstants.wishlist}/user/$userId');
     final list = response.data as List<dynamic>;
@@ -22,10 +18,6 @@ class WishlistRepository {
   }
 
   Future<void> addToWishlist(int userId, int menuItemId) async {
-    if (MockData.enabled) {
-      MockData.addMockWishlistItem(menuItemId);
-      return;
-    }
     await _dio.post(ApiConstants.wishlist, data: {
       'userId': userId,
       'menuItemId': menuItemId,
@@ -33,19 +25,11 @@ class WishlistRepository {
   }
 
   Future<void> removeFromWishlist(int wishId) async {
-    if (MockData.enabled) {
-      MockData.removeMockWishlistItem(wishId);
-      return;
-    }
     await _dio.delete('${ApiConstants.wishlist}/$wishId');
   }
 
   /// Bir menü öğesi değerlendirildiğinde istek listesinden otomatik kaldırmak için.
   Future<void> removeByMenuItemId(int userId, int menuItemId) async {
-    if (MockData.enabled) {
-      MockData.removeMockWishlistByMenuItemId(menuItemId);
-      return;
-    }
     try {
       await _dio.delete(
         '${ApiConstants.wishlist}/user/$userId/menu-item/$menuItemId',

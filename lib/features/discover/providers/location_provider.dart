@@ -73,10 +73,6 @@ class LocationNotifier extends StateNotifier<SelectedLocation> {
   static const _ilceKey = 'dishrate_konum_ilce';
   static const _kaynakKey = 'dishrate_konum_kaynak';
 
-  /// Konum çözümlenirken true — başlıkta dönen gösterge için.
-  bool _busy = false;
-  bool get isBusy => _busy;
-
   Future<void> _restore() async {
     try {
       final il = await _storage.read(key: _ilKey);
@@ -111,9 +107,7 @@ class LocationNotifier extends StateNotifier<SelectedLocation> {
   /// Kullanıcı bilinçli olarak konum istedi — sistem penceresi burada açılır.
   /// Sonucu arayan taraf kullanıcıya anlatabilsin diye geri döndürülür.
   Future<LocationResult> requestGps() async {
-    _busy = true;
     final result = await LocationService.resolve();
-    _busy = false;
     if (result.isOk) _applyPlace(result.place!);
     return result;
   }

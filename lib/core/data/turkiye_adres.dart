@@ -41,17 +41,6 @@ abstract final class TurkiyeAdres {
     return list;
   }
 
-  /// Ada göre il bulur; bulunamazsa null.
-  static Future<Il?> ilBul(String? ad) async {
-    if (ad == null || ad.trim().isEmpty) return null;
-    final list = await iller();
-    final hedef = trLower(ad);
-    for (final il in list) {
-      if (trLower(il.ad) == hedef) return il;
-    }
-    return null;
-  }
-
   /// Türkçe'ye duyarlı küçük harf. Bkz. [Turkce.kucuk].
   static String trLower(String s) => Turkce.kucuk(s);
 
@@ -73,15 +62,6 @@ class Il {
             .toList()
           ..sort((a, b) => Turkce.karsilastir(a.ad, b.ad)),
       );
-
-  Ilce? ilceBul(String? ad) {
-    if (ad == null || ad.trim().isEmpty) return null;
-    final hedef = TurkiyeAdres.trLower(ad);
-    for (final ilce in ilceler) {
-      if (TurkiyeAdres.trLower(ilce.ad) == hedef) return ilce;
-    }
-    return null;
-  }
 }
 
 class Ilce {

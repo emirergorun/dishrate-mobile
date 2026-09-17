@@ -34,8 +34,6 @@ class ResolvedPlace {
   final double longitude;
   final String? il;
   final String? ilce;
-
-  bool get hasAdres => il != null && il!.trim().isNotEmpty;
 }
 
 class LocationResult {

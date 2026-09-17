@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Flutter'ın hazır bileşenlerindeki metinler (kopyala/yapıştır menüsü,
+  # lisans sayfası, erişilebilirlik etiketleri) için Türkçe çeviriler.
+  flutter_localizations:
+    sdk: flutter
 
   # Navigasyon
   go_router: ^14.2.0
@@ -108,26 +112,15 @@ flutter:
     - assets/images/
     - assets/branding/
     - assets/data/
+    # Uygulamadaki "Açık kaynak lisansları" sayfasında gösterilir (OFL şartı).
+    - assets/fonts/URBANIST-OFL.txt
+    - assets/fonts/POPPINS-OFL.txt
 
   # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart);
   # logo yazısı ("dishrate") her zaman Poppins'tir (AppFonts.wordmark).
   fonts:
-    # Denendi, karşılaştırma için duruyor (--dart-define=APP_FONT=Geist).
-    # Kaynak: github.com/vercel/geist-font (SIL OFL, lisans assets/fonts/GEIST-OFL.txt).
-    - family: Geist
-      fonts:
-        - asset: assets/fonts/Geist-Light.ttf
-          weight: 300
-        - asset: assets/fonts/Geist-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Geist-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Geist-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Geist-Bold.ttf
-          weight: 700
-
     # Logo kelime markası ("dishrate") ve karşılaştırma için.
+    # Kaynak: github.com/itfoundry/Poppins (SIL OFL, lisans assets/fonts/POPPINS-OFL.txt).
     - family: Poppins
       fonts:
         - asset: assets/fonts/Poppins-Light.ttf
@@ -153,6 +146,7 @@ flutter:
           weight: 900
 
     # Arayüz fontu. Türkçe harflerin tamamı var; fi/fl bitişik harfi yok.
+    # Kaynak: github.com/coreyhu/Urbanist (SIL OFL, lisans assets/fonts/URBANIST-OFL.txt).
     - family: Urbanist
       fonts:
         - asset: assets/fonts/Urbanist-Light.ttf

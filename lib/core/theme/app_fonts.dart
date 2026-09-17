@@ -12,7 +12,6 @@ import 'package:flutter/material.dart' show FontWeight;
 /// Kalıcı olarak değiştirmek: [active] içindeki `defaultValue`.
 /// Kodu değiştirmeden karşılaştırmak:
 /// ```
-/// flutter run --dart-define=APP_FONT=Geist
 /// flutter run --dart-define=APP_FONT=Poppins
 /// ```
 abstract final class AppFonts {
@@ -23,9 +22,6 @@ abstract final class AppFonts {
 
   /// Logo kelime markasının ailesi (Poppins SemiBold, harf aralığı −%2).
   static const String poppins = 'Poppins';
-
-  /// Denendi; karşılaştırma için duruyor.
-  static const String geist = 'Geist';
 
   /// Arayüzün kullandığı aktif font ailesi.
   static const String active = String.fromEnvironment(

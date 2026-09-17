@@ -22,22 +22,15 @@ Bu depo Flutter istemcisidir. API: [dishrate-backend](https://github.com/emirerg
 
 ## Ekranlar
 
-**Kullanıcı**
 - **Keşfet** — puan/kategoriye göre türetilmiş 6 raf, kategori filtreleri
-- **Ara** — restoran/yemek arama (debounce'lu) + harita görünümü, marker'lara tıklayınca menü
-- **Puan ver** — 3 adımlı akış: restoran → menü öğesi → puan + yorum
-- **Günlüğüm** — tüm değerlendirmelerin; sıralama, kategori filtresi, kaydırarak silme, düzenleme
+- **Ara** — yemek, restoran ve kategori araması (Türkçe karakter duyarsız) + harita; işarete dokununca önizleme kartı
+- **Restoran** — menü, menü içi arama, puana veya değerlendirme sayısına göre sıralama
+- **Puan ver** — 3 adımlı akış: restoran → menü öğesi → puan, yorum ve isteğe bağlı fotoğraf
+- **Günlüğüm** — tüm değerlendirmelerin; sıralama, kategori filtresi, kaydırarak silme, düzenleme (fotoğraf dahil)
 - **Profil** — favoriler (en yüksek 5), istek listesi, profil fotoğrafı, ayarlar
 - **Yorumlar** — bir ürünün tüm değerlendirmeleri; isimler gizlilik için maskeli (`E*** E***`)
 
-**Restoran sahibi**
-- Başvuru durumu takibi (inceleniyor / onaylandı / reddedildi)
-- Restoranım → menü yönetimi (ekle / düzenle / sil), restoran bilgisi ve logo
-- Ürününe gelen değerlendirmeleri görme + bildirimler
-
-**Admin**
-- Başvuru onay/red (red sebebi notuyla)
-- Kullanıcı listesi ve rol yönetimi
+Restoran sahipliği, menü yönetimi ve admin işleri uygulamada yok; web paneline taşınacak.
 
 Karanlık ve aydınlık tema desteklenir (cihaz ayarına uyar).
 
@@ -103,7 +96,7 @@ lib/
 │   └── theme/              Renkler, tipografi, tema
 ├── features/             Her özellik kendi klasöründe (ekran + widget)
 │   ├── discover/  search/  diary/  profile/  rating/
-│   └── owner/  admin/  reviews/  restaurant/  notifications/
+│   └── reviews/  restaurant/  auth/  settings/
 └── shared/
     ├── models/             API yanıtlarını karşılayan modeller
     └── widgets/            Ortak bileşenler (ana iskelet, alt menü)
@@ -117,6 +110,6 @@ Token süresi dolduğunda Dio interceptor'ı refresh token ile sessizce yeniler 
 
 ## Durum
 
-Aktif geliştirme aşamasında. Tamamlananlar: kimlik doğrulama, keşfet/arama/harita, puanlama akışı, günlük, profil, restoran sahibi ve admin panelleri, bildirimler, görsel yükleme.
+Aktif geliştirme aşamasında. Tamamlananlar: kimlik doğrulama, keşfet/arama/harita, puanlama akışı, günlük, profil, değerlendirme fotoğrafları, görsel yükleme.
 
-Sırada: push bildirimleri (FCM), konum bazlı keşif, sayfalama.
+Sırada: hesap silme, şifre sıfırlama ve e-posta doğrulama, mağaza yayını.

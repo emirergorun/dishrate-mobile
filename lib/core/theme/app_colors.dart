@@ -46,7 +46,6 @@ abstract final class AppColors {
   static const Color textDisabled = Color(0xFF6F6A64);
 
   static const Color navBackground = background;
-  static const Color navSelected = primary;
   static const Color navUnselected = Color(0xFF7A756F);
 
   // ─── Açık tema ────────────────────────────────────────────────────────────

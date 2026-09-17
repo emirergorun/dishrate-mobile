@@ -25,8 +25,6 @@ class ProfilePhotoResult {
 
   /// Özgün görsel üzerindeki kırpma dikdörtgeni: "x,y,genişlik,yükseklik".
   final String crop;
-
-  bool get isRemoval => photoUrl.isEmpty;
 }
 
 /// Profil fotoğrafı seçme / yeniden çerçeveleme akışı.
@@ -43,15 +41,14 @@ abstract final class ProfilePhotoEditor {
     final choice = await _askChoice(context, user: user);
     if (choice == null || !context.mounted) return null;
 
-    return switch (choice) {
-      _PhotoAction.pickNew => await _pickFromGallery(context),
-      _PhotoAction.recrop => await _recropExisting(context, user: user),
-      _PhotoAction.remove => const ProfilePhotoResult(
-          photoUrl: '',
-          originalUrl: '',
-          crop: '',
-        ),
-    };
+    switch (choice) {
+      case _PhotoAction.pickNew:
+        return _pickFromGallery(context);
+      case _PhotoAction.recrop:
+        return _recropExisting(context, user: user);
+      case _PhotoAction.remove:
+        return const ProfilePhotoResult(photoUrl: '', originalUrl: '', crop: '');
+    }
   }
 
   // ── Seçenek listesi ────────────────────────────────────────────────────────

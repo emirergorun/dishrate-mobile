@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/theme/app_colors.dart';
@@ -20,8 +22,23 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  _fontLisanslariniKaydet();
   await _logoyuOnceCoz();
   runApp(const ProviderScope(child: DishrateApp()));
+}
+
+/// Gömülü fontların OFL lisansları. Paket lisanslarını Flutter kendisi
+/// ekliyor; fontları biz eklemezsek lisans sayfasında görünmüyorlar.
+void _fontLisanslariniKaydet() {
+  LicenseRegistry.addLicense(() async* {
+    for (final (ad, dosya) in [
+      ('Urbanist', 'URBANIST-OFL.txt'),
+      ('Poppins', 'POPPINS-OFL.txt'),
+    ]) {
+      final metin = await rootBundle.loadString('assets/fonts/$dosya');
+      yield LicenseEntryWithLineBreaks(['$ad (font)'], metin);
+    }
+  });
 }
 
 /// Açılış logosunu uygulama çizilmeden önce çözer.
@@ -89,6 +106,11 @@ class DishrateApp extends ConsumerWidget {
       themeMode: themeMode,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      // Uygulama yalnızca Türkçe. Cihaz dili ne olursa olsun Flutter'ın hazır
+      // metinleri de Türkçe çıksın diye dil sabit.
+      locale: const Locale('tr', 'TR'),
+      supportedLocales: const [Locale('tr', 'TR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: const _AuthGate(),
     );
   }

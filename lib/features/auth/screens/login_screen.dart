@@ -86,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   /// beliriyordu (cihazda tam olarak bu oluyordu).
   Offset _logoTarget(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final h = _logoWidth / _wordmarkAspect;
+    const h = _logoWidth / _wordmarkAspect;
     return Offset(mq.size.width / 2, mq.padding.top + 60 + h / 2);
   }
 

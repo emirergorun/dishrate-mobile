@@ -23,9 +23,8 @@ class AuthState {
         user = null,
         errorMessage = null;
 
-  const AuthState.authenticated(UserModel user)
+  const AuthState.authenticated(UserModel this.user)
       : status = AuthStatus.authenticated,
-        user = user,
         errorMessage = null;
 
   const AuthState.unauthenticated([String? error])

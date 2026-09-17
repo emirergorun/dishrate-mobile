@@ -92,8 +92,4 @@ class UserModel {
       _                  => UserRole.user,
     };
   }
-
-  bool get isAdmin => role == UserRole.admin;
-  bool get isRestaurantOwner => role == UserRole.restaurantOwner;
-  bool get isUser => role == UserRole.user;
 }

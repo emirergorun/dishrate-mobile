@@ -8,9 +8,8 @@ import 'app_fonts.dart';
 ///
 /// Stillerin çoğu **renksizdir**: rengi ekran `context.textSecondaryColor`
 /// gibi temaya duyarlı erişimcilerle verir. Stile sabit renk gömmek onu tek
-/// temaya kilitliyordu. İstisnalar bilerek sabittir: görsel üstü stiller
-/// (zemin iki temada da koyu) ve eski ekranların kullandığı [bodySmall] /
-/// [labelSmall].
+/// temaya kilitliyordu. İstisnalar bilerek sabittir: eski ekranların
+/// kullandığı [bodySmall] / [labelSmall].
 ///
 /// Harf aralığı Urbanist'e göre: font zaten sıkı çiziyor, bu yüzden yalnızca
 /// 20px üstündeki başlıklarda hafif eksi aralık var. Geist'e göre ayarlanmış
@@ -145,54 +144,10 @@ abstract final class AppTextStyles {
         letterSpacing: size * -0.02,
       );
 
-  // ─── Görsel üstü metin ────────────────────────────────────────────────────
-  // Fotoğrafın üzerine koyu degradeyle yerleştirilen yazılar. Zemin her iki
-  // temada da koyu olduğundan renkler SABİTTİR. Buraya tema rengi miras alan
-  // bir stil (örn. titleSmall) koyulursa açık modda yazı siyaha döner ve
-  // koyu degradenin üstünde okunmaz olur — bu stiller tam olarak onu önler.
-  static const TextStyle onImageTitle = TextStyle(
-    fontFamily: _font,
-    fontSize: 15,
-    fontWeight: AppFonts.title,
-    color: Colors.white,
-    height: 1.25,
-  );
-
-  static const TextStyle onImageTitleLarge = TextStyle(
-    fontFamily: _font,
-    fontSize: 20,
-    fontWeight: AppFonts.heading,
-    color: Colors.white,
-    height: 1.2,
-    letterSpacing: -0.2,
-  );
-
-  /// Görsel üstü ikincil metin — restoran adı, konum gibi.
-  static const TextStyle onImageCaption = TextStyle(
-    fontFamily: _font,
-    fontSize: 12,
-    fontWeight: AppFonts.body,
-    color: Color(0xCCFFFFFF),
-    height: 1.4,
-  );
-
-  /// Görsel üstü ikincil metnin ikon rengiyle eşleşen tonu.
-  static const Color onImageMuted = Color(0xCCFFFFFF);
-
   // ─── Puan ─────────────────────────────────────────────────────────────────
   // Rakamlar metin renginde; sarı yalnızca yıldız glifinde. Rakamın kendisi
   // sarı olunca açık zeminde okunmuyordu, koyu zeminde de her kart ekranda
   // iki ayrı vurgu rengiyle (turuncu + sarı) bağırıyordu.
-
-  /// Değerlendirme adımındaki büyük puan.
-  static const TextStyle scoreDisplay = TextStyle(
-    fontFamily: _font,
-    fontSize: 56,
-    fontWeight: AppFonts.title,
-    height: 1,
-    letterSpacing: -1,
-    fontFeatures: tabular,
-  );
 
   /// Detay başlığındaki ortalama puan.
   static const TextStyle ratingLarge = TextStyle(

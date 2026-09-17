@@ -88,6 +88,16 @@ class SettingsScreen extends ConsumerWidget {
             value: '',
             onTap: () {},
           ),
+          _InfoItem(
+            icon: Icons.description_outlined,
+            label: 'Açık Kaynak Lisansları',
+            value: '',
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: 'Dishrate',
+              applicationVersion: '1.0.0',
+            ),
+          ),
 
           const SizedBox(height: 40),
         ],

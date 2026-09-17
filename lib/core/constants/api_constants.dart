@@ -15,12 +15,8 @@ abstract final class ApiConstants {
   static const String authRefresh = '/auth/refresh';
   static const String authLogout = '/auth/logout';
 
-  // Admin
-  static const String admin = '/admin';
-
-  // Dosya yükleme & bildirimler
+  // Dosya yükleme
   static const String files = '/files';
-  static const String notifications = '/notifications';
 
   // Diğer endpoint'ler
   static const String users = '/users';

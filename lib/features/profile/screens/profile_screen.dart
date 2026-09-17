@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/auth/token_storage.dart';
-import '../../../core/mock/mock_data.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/user_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
@@ -22,15 +21,9 @@ import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
 
 import '../../../core/utils/password_validator.dart';
-import '../../admin/screens/admin_panel_screen.dart';
-import '../../notifications/screens/notifications_screen.dart';
-import '../../owner/screens/claim_status_screen.dart';
-import '../../owner/screens/restaurant_claim_screen.dart';
-import '../../owner/screens/owner_dashboard_screen.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
 import '../../settings/screens/settings_screen.dart';
-
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -58,22 +51,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  /// Sahiplik talebi akışını açar; talep gönderilirse profili tazeler.
-  Future<void> _openApply() async {
-    final gonderildi = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const RestaurantClaimScreen()),
-    );
-    if (!mounted || gonderildi != true) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Talebin alındı. "Sahiplik Taleplerim"den takip edebilirsin.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    _load(silent: true);
   }
 
   /// Başlıktaki avatardan fotoğraf değiştirme. "Profili Düzenle" panelinden
@@ -163,30 +140,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   /// İstek listesindeki bir ürünü doğrudan puanlama ekranına gönderir.
   void _openRatingForWishlistItem(WishlistModel wish) {
-    // MockData'dan tam ürün bilgisini çekmeye çalış (foto, kategori, konum)
-    final fullItem = MockData.getMenuItemById(wish.menuItemId);
-
-    final menuItem = fullItem ??
-        MenuItemModel(
-          menuItemId: wish.menuItemId,
-          name: wish.menuItemName,
-          price: wish.price,
-          averageRating: wish.averageRating,
-          restaurantId: wish.restaurantId,
-          restaurantName: wish.restaurantName,
-        );
+    final menuItem = MenuItemModel(
+      menuItemId: wish.menuItemId,
+      name: wish.menuItemName,
+      price: wish.price,
+      averageRating: wish.averageRating,
+      restaurantId: wish.restaurantId,
+      restaurantName: wish.restaurantName,
+    );
 
     final restaurant = RestaurantModel(
       restaurantId: wish.restaurantId,
       name: wish.restaurantName,
-      city: fullItem?.city ?? 'İstanbul',
-      district: fullItem?.district,
-      fullAddress: fullItem?.district != null
-          ? '${wish.restaurantName}, ${fullItem!.district}'
-          : wish.restaurantName,
-      latitude: fullItem?.restaurantLatitude,
-      longitude: fullItem?.restaurantLongitude,
-      categoryName: fullItem?.categoryName,
+      city: 'İstanbul',
+      fullAddress: wish.restaurantName,
     );
 
     ref.read(ratingFlowProvider.notifier).jumpToRateItem(restaurant, menuItem);
@@ -357,7 +324,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 SliverAppBar(
                   pinned: true,
                   backgroundColor: context.bgColor,
-                  title: const Text('Profil', style: AppTextStyles.headlineMedium),
+                  title:
+                      const Text('Profil', style: AppTextStyles.headlineMedium),
                   actions: [
                     IconButton(
                       icon: Icon(Icons.settings_outlined,
@@ -388,82 +356,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             .state = 2, // Günlük sekmesi
                         onWishlistTap: _showWishlist,
                         // Avatara dokununca fotoğrafı doğrudan değiştir
-                        onPhotoTap: _user == null
-                            ? null
-                            : () => _editPhoto(_user!),
+                        onPhotoTap:
+                            _user == null ? null : () => _editPhoto(_user!),
                         photoBusy: _photoBusy,
                       ),
 
                       const SizedBox(height: 8),
-
-                      // ── YÖNETİM (admin) ────────────────────────────
-                      if (_user != null && _user!.isAdmin) ...[
-                        const _SectionLabel('YÖNETİM'),
-                        _ProfileItem(
-                          icon: Icons.admin_panel_settings_rounded,
-                          iconColor: AppColors.error,
-                          label: 'Admin Paneli',
-                          subtitle: 'Başvurular ve kullanıcı yönetimi',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const AdminPanelScreen()),
-                          ),
-                        ),
-                      ],
-
-                      // ── RESTORAN (rol bazlı) ───────────────────────
-                      if (_user != null &&
-                          (_user!.isRestaurantOwner || _user!.isUser)) ...[
-                        const _SectionLabel('RESTORAN'),
-                        if (_user!.isRestaurantOwner) ...[
-                          _ProfileItem(
-                            icon: Icons.storefront_rounded,
-                            iconColor: AppColors.primary,
-                            label: 'Restoranım',
-                            subtitle: 'Menünü ve bilgilerini yönet',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const OwnerDashboardScreen()),
-                            ),
-                          ),
-                          _ProfileItem(
-                            icon: Icons.notifications_rounded,
-                            iconColor: AppColors.star,
-                            label: 'Bildirimler',
-                            subtitle: 'Ürünlerine gelen değerlendirmeler',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const NotificationsScreen()),
-                            ),
-                          ),
-                        ] else ...[
-                          // Restoran sahipliği artık kayıt anına bağlı değil;
-                          // her kullanıcı istediği zaman kendi restoranını
-                          // arayıp sahipliğini talep edebilir.
-                          _ProfileItem(
-                            icon: Icons.storefront_rounded,
-                            iconColor: AppColors.primary,
-                            label: 'Restoranımı Sahiplen',
-                            subtitle: 'Restoran sahibiysen sahipliğini talep et',
-                            onTap: () => _openApply(),
-                          ),
-                          _ProfileItem(
-                            icon: Icons.assignment_rounded,
-                            iconColor: AppColors.primary,
-                            label: 'Sahiplik Taleplerim',
-                            subtitle: 'Talebinin durumunu takip et',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const ClaimStatusScreen()),
-                            ),
-                          ),
-                        ],
-                      ],
 
                       // ── KEŞFEDİN ───────────────────────────────────
                       const _SectionLabel('KEŞFEDİN'),
@@ -547,7 +445,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(height: 8),
 
                       // ── TEHLİKELİ BÖLGE ─────────────────────────────
-                      const _SectionLabel('TEHLİKELİ BÖLGE', color: AppColors.error),
+                      const _SectionLabel('TEHLİKELİ BÖLGE',
+                          color: AppColors.error),
                       _ProfileItem(
                         icon: Icons.ac_unit_rounded,
                         iconColor: AppColors.error,
@@ -647,8 +546,8 @@ class _ProfileHeader extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                                color: context.bgColor, width: 2),
+                            border:
+                                Border.all(color: context.bgColor, width: 2),
                           ),
                           child: photoBusy
                               ? const SizedBox(
@@ -850,7 +749,6 @@ class _ProfileItem extends StatelessWidget {
     );
   }
 }
-
 
 // ── Profili düzenle sheet ─────────────────────────────────────────────────────
 
@@ -1076,8 +974,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                                   width: 24,
                                   height: 24,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary),
+                                      strokeWidth: 2, color: AppColors.primary),
                                 ),
                               )
                             : _photoUrl != null
@@ -1273,8 +1170,7 @@ class _PrivacySheetState extends State<_PrivacySheet> {
             padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
-                Icon(Icons.lock_rounded,
-                    color: AppColors.primary, size: 20),
+                Icon(Icons.lock_rounded, color: AppColors.primary, size: 20),
                 SizedBox(width: 8),
                 Text('Gizlilik ve Güvenlik', style: AppTextStyles.titleSmall),
               ],
@@ -2114,7 +2010,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                     const Icon(Icons.key_rounded,
                         color: AppColors.primary, size: 20),
                     const SizedBox(width: 8),
-                    const Text('Şifre Değiştir', style: AppTextStyles.titleSmall),
+                    const Text('Şifre Değiştir',
+                        style: AppTextStyles.titleSmall),
                     const Spacer(),
                     IconButton(
                       icon: Icon(
@@ -2336,12 +2233,12 @@ class _ProfileRatingSheet extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: context.dividerColor,
-                borderRadius: BorderRadius.all(Radius.circular(2)),
+                borderRadius: const BorderRadius.all(Radius.circular(2)),
               ),
             ),
           ),
-          SizedBox(height: 20),
-          Expanded(child: AddRatingScreen()),
+          const SizedBox(height: 20),
+          const Expanded(child: AddRatingScreen()),
         ],
       ),
     );

@@ -9,7 +9,6 @@ import '../../../core/utils/turkce.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/pressable.dart';
-import '../../../shared/widgets/rating_stars.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
 import '../providers/rating_flow_provider.dart';
