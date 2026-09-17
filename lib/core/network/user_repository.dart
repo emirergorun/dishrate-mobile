@@ -42,6 +42,12 @@ class UserRepository {
     return UserModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Hesabı ve bütün verisini kalıcı olarak siler. Şifre yanlışsa backend
+  /// 409 + Türkçe mesaj döner.
+  Future<void> deleteAccount({required String password}) async {
+    await _dio.delete('${ApiConstants.users}/me', data: {'password': password});
+  }
+
   /// Şifre değiştir. Mevcut şifre yanlışsa backend 409 + Türkçe mesaj döner.
   Future<void> changePassword(
     int userId, {

@@ -75,3 +75,6 @@ Thumbs.db
 # Kurulum: skills/ altındaki araçla çekilir, sonra .claude/skills'e kopyalanır.
 skills/
 .claude/
+
+# Claude Code proje notları (yerel, GitHub’a gitmez)
+CLAUDE.md

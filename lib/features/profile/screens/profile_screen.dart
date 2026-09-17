@@ -298,6 +298,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  void _openDeleteAccount() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.surfaceColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _DeleteAccountSheet(
+        onDeleted: () => ref.read(authProvider.notifier).clearDeletedAccount(),
+      ),
+    );
+  }
+
   void _openSettings(BuildContext context) {
     Navigator.push(
       context,
@@ -463,11 +476,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         iconColor: AppColors.error,
                         label: 'Hesabı Sil',
                         labelColor: AppColors.error,
-                        onTap: () => _confirmDelete(
-                          'Hesabı Sil',
-                          'Tüm verilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
-                          () {},
-                        ),
+                        onTap: _openDeleteAccount,
                       ),
 
                       const SizedBox(height: 40),
@@ -2101,6 +2110,230 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                             style: AppTextStyles.labelLarge
                                 .copyWith(color: Colors.white)),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Hesabı sil sheet ──────────────────────────────────────────────────────────
+
+class _DeleteAccountSheet extends StatefulWidget {
+  const _DeleteAccountSheet({required this.onDeleted});
+
+  /// Sunucuda silme başarılı olunca çağrılır (cihazdaki oturumu temizler).
+  final VoidCallback onDeleted;
+
+  @override
+  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
+}
+
+class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
+  final _passwordCtrl = TextEditingController();
+  bool _obscure = true;
+  bool _deleting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    final password = _passwordCtrl.text;
+    if (password.isEmpty) {
+      setState(() => _error = 'Şifreni gir.');
+      return;
+    }
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await UserRepository.instance.deleteAccount(password: password);
+      if (!mounted) return;
+      // Mesaj uygulamanın kök ScaffoldMessenger'ına gidiyor; profil ekranı
+      // kapanıp giriş ekranı açıldığında da görünür kalır.
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      widget.onDeleted();
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Hesabın ve bütün verilerin silindi.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _deleting = false;
+        _error = _parseError(e);
+      });
+    }
+  }
+
+  String _parseError(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+    }
+    return 'Hesap silinemedi, tekrar dene.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SheetHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.delete_forever_rounded,
+                        color: AppColors.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('Hesabı Sil', style: AppTextStyles.titleSmall),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Hesabın kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+                  style: AppTextStyles.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                for (final madde in const [
+                  'Bütün puanların, yorumların ve yorum fotoğrafların',
+                  'İstek listen',
+                  'Profil bilgilerin ve profil fotoğrafın',
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(Icons.remove_circle_outline_rounded,
+                              size: 16, color: context.textSecondaryColor),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(madde, style: AppTextStyles.bodySmall),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  enabled: !_deleting,
+                  autofillHints: const [AutofillHints.password],
+                  style: AppTextStyles.bodyMedium,
+                  onSubmitted: (_) => _delete(),
+                  decoration: InputDecoration(
+                    labelText: 'Onaylamak için şifren',
+                    labelStyle: AppTextStyles.bodySmall,
+                    prefixIcon: Icon(Icons.lock_outline_rounded,
+                        size: 18, color: context.textSecondaryColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        size: 20,
+                        color: context.textSecondaryColor,
+                      ),
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                    ),
+                    filled: true,
+                    fillColor: context.surfaceElevatedColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.dividerColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.dividerColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AppColors.error, width: 1.5),
+                    ),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: AppColors.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_error!,
+                              style: AppTextStyles.bodySmall
+                                  .copyWith(color: AppColors.error)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _deleting || _passwordCtrl.text.isEmpty
+                      ? null
+                      : _delete,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    disabledBackgroundColor:
+                        AppColors.error.withValues(alpha: 0.35),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _deleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text('Hesabımı kalıcı olarak sil',
+                          style: AppTextStyles.labelLarge
+                              .copyWith(color: Colors.white)),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: _deleting ? null : () => Navigator.pop(context),
+                  child: const Text('Vazgeç'),
                 ),
               ],
             ),

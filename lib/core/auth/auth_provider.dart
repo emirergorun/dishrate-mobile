@@ -140,6 +140,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Hesap sunucuda silindikten sonra: oturum anahtarları zaten geçersiz,
+  /// sunucuya çıkış isteği atmadan yalnızca cihazdaki oturum temizlenir.
+  Future<void> clearDeletedAccount() async {
+    await _storage.clearAll();
+    state = const AuthState.unauthenticated();
+  }
+
   /// Hata mesajını okunabilir hale getir
   String _parseError(Object e) {
     if (e is Exception) {
