@@ -13,3 +13,8 @@ final userDataRefreshProvider = StateProvider<int>((ref) => 0);
 /// Yemek panelindeki "Günlüğe git" bu değeri koyar, Günlük ekranı o karta
 /// kaydırıp kısa süre aydınlatır ve değeri sıfırlar.
 final diaryFocusProvider = StateProvider<int?>((ref) => null);
+
+/// "İstek listesini aç" isteği. Her artış bir istek: yemek panelindeki
+/// "Tümünü gör" bunu artırır, Profil ekranı istek listesi panelini açar.
+/// Sayaç kullanılıyor; aynı istek art arda gelirse bool değişiklik saymazdı.
+final wishlistOpenRequestProvider = StateProvider<int>((ref) => 0);

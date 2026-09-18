@@ -98,8 +98,8 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
   /// Yorum listesinden çıkıyor: kendi değerlendirmesi `mine` ile işaretli.
   int? _ownRatingId;
 
-  /// "Bu ürünü daha önce denedin" şeridi görünüyor mu?
-  bool _showTriedBanner = false;
+  /// Eylem satırının üstündeki bilgi şeridi.
+  _InfoBannerKind _banner = _InfoBannerKind.none;
 
   /// İçerik en üstteyken aşağı çekilen mesafe.
   double _pull = 0;
@@ -176,7 +176,7 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
         // girmez. Listeden çıkarmak her zaman serbest, yalnızca ekleme durur.
         if (mounted) {
           setState(() {
-            _showTriedBanner = true;
+            _banner = _InfoBannerKind.alreadyTried;
             _wishlistLoading = false;
           });
         }
@@ -190,6 +190,10 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       setState(() {
         _inWishlist = !_inWishlist;
         _wishlistLoading = false;
+        // Çıkarınca "eklendi" yazısı yanlış kalmasın.
+        _banner = _inWishlist
+            ? _InfoBannerKind.addedToWishlist
+            : _InfoBannerKind.none;
       });
     } catch (_) {
       if (mounted) setState(() => _wishlistLoading = false);
@@ -209,7 +213,10 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
           final own = reviews.where((r) => r.mine);
           _ownRatingId = own.isEmpty ? null : own.first.ratingId;
           // Kullanıcı bu arada puanını silmiş olabilir.
-          if (_ownRatingId == null) _showTriedBanner = false;
+          if (_ownRatingId == null &&
+              _banner == _InfoBannerKind.alreadyTried) {
+            _banner = _InfoBannerKind.none;
+          }
         });
       }
     } catch (_) {
@@ -245,6 +252,34 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     // sayfasından açıldıysa o sayfa üstte kalıyor ve sekme değişse de günlük
     // görünmüyordu. Ana iskelete kadar geri dönülür.
     Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// Şeritteki "Tümünü gör": Profil sekmesine geçer ve istek listesi
+  /// panelini açtırır. "Günlüğe git" ile aynı nedenle ana iskelete dönülür.
+  void _openWishlist() {
+    ref.read(selectedTabProvider.notifier).state = 3;
+    ref.read(wishlistOpenRequestProvider.notifier).state++;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Widget _buildBanner() {
+    return switch (_banner) {
+      _InfoBannerKind.none => const SizedBox(width: double.infinity),
+      _InfoBannerKind.alreadyTried => _InfoBanner(
+          key: const ValueKey(_InfoBannerKind.alreadyTried),
+          icon: Icons.info_outline_rounded,
+          message: 'Bu ürünü daha önce denedin.',
+          actionLabel: 'Günlüğe git',
+          onAction: _openInDiary,
+        ),
+      _InfoBannerKind.addedToWishlist => _InfoBanner(
+          key: const ValueKey(_InfoBannerKind.addedToWishlist),
+          icon: Icons.check_circle_outline_rounded,
+          message: "İstek Listesi'ne eklendi.",
+          actionLabel: 'Tümünü gör',
+          onAction: _openWishlist,
+        ),
+    };
   }
 
   void _openAllReviews() {
@@ -378,17 +413,20 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
               // eşit genişlikte yan yana durunca ikisi aynı önemde okunuyordu
               // (ve "İstek Listesi'ne Ekle" iki satıra taşıyordu). İstek
               // listesi artık ikon butonu.
-              // Puanlanmış yemek istek listesine eklenmek istenince çıkan şerit.
+              // Bilgi şeridi: "daha önce denedin" ya da "istek listesine eklendi".
               AnimatedSize(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                child: _showTriedBanner
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                            AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
-                        child: _AlreadyTriedBanner(onOpenDiary: _openInDiary),
-                      )
-                    : const SizedBox(width: double.infinity),
+                child: Padding(
+                  padding: _banner == _InfoBannerKind.none
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.fromLTRB(
+                          AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: _buildBanner(),
+                  ),
+                ),
               ),
 
               Padding(
@@ -590,14 +628,25 @@ class _RatingSummary extends StatelessWidget {
   }
 }
 
-// ── "Daha önce denedin" şeridi ────────────────────────────────────────────────
+// ── Bilgi şeridi ──────────────────────────────────────────────────────────────
+
+enum _InfoBannerKind { none, alreadyTried, addedToWishlist }
 
 /// Panelin içinde gösterilir. SnackBar kullanılamaz: ScaffoldMessenger panelin
 /// ALTINDAKİ Scaffold'a bağlı olduğu için mesaj panelin arkasında kalıyor.
-class _AlreadyTriedBanner extends StatelessWidget {
-  const _AlreadyTriedBanner({required this.onOpenDiary});
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({
+    super.key,
+    required this.icon,
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+  });
 
-  final VoidCallback onOpenDiary;
+  final IconData icon;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -610,20 +659,19 @@ class _AlreadyTriedBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded,
-              size: 18, color: context.textSecondaryColor),
+          Icon(icon, size: 18, color: context.textSecondaryColor),
           const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Text(
-              'Bu ürünü daha önce denedin.',
+              message,
               style: AppTextStyles.bodyMedium
                   .copyWith(color: context.textPrimaryColor),
             ),
           ),
           TextButton(
-            onPressed: onOpenDiary,
+            onPressed: onAction,
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Günlüğe git'),
+            child: Text(actionLabel),
           ),
         ],
       ),

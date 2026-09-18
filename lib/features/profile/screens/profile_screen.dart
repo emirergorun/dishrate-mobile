@@ -324,6 +324,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     // Dışarıdan (puanlama, sekme değişimi) tetiklenen sessiz yenileme.
     ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
+    // Yemek panelindeki "Tümünü gör": panel ve üstteki sayfalar kapandıktan
+    // sonra istek listesi açılsın diye bir sonraki kareye bırakılıyor.
+    ref.listen<int>(wishlistOpenRequestProvider, (_, __) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showWishlist();
+      });
+    });
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -1701,8 +1708,9 @@ class _WishlistItemRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
-                textStyle:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                // Düğme stili temadan birleşmiyor, yerine geçiyor: font ailesi
+                // verilmezse yazı sistem fontuna düşüyordu.
+                textStyle: AppTextStyles.label,
               ),
               icon: const Icon(Icons.star_rounded, size: 16),
               label: const Text('Sonunda denedim!'),
