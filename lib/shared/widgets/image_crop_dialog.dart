@@ -102,41 +102,41 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
   // Bağıntı doğrusal, o yüzden bir ölçüm + bir düzeltme yetiyor. Düzeltme
   // tutmazsa ekran varsayılan çerçevelemeyle açılır — yani en kötü ihtimalde
   // eski davranış.
-  static const int _kapali = 0, _olculuyor = 1, _tamam = 2;
-  int _geriYukleme = _kapali;
+  static const int _idle = 0, _measuring = 1, _done = 2;
+  int _restoreState = _idle;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialArea != null) _geriYukleme = _olculuyor;
+    if (widget.initialArea != null) _restoreState = _measuring;
   }
 
-  void _onHazir() {
-    if (_geriYukleme != _olculuyor) return;
+  void _onReady() {
+    if (_restoreState != _measuring) return;
     // Kırpıcı kendi setState'i içinden çağırıyor; kareyi bekliyoruz.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _controller.area = widget.initialArea!;
     });
   }
 
-  void _onTasindi(Rect rectToCrop) {
+  void _onMoved(Rect rectToCrop) {
     _currentArea = rectToCrop;
-    if (_geriYukleme != _olculuyor) return;
-    _geriYukleme = _tamam;
+    if (_restoreState != _measuring) return;
+    _restoreState = _done;
 
-    final hedef = widget.initialArea!;
+    final target = widget.initialArea!;
     if (rectToCrop.width <= 0) return;
 
-    final olcek = hedef.width / rectToCrop.width;
-    if ((olcek - 1).abs() < 0.01) return; // ölçek 1 — düzeltmeye gerek yok
+    final scaleFactor = target.width / rectToCrop.width;
+    if ((scaleFactor - 1).abs() < 0.01) return; // ölçek 1 — düzeltmeye gerek yok
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _controller.area = Rect.fromLTWH(
-        hedef.left * olcek,
-        hedef.top * olcek,
-        hedef.width * olcek,
-        hedef.height * olcek,
+        target.left * scaleFactor,
+        target.top * scaleFactor,
+        target.width * scaleFactor,
+        target.height * scaleFactor,
       );
     });
   }
@@ -199,11 +199,11 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                   // Görsel çözümlenip çerçeve kurulduğunda önceki
                   // çerçevelemeyi geri yüklemeye başlarız.
                   onStatusChanged: (status) {
-                    if (status == CropStatus.ready) _onHazir();
+                    if (status == CropStatus.ready) _onReady();
                   },
                   // Kullanıcı görseli her oynattığında güncel dikdörtgeni
                   // sakla; "Uygula"da bunu da geri döndüreceğiz.
-                  onMoved: (_, rectToCrop) => _onTasindi(rectToCrop),
+                  onMoved: (_, rectToCrop) => _onMoved(rectToCrop),
                   onCropped: (result) {
                     if (!mounted) return;
                     switch (result) {

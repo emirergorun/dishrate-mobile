@@ -26,14 +26,14 @@ class ResolvedPlace {
   const ResolvedPlace({
     required this.latitude,
     required this.longitude,
-    this.il,
-    this.ilce,
+    this.province,
+    this.district,
   });
 
   final double latitude;
   final double longitude;
-  final String? il;
-  final String? ilce;
+  final String? province;
+  final String? district;
 }
 
 class LocationResult {
@@ -114,13 +114,13 @@ abstract final class LocationService {
       // Türkiye'de iOS/Android geocoder'ları farklı alanları dolduruyor:
       // il genelde administrativeArea, ilçe ise subAdministrativeArea ya da
       // locality oluyor. İkisini de deneyip ilk dolu olanı alıyoruz.
-      final il = _ilkDolu([m.administrativeArea]);
-      final ilce = _ilkDolu([m.subAdministrativeArea, m.locality, m.subLocality]);
+      final province = _firstNonEmpty([m.administrativeArea]);
+      final district = _firstNonEmpty([m.subAdministrativeArea, m.locality, m.subLocality]);
       return ResolvedPlace(
         latitude: lat,
         longitude: lng,
-        il: il,
-        ilce: ilce,
+        province: province,
+        district: district,
       );
     } catch (_) {
       // Adres çözümlenemese bile koordinat işe yarar (mesafe sıralaması).
@@ -128,8 +128,8 @@ abstract final class LocationService {
     }
   }
 
-  static String? _ilkDolu(List<String?> adaylar) {
-    for (final a in adaylar) {
+  static String? _firstNonEmpty(List<String?> candidates) {
+    for (final a in candidates) {
       if (a != null && a.trim().isNotEmpty) return a.trim();
     }
     return null;

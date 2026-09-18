@@ -67,10 +67,10 @@ class UserModel {
       // Fotoğraf kaldırıldığında sunucuya boş metin gidiyor. Boşu null'a
       // çevirmezsek `profilePhotoUrl != null` kontrolleri doğru kalır ve
       // kaldırılan fotoğrafın yerinde kırık görsel görünür.
-      profilePhotoUrl: _bosuNull(json['profilePhotoUrl'] as String?),
+      profilePhotoUrl: _blankToNull(json['profilePhotoUrl'] as String?),
       profilePhotoOriginalUrl:
-          _bosuNull(json['profilePhotoOriginalUrl'] as String?),
-      profilePhotoCrop: _bosuNull(json['profilePhotoCrop'] as String?),
+          _blankToNull(json['profilePhotoOriginalUrl'] as String?),
+      profilePhotoCrop: _blankToNull(json['profilePhotoCrop'] as String?),
       bio: json['bio'] as String?,
       role: _parseRole(json['role'] as String?),
       nameChangeAvailableAt: json['nameChangeAvailableAt'] != null
@@ -79,7 +79,7 @@ class UserModel {
     );
   }
 
-  static String? _bosuNull(String? value) {
+  static String? _blankToNull(String? value) {
     if (value == null) return null;
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;

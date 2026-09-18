@@ -45,6 +45,23 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   _SortBy _sortBy = _SortBy.newest;
   String? _categoryFilter; // null = tümü
 
+  final _scrollController = ScrollController();
+
+  /// Yemek panelindeki "Günlüğe git" ile gelindiğinde kısa süre aydınlatılan
+  /// değerlendirme. Vurgu bitince null'a döner.
+  int? _highlightedId;
+
+  /// Odaklanan kartın konumunu tam hizalamak için (kart yalnızca odaktayken
+  /// bu anahtarı taşır).
+  final _highlightKey = GlobalKey();
+
+  /// Kart bulunamayınca bir kez tazelenir; sonsuz döngü olmasın.
+  bool _refreshedForFocus = false;
+
+  /// Yaklaşık kart yüksekliği — tembel listede ekran dışındaki kartın context'i
+  /// olmadığı için önce buna göre yaklaşılır, sonra tam hizalanır.
+  static const double _cardHeight = 132;
+
   // Yüklenen puanlardan dinamik kategori listesi
   Set<String> get _availableCategories => _allRatings
       .map((r) => r.categoryName)
@@ -58,6 +75,79 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   void initState() {
     super.initState();
     _load();
+    // Ekran ilk kez burada oluşuyorsa ref.listen henüz bir değişiklik görmez;
+    // bekleyen odak isteği varsa onu da karşıla.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pending = ref.read(diaryFocusProvider);
+      if (pending != null) _focusOn(pending);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Verilen değerlendirmeye kaydırır ve kısa süre aydınlatır.
+  Future<void> _focusOn(int ratingId) async {
+    if (!mounted) return;
+
+    // Puan başka bir cihazda/ekranda verilmiş olabilir: listede yoksa bir kez tazele.
+    if (!_allRatings.any((r) => r.ratingId == ratingId)) {
+      if (_refreshedForFocus) return _clearFocus();
+      _refreshedForFocus = true;
+      await _load(silent: true);
+      if (!mounted) return;
+      if (!_allRatings.any((r) => r.ratingId == ratingId)) return _clearFocus();
+    }
+    _refreshedForFocus = false;
+
+    // Kategori filtresi kartı gizliyorsa filtre kalkar; sıralama tercihi kalır.
+    if (!_displayed.any((r) => r.ratingId == ratingId)) {
+      setState(() {
+        _categoryFilter = null;
+        _applyFilters();
+      });
+    }
+
+    final index = _displayed.indexWhere((r) => r.ratingId == ratingId);
+    if (index == -1) return _clearFocus();
+
+    setState(() => _highlightedId = ratingId);
+
+    // 1) Yaklaşık konuma atla — hedef kart böylece oluşturulur.
+    if (_scrollController.hasClients) {
+      final scrollTarget = (index * _cardHeight)
+          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.jumpTo(scrollTarget);
+    }
+
+    // 2) Bir sonraki karede tam hizala.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _highlightKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.25,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    // Vurgu söndükten sonra istek tüketilmiş sayılır; aynı yemeğe ikinci kez
+    // basılınca yeniden çalışsın diye provider da sıfırlanır.
+    await Future<void>.delayed(const Duration(milliseconds: 1600));
+    if (!mounted) return;
+    setState(() => _highlightedId = null);
+    _clearFocus();
+  }
+
+  void _clearFocus() {
+    if (ref.read(diaryFocusProvider) != null) {
+      ref.read(diaryFocusProvider.notifier).state = null;
+    }
   }
 
   /// [silent] açıkken iskelet gösterilmez: başka ekranda puan verilince liste
@@ -197,6 +287,10 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   Widget build(BuildContext context) {
     // Başka ekranda puan verilince/silinince liste sessizce tazelenir.
     ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
+    // Yemek panelindeki "Günlüğe git" isteği.
+    ref.listen<int?>(diaryFocusProvider, (_, next) {
+      if (next != null) _focusOn(next);
+    });
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -204,6 +298,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         onRefresh: _load,
         color: AppColors.primary,
         child: CustomScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
@@ -306,11 +401,14 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final rating = _displayed[index];
+                  final highlighted = rating.ratingId == _highlightedId;
                   return _SwipeCard(
                     key: Key('rating_${rating.ratingId}'),
                     onDelete: () => _deleteRating(rating),
                     child: _RatingCard(
+                      key: highlighted ? _highlightKey : null,
                       rating: rating,
+                      highlighted: highlighted,
                       onDelete: () => _deleteRating(rating),
                       onEdit: () => _editRating(rating),
                     ),
@@ -591,13 +689,18 @@ class _CategoryChip extends StatelessWidget {
 
 class _RatingCard extends StatelessWidget {
   const _RatingCard({
+    super.key,
     required this.rating,
     required this.onDelete,
     required this.onEdit,
+    this.highlighted = false,
   });
   final RatingModel rating;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
+
+  /// "Günlüğe git" ile gelindiğinde kart kısa süre aydınlanır.
+  final bool highlighted;
 
   static const _months = [
     'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
@@ -610,13 +713,24 @@ class _RatingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.dividerColor),
+    // Vurgu: turuncudan normale sönen zemin ve kenarlık.
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(highlighted),
+      tween: Tween(begin: highlighted ? 1 : 0, end: 0),
+      duration: Duration(milliseconds: highlighted ? 1200 : 0),
+      curve: Curves.easeOut,
+      builder: (context, t, child) => Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Color.lerp(context.surfaceColor,
+              AppColors.primary.withValues(alpha: 0.14), t),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Color.lerp(context.dividerColor, AppColors.primary, t)!,
+          ),
+        ),
+        child: child,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,25 +937,25 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
   bool _isLoading = false;
   String? _error;
 
-  /// Kayıtlı fotoğraf (varsa). Kullanıcı kaldırırsa [_fotoSilindi] açılır.
-  String? _mevcutFoto;
-  bool _fotoSilindi = false;
+  /// Kayıtlı fotoğraf (varsa). Kullanıcı kaldırırsa [_photoRemoved] açılır.
+  String? _currentPhoto;
+  bool _photoRemoved = false;
 
   /// Yeni seçilen fotoğraf; kaydederken yüklenir.
-  XFile? _yeniFoto;
-  Uint8List? _yeniFotoBytes;
+  XFile? _newPhoto;
+  Uint8List? _newPhotoBytes;
 
-  bool get _fotoVar => _yeniFotoBytes != null || (!_fotoSilindi && _mevcutFoto != null);
+  bool get _hasPhoto => _newPhotoBytes != null || (!_photoRemoved && _currentPhoto != null);
 
   @override
   void initState() {
     super.initState();
     _score = widget.rating.score;
     _commentCtrl = TextEditingController(text: widget.rating.comment ?? '');
-    _mevcutFoto = widget.rating.reviewPhotoUrl;
+    _currentPhoto = widget.rating.reviewPhotoUrl;
   }
 
-  Future<void> _fotoSec() async {
+  Future<void> _pickPhoto() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: context.surfaceElevatedColor,
@@ -871,9 +985,9 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       final bytes = await file.readAsBytes();
       if (!mounted) return;
       setState(() {
-        _yeniFoto = file;
-        _yeniFotoBytes = bytes;
-        _fotoSilindi = false;
+        _newPhoto = file;
+        _newPhotoBytes = bytes;
+        _photoRemoved = false;
       });
     } catch (_) {
       if (mounted) {
@@ -882,11 +996,11 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     }
   }
 
-  void _fotoKaldir() {
+  void _removePhoto() {
     setState(() {
-      _yeniFoto = null;
-      _yeniFotoBytes = null;
-      _fotoSilindi = true;
+      _newPhoto = null;
+      _newPhotoBytes = null;
+      _photoRemoved = true;
     });
   }
 
@@ -906,9 +1020,9 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     // Yeni fotoğraf varsa yüklenir; kaldırıldıysa boş metin gider (sunucu
     // fotoğrafı siler); ikisi de yoksa null gider ve mevcut fotoğraf kalır.
     String? photoUrl;
-    if (_yeniFoto != null) {
+    if (_newPhoto != null) {
       try {
-        photoUrl = await FileRepository.instance.uploadImage(_yeniFoto!);
+        photoUrl = await FileRepository.instance.uploadImage(_newPhoto!);
       } catch (_) {
         if (mounted) {
           setState(() {
@@ -918,7 +1032,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
         }
         return;
       }
-    } else if (_fotoSilindi) {
+    } else if (_photoRemoved) {
       photoUrl = '';
     }
 
@@ -1065,24 +1179,24 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  if (_fotoVar)
+                  if (_hasPhoto)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: _yeniFotoBytes != null
-                          ? Image.memory(_yeniFotoBytes!,
+                      child: _newPhotoBytes != null
+                          ? Image.memory(_newPhotoBytes!,
                               width: 56, height: 56, fit: BoxFit.cover)
                           : DishPhoto(
-                              url: _mevcutFoto, width: 56, height: 56),
+                              url: _currentPhoto, width: 56, height: 56),
                     ),
-                  if (_fotoVar) const SizedBox(width: 12),
+                  if (_hasPhoto) const SizedBox(width: 12),
                   TextButton.icon(
-                    onPressed: _fotoSec,
+                    onPressed: _pickPhoto,
                     icon: const Icon(Icons.photo_camera_rounded, size: 18),
-                    label: Text(_fotoVar ? 'Değiştir' : 'Fotoğraf ekle'),
+                    label: Text(_hasPhoto ? 'Değiştir' : 'Fotoğraf ekle'),
                   ),
-                  if (_fotoVar)
+                  if (_hasPhoto)
                     TextButton(
-                      onPressed: _fotoKaldir,
+                      onPressed: _removePhoto,
                       style: TextButton.styleFrom(
                           foregroundColor: context.textSecondaryColor),
                       child: const Text('Kaldır'),

@@ -7,3 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// verilen puanlar aşağı çekip yenileyene kadar görünmüyordu (profilde 7
 /// değerlendirme, günlükte 4 yemek).
 final userDataRefreshProvider = StateProvider<int>((ref) => 0);
+
+/// Günlükte vurgulanacak değerlendirmenin kimliği (yoksa `null`).
+///
+/// Yemek panelindeki "Günlüğe git" bu değeri koyar, Günlük ekranı o karta
+/// kaydırıp kısa süre aydınlatır ve değeri sıfırlar.
+final diaryFocusProvider = StateProvider<int?>((ref) => null);

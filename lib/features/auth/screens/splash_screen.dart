@@ -23,11 +23,11 @@ class SplashScreen extends StatelessWidget {
   /// giriş ekranının kendi "bir kez oynat" bayrağı vardı; ekran yeniden
   /// kurulursa (auth durumu iki kez değişirse, sıcak yenilemede) animasyon
   /// sessizce atlanıyordu.
-  static bool gosterildi = false;
+  static bool wasShown = false;
 
   @override
   Widget build(BuildContext context) {
-    gosterildi = true;
+    wasShown = true;
     return Scaffold(
       backgroundColor: context.bgColor,
       body: const Stack(

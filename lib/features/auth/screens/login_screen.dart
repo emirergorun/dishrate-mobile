@@ -57,12 +57,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
     // Yalnızca açılış ekranından gelindiyse oynat; çıkış yapıp girişe dönünce
     // logonun ortadan gelmesi için sebep yok.
-    if (!SplashScreen.gosterildi) {
+    if (!SplashScreen.wasShown) {
       _intro.value = 1;
       _introDone = true;
       return;
     }
-    SplashScreen.gosterildi = false;
+    SplashScreen.wasShown = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (MediaQuery.disableAnimationsOf(context)) {
@@ -135,19 +135,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     if (!mounted) return;
     final authState = ref.read(authProvider);
-    final hata = authState.status == AuthStatus.unauthenticated
+    final errorText = authState.status == AuthStatus.unauthenticated
         ? (authState.errorMessage ?? 'Giriş yapılamadı, tekrar dene')
         : null;
 
     setState(() {
       _isLoading = false;
-      _error = hata;
+      _error = errorText;
     });
 
     // Hata mesajı formun içinde kalıyor (alttan çıkan bildirim yerine) ve
     // ekran yeniden kurulmuyor: kullanıcı adı yazdığı gibi duruyor, yalnızca
     // şifre temizleniyor — yanlış olan büyük ihtimalle o.
-    if (hata != null) _passwordController.clear();
+    if (errorText != null) _passwordController.clear();
   }
 
   @override

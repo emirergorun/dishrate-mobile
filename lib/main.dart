@@ -22,21 +22,21 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  _fontLisanslariniKaydet();
-  await _logoyuOnceCoz();
+  _registerFontLicenses();
+  await _precacheLogo();
   runApp(const ProviderScope(child: DishrateApp()));
 }
 
 /// Gömülü fontların OFL lisansları. Paket lisanslarını Flutter kendisi
 /// ekliyor; fontları biz eklemezsek lisans sayfasında görünmüyorlar.
-void _fontLisanslariniKaydet() {
+void _registerFontLicenses() {
   LicenseRegistry.addLicense(() async* {
-    for (final (ad, dosya) in [
+    for (final (name, file) in [
       ('Urbanist', 'URBANIST-OFL.txt'),
       ('Poppins', 'POPPINS-OFL.txt'),
     ]) {
-      final metin = await rootBundle.loadString('assets/fonts/$dosya');
-      yield LicenseEntryWithLineBreaks(['$ad (font)'], metin);
+      final text = await rootBundle.loadString('assets/fonts/$file');
+      yield LicenseEntryWithLineBreaks(['$name (font)'], text);
     }
   });
 }
@@ -46,30 +46,30 @@ void _fontLisanslariniKaydet() {
 /// Logo büyük bir PNG; çözülmesi birkaç kare sürüyordu. O arada sistem açılış
 /// ekranı kaybolup Flutter'ın boş ilk karesi görünüyor, logo bir an sönüp
 /// yeniden yanıyordu. Bu süre boyunca sistem açılış ekranı ekranda kalıyor.
-Future<void> _logoyuOnceCoz() async {
-  Future<void> coz(bool dark) {
-    final tamam = Completer<void>();
+Future<void> _precacheLogo() async {
+  Future<void> resolveLogo(bool dark) {
+    final done = Completer<void>();
     // Ekranda kullanılan sağlayıcının aynısı: önbellek anahtarı tutsun.
     final stream =
         DishrateWordmark.provider(dark).resolve(ImageConfiguration.empty);
-    late final ImageStreamListener dinleyici;
-    dinleyici = ImageStreamListener(
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
       (_, __) {
-        if (!tamam.isCompleted) tamam.complete();
-        stream.removeListener(dinleyici);
+        if (!done.isCompleted) done.complete();
+        stream.removeListener(listener);
       },
       onError: (_, __) {
-        if (!tamam.isCompleted) tamam.complete();
-        stream.removeListener(dinleyici);
+        if (!done.isCompleted) done.complete();
+        stream.removeListener(listener);
       },
     );
-    stream.addListener(dinleyici);
-    return tamam.future;
+    stream.addListener(listener);
+    return done.future;
   }
 
   // Tema henüz bilinmiyor; iki sürüm de çözülüyor. Bir sorun olursa açılışı
   // bekletmemek için süre sınırı var.
-  await Future.wait([coz(true), coz(false)])
+  await Future.wait([resolveLogo(true), resolveLogo(false)])
       .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
 }
 

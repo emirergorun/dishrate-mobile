@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/utils/turkce.dart';
+import '../../core/utils/turkish_text.dart';
 
 /// Listenin en üstüne sabitlenen seçenek — aramadan etkilenmez.
 ///
@@ -10,8 +10,8 @@ import '../../core/utils/turkce.dart';
 /// sıranın parçası olmayan ama her zaman erişilebilir olması gereken
 /// seçenekler için.
 @immutable
-class SabitSecenek {
-  const SabitSecenek(this.label, {this.icon});
+class PinnedOption {
+  const PinnedOption(this.label, {this.icon});
   final String label;
   final IconData? icon;
 }
@@ -26,7 +26,7 @@ abstract final class SearchablePicker {
     BuildContext context, {
     required String title,
     required List<String> options,
-    List<SabitSecenek> pinned = const [],
+    List<PinnedOption> pinned = const [],
     String? selected,
     String searchHint = 'Ara…',
   }) {
@@ -59,7 +59,7 @@ class _PickerSheet extends StatefulWidget {
 
   final String title;
   final List<String> options;
-  final List<SabitSecenek> pinned;
+  final List<PinnedOption> pinned;
   final String? selected;
   final String searchHint;
 
@@ -72,13 +72,13 @@ class _PickerSheetState extends State<_PickerSheet> {
 
   /// Alfabetik sıra Türkçe kurallarına göre — çağıran taraf sırasını
   /// korumak isterse bile burada garanti altına alınır.
-  late final List<String> _sirali = Turkce.sirala(widget.options);
-  late List<String> _visible = _sirali;
+  late final List<String> _sorted = TurkishText.sortedList(widget.options);
+  late List<String> _visible = _sorted;
 
   /// Arama anahtarları önceden hesaplanır — her tuş vuruşunda 32.000 kaydı
   /// yeniden normalize etmemek için.
   late final Map<String, String> _keys = {
-    for (final o in _sirali) o: Turkce.aramaAnahtari(o),
+    for (final o in _sorted) o: TurkishText.searchKey(o),
   };
 
   @override
@@ -88,11 +88,11 @@ class _PickerSheetState extends State<_PickerSheet> {
   }
 
   void _filter(String query) {
-    final q = Turkce.aramaAnahtari(query.trim());
+    final q = TurkishText.searchKey(query.trim());
     setState(() {
       _visible = q.isEmpty
-          ? _sirali
-          : _sirali.where((o) => _keys[o]!.contains(q)).toList();
+          ? _sorted
+          : _sorted.where((o) => _keys[o]!.contains(q)).toList();
     });
   }
 
@@ -131,7 +131,7 @@ class _PickerSheetState extends State<_PickerSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
                 controller: _searchCtrl,
-                autofocus: _sirali.length > 20,
+                autofocus: _sorted.length > 20,
                 onChanged: _filter,
                 decoration: InputDecoration(
                   hintText: widget.searchHint,
@@ -154,26 +154,26 @@ class _PickerSheetState extends State<_PickerSheet> {
             // Arama kutusunun altında, listenin dışında duruyorlar:
             // alfabetik sıraya karışmasınlar ve arama yapılırken de
             // kaybolmasınlar diye.
-            for (final sabit in widget.pinned)
+            for (final option in widget.pinned)
               ListTile(
                 dense: true,
-                leading: sabit.icon == null
+                leading: option.icon == null
                     ? null
-                    : Icon(sabit.icon, color: AppColors.primary, size: 20),
+                    : Icon(option.icon, color: AppColors.primary, size: 20),
                 horizontalTitleGap: 8,
                 title: Text(
-                  sabit.label,
+                  option.label,
                   style: AppTextStyles.bodyLarge.copyWith(
-                    color: sabit.label == widget.selected
+                    color: option.label == widget.selected
                         ? AppColors.primary
                         : context.textPrimaryColor,
                   ),
                 ),
-                trailing: sabit.label == widget.selected
+                trailing: option.label == widget.selected
                     ? const Icon(Icons.check_rounded,
                         color: AppColors.primary, size: 20)
                     : null,
-                onTap: () => Navigator.pop(context, sabit.label),
+                onTap: () => Navigator.pop(context, option.label),
               ),
             if (widget.pinned.isNotEmpty)
               Divider(height: 1, color: context.dividerColor),

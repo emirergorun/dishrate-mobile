@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/utils/tarih.dart';
+import '../../core/utils/relative_date.dart';
 import '../models/menu_item_review_model.dart';
 import 'dish_photo.dart';
 import 'photo_viewer.dart';
@@ -68,7 +68,7 @@ class ReviewTile extends StatelessWidget {
                   const SizedBox(width: AppSpace.sm),
                   if (review.ratedAt != null)
                     Text(
-                      Tarih.gecenSure(review.ratedAt!),
+                      RelativeDate.timeAgo(review.ratedAt!),
                       style: AppTextStyles.caption
                           .copyWith(color: context.textTertiaryColor),
                     ),

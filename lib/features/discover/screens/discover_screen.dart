@@ -15,7 +15,7 @@ import '../widgets/category_chips.dart';
 import '../widgets/dish_layouts.dart';
 import '../widgets/section_header.dart';
 import '../providers/location_provider.dart';
-import '../../../core/data/turkiye_adres.dart';
+import '../../../core/data/turkey_addresses.dart';
 import '../../../shared/widgets/searchable_picker.dart';
 import '../../../core/location/location_service.dart';
 import 'see_all_screen.dart';
@@ -65,7 +65,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     super.initState();
     // Akış konuma bağlı: il ya da ilçe değişince yeniden istenir.
     ref.listenManual(selectedLocationProvider, (prev, next) {
-      if (prev?.il != next.il || prev?.ilce != next.ilce) _load();
+      if (prev?.province != next.province || prev?.district != next.district) _load();
     });
     _load();
   }
@@ -100,9 +100,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 
   static String? _city(SelectedLocation loc) =>
-      loc.il.trim().isEmpty ? null : loc.il;
+      loc.province.trim().isEmpty ? null : loc.province;
   static String? _district(SelectedLocation loc) =>
-      loc.hasIlce ? loc.ilce : null;
+      loc.hasDistrict ? loc.district : null;
   String? get _category => _allSelected ? null : _selectedCategory;
 
   static const List<String> _categories = ['Tümü', ...AppCategories.all];
@@ -146,11 +146,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   /// satır ediyordu; ekran fotoğraflardan önce metin olarak okunuyordu.
   List<_Section> get _sections {
     final loc = ref.watch(selectedLocationProvider);
-    final yer = loc.hasIlce ? loc.ilce! : loc.il;
+    final place = loc.hasDistrict ? loc.district! : loc.province;
     final Map<String, ({String title, String? subtitle, _Layout layout})>
         meta = {
       'top-rated': (
-        title: '${_bulunmaEki(yer)} En İyiler',
+        title: '${_locativeSuffix(place)} En İyiler',
         subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
         layout: _Layout.ranked,
       ),
@@ -204,20 +204,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
   /// "Kadıköy" → "Kadıköy'de", "Beşiktaş" → "Beşiktaş'ta". Önceden her yere
   /// "'da" ekleniyordu ("Kadıköy'da", "Beşiktaş'da").
-  static String _bulunmaEki(String yer) {
-    const kalin = 'aıouAIOU';
-    const ince = 'eiöüEİÖÜ';
-    var unlu = 'a';
-    for (var i = yer.length - 1; i >= 0; i--) {
-      if (kalin.contains(yer[i])) break;
-      if (ince.contains(yer[i])) {
-        unlu = 'e';
+  static String _locativeSuffix(String place) {
+    const bold = 'aıouAIOU';
+    const frontVowels = 'eiöüEİÖÜ';
+    var vowel = 'a';
+    for (var i = place.length - 1; i >= 0; i--) {
+      if (bold.contains(place[i])) break;
+      if (frontVowels.contains(place[i])) {
+        vowel = 'e';
         break;
       }
     }
-    final son = yer.isEmpty ? '' : yer[yer.length - 1];
-    final sert = 'çfhkpsştÇFHKPSŞT'.contains(son);
-    return "$yer'${sert ? 't' : 'd'}$unlu";
+    final lastChar = place.isEmpty ? '' : place[place.length - 1];
+    final hardEnding = 'çfhkpsştÇFHKPSŞT'.contains(lastChar);
+    return "$place'${hardEnding ? 't' : 'd'}$vowel";
   }
 
   Widget _sectionBody(_Section s) {
@@ -414,7 +414,7 @@ class _DiscoverSkeleton extends StatelessWidget {
 // ── App Bar ───────────────────────────────────────────────────────────────────
 
 /// İl listesinin başına sabitlenen GPS satırının etiketi.
-const String _konumuKullan = 'Konumumu kullan';
+const String _useLocation = 'Konumumu kullan';
 
 class _DiscoverAppBar extends ConsumerWidget {
   const _DiscoverAppBar();
@@ -431,12 +431,12 @@ class _DiscoverAppBar extends ConsumerWidget {
   Future<void> _onLocationTap(BuildContext context, WidgetRef ref) async {
     final notifier = ref.read(selectedLocationProvider.notifier);
 
-    final izinVar = await LocationService.hasPermission();
-    if (!izinVar && await LocationService.canAsk()) {
+    final permissionGranted = await LocationService.hasPermission();
+    if (!permissionGranted && await LocationService.canAsk()) {
       if (!context.mounted) return;
-      final izinIster = await _askUseLocation(context);
+      final wantsPermission = await _askUseLocation(context);
       if (!context.mounted) return;
-      if (izinIster == true) {
+      if (wantsPermission == true) {
         final r = await notifier.requestGps();
         if (!context.mounted) return;
         if (r.isOk) return;
@@ -489,52 +489,52 @@ class _DiscoverAppBar extends ConsumerWidget {
 
   /// İl → (opsiyonel) ilçe seçimi. İl değişirse ilçe sıfırlanır.
   Future<void> _pickLocation(BuildContext context, WidgetRef ref) async {
-    final iller = await TurkiyeAdres.iller();
-    final izinVar = await LocationService.hasPermission();
+    final provinces = await TurkeyAddresses.provinces();
+    final permissionGranted = await LocationService.hasPermission();
     if (!context.mounted) return;
-    final mevcut = ref.read(selectedLocationProvider);
+    final current = ref.read(selectedLocationProvider);
 
-    final secilenIl = await SearchablePicker.show(
+    final selectedProvince = await SearchablePicker.show(
       context,
       title: 'İl Seç',
-      options: iller.map((i) => i.ad).toList(),
+      options: provinces.map((i) => i.name).toList(),
       // Elle seçim yaptıktan sonra cihaz konumuna dönebilmenin tek yolu.
-      pinned: izinVar
+      pinned: permissionGranted
           ? const [
-              SabitSecenek(_konumuKullan, icon: Icons.my_location_rounded),
+              PinnedOption(_useLocation, icon: Icons.my_location_rounded),
             ]
           : const [],
-      selected: mevcut.il,
+      selected: current.province,
       searchHint: 'İl ara…',
     );
-    if (secilenIl == null || !context.mounted) return;
+    if (selectedProvince == null || !context.mounted) return;
 
-    if (secilenIl == _konumuKullan) {
+    if (selectedProvince == _useLocation) {
       final r = await ref.read(selectedLocationProvider.notifier).requestGps();
       if (!context.mounted || r.isOk) return;
       _snack(context, 'Konum alınamadı. Şehri listeden seçebilirsin.');
       return;
     }
 
-    final il = iller.firstWhere((i) => i.ad == secilenIl);
-    final tumu = 'Tüm $secilenIl';
-    final secilenIlce = await SearchablePicker.show(
+    final province = provinces.firstWhere((i) => i.name == selectedProvince);
+    final allLabel = 'Tüm $selectedProvince';
+    final selectedDistrict = await SearchablePicker.show(
       context,
-      title: '$secilenIl · İlçe Seç',
-      options: il.ilceler.map((i) => i.ad).toList(),
+      title: '$selectedProvince · İlçe Seç',
+      options: province.districts.map((i) => i.name).toList(),
       // İl geneline dönme seçeneği alfabetik sıraya karışmasın diye sabit.
-      pinned: [SabitSecenek(tumu, icon: Icons.select_all_rounded)],
-      selected: secilenIl == mevcut.il ? (mevcut.ilce ?? tumu) : null,
+      pinned: [PinnedOption(allLabel, icon: Icons.select_all_rounded)],
+      selected: selectedProvince == current.province ? (current.district ?? allLabel) : null,
       searchHint: 'İlçe ara…',
     );
-    if (secilenIlce == null) {
+    if (selectedDistrict == null) {
       // İlçe adımı iptal edilse bile il seçimi geçerli olsun.
-      await ref.read(selectedLocationProvider.notifier).setManual(secilenIl);
+      await ref.read(selectedLocationProvider.notifier).setManual(selectedProvince);
       return;
     }
     await ref.read(selectedLocationProvider.notifier).setManual(
-          secilenIl,
-          ilce: secilenIlce == tumu ? null : secilenIlce,
+          selectedProvince,
+          district: selectedDistrict == allLabel ? null : selectedDistrict,
         );
   }
 
@@ -564,7 +564,7 @@ class _DiscoverAppBar extends ConsumerWidget {
           // soluk gri değil metin renginde duruyor.
           Pressable(
             onTap: () => _onLocationTap(context, ref),
-            semanticLabel: 'Konum: ${loc.isUnset ? 'seçilmedi' : loc.etiket}',
+            semanticLabel: 'Konum: ${loc.isUnset ? 'seçilmedi' : loc.tag}',
             // Yazı tek satır, görünen yükseklik 34 pt'de kalıyor; dokunma
             // alanı yine de en az 44.
             child: ConstrainedBox(
@@ -587,7 +587,7 @@ class _DiscoverAppBar extends ConsumerWidget {
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 170),
                     child: Text(
-                      loc.isUnset ? 'Konum seç' : loc.etiket,
+                      loc.isUnset ? 'Konum seç' : loc.tag,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.label.copyWith(

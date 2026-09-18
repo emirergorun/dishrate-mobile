@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/constants/app_categories.dart';
-import '../../../core/data/turkiye_adres.dart';
+import '../../../core/data/turkey_addresses.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/restaurant_repository.dart';
@@ -33,20 +33,20 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   static const _istanbul = LatLng(41.0082, 28.9784);
 
   /// Konum şeridi kapatıldı mı? (Bu oturum için.)
-  bool _konumSeridiKapali = false;
+  bool _locationBannerDismissed = false;
 
   /// Cihazın konum izni. `null` → henüz bakılmadı; şerit gösterilmez.
   ///
   /// Şerit önceden keşfetteki konumun *kaynağına* bakıyordu: konum elle
   /// seçildiyse izin verilmiş olsa bile "konumunu aç" diyordu. Artık yalnızca
   /// cihaz izni yoksa çıkıyor.
-  bool? _izinVar;
+  bool? _hasPermission;
 
   /// Kullanıcının puanladığı yemekler, restoran kimliğine göre.
-  Map<int, List<RatingModel>> _puanlarim = const {};
+  Map<int, List<RatingModel>> _myRatings = const {};
 
   /// Yalnızca puanlanan restoranlar mı gösteriliyor?
-  bool _sadecePuanladiklarim = false;
+  bool _onlyRated = false;
 
   /// Harita nereye ortalansın?
   ///
@@ -55,23 +55,23 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   /// işini görüyor. Sadece seçili konuma ortalıyoruz.
   LatLng get _center {
     final loc = ref.watch(selectedLocationProvider);
-    if (loc.hasKoordinat) {
+    if (loc.hasCoordinates) {
       return LatLng(loc.latitude!, loc.longitude!);
     }
     // Konum yoksa: seçili ilçe/ildeki restoranların ortalaması.
-    final eslesen = widget.initialRestaurants.where((r) {
+    final matches = widget.initialRestaurants.where((r) {
       if (r.latitude == null || r.longitude == null) return false;
-      final hedef = loc.hasIlce ? loc.ilce! : loc.il;
-      final alan = loc.hasIlce ? r.district : r.city;
-      return alan != null &&
-          TurkiyeAdres.aramaAnahtari(alan) ==
-              TurkiyeAdres.aramaAnahtari(hedef);
+      final target = loc.hasDistrict ? loc.district! : loc.province;
+      final area = loc.hasDistrict ? r.district : r.city;
+      return area != null &&
+          TurkeyAddresses.searchKey(area) ==
+              TurkeyAddresses.searchKey(target);
     }).toList();
-    if (eslesen.isEmpty) return _istanbul;
-    final lat = eslesen.map((r) => r.latitude!).reduce((a, b) => a + b) /
-        eslesen.length;
-    final lng = eslesen.map((r) => r.longitude!).reduce((a, b) => a + b) /
-        eslesen.length;
+    if (matches.isEmpty) return _istanbul;
+    final lat = matches.map((r) => r.latitude!).reduce((a, b) => a + b) /
+        matches.length;
+    final lng = matches.map((r) => r.longitude!).reduce((a, b) => a + b) /
+        matches.length;
     return LatLng(lat, lng);
   }
 
@@ -83,16 +83,16 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   void initState() {
     super.initState();
     _visibleRestaurants = widget.initialRestaurants;
-    _izniKontrolEt();
-    _puanlarimiYukle();
+    _checkPermission();
+    _loadMyRatings();
   }
 
-  Future<void> _izniKontrolEt() async {
-    final izin = await LocationService.hasPermission();
-    if (mounted) setState(() => _izinVar = izin);
+  Future<void> _checkPermission() async {
+    final permission = await LocationService.hasPermission();
+    if (mounted) setState(() => _hasPermission = permission);
   }
 
-  Future<void> _puanlarimiYukle() async {
+  Future<void> _loadMyRatings() async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
     try {
@@ -105,7 +105,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
       for (final l in map.values) {
         l.sort((a, b) => b.score.compareTo(a.score));
       }
-      if (mounted) setState(() => _puanlarim = map);
+      if (mounted) setState(() => _myRatings = map);
     } catch (_) {
       // Puan işaretleri olmadan da harita çalışır.
     }
@@ -169,20 +169,20 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   }
 
   List<Marker> _buildMarkers() {
-    final shown = _sadecePuanladiklarim
+    final shown = _onlyRated
         ? _visibleRestaurants
-            .where((r) => _puanlarim.containsKey(r.restaurantId))
+            .where((r) => _myRatings.containsKey(r.restaurantId))
         : _visibleRestaurants;
     return shown
         .where((r) => r.latitude != null && r.longitude != null)
         .map((r) {
-      final rated = _puanlarim.containsKey(r.restaurantId);
+      final rated = _myRatings.containsKey(r.restaurantId);
       return Marker(
         point: LatLng(r.latitude!, r.longitude!),
         width: 52,
         height: 52,
         child: GestureDetector(
-          onTap: () => _onizlemeAc(r),
+          onTap: () => _openPreview(r),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -240,21 +240,21 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
   /// Önceden burada haritaya özel bir mini menü açılıyordu: arama kutusu yok,
   /// sıralama yok, uzun menüde aradığın yemeğe ulaşmak için hepsini kaydırmak
   /// gerekiyordu. Artık menü tek yerde — restoran sayfasında.
-  Future<void> _onizlemeAc(RestaurantModel restaurant) async {
-    final ac = await showModalBottomSheet<bool>(
+  Future<void> _openPreview(RestaurantModel restaurant) async {
+    final open = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _OnizlemeKarti(
+      builder: (_) => _PreviewCard(
         restaurant: restaurant,
-        ratings: _puanlarim[restaurant.restaurantId] ?? const [],
+        ratings: _myRatings[restaurant.restaurantId] ?? const [],
       ),
     );
-    if (ac == true && mounted) await _restoranSayfasiniAc(restaurant);
+    if (open == true && mounted) await _openRestaurantPage(restaurant);
   }
 
-  Future<void> _restoranSayfasiniAc(RestaurantModel restaurant) async {
-    final yer = [restaurant.district, restaurant.city]
+  Future<void> _openRestaurantPage(RestaurantModel restaurant) async {
+    final place = [restaurant.district, restaurant.city]
         .where((s) => s != null && s.isNotEmpty)
         .join(', ');
     await Navigator.push(
@@ -263,15 +263,15 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
         builder: (_) => RestaurantDetailScreen(
           restaurantId: restaurant.restaurantId,
           restaurantName: restaurant.name,
-          locationText: yer,
+          locationText: place,
         ),
       ),
     );
     // Sayfada puan verilmiş olabilir; işaretler güncellensin.
-    if (mounted) _puanlarimiYukle();
+    if (mounted) _loadMyRatings();
   }
 
-  Widget _buildKonumSeridi() {
+  Widget _buildLocationBanner() {
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
@@ -299,7 +299,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _konumIste,
+                  onPressed: _requestLocation,
                   child: Text('Aç',
                       style: AppTextStyles.labelLarge
                           .copyWith(color: AppColors.primary)),
@@ -307,7 +307,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                 IconButton(
                   icon: Icon(Icons.close_rounded,
                       size: 18, color: Colors.white.withValues(alpha: 0.7)),
-                  onPressed: () => setState(() => _konumSeridiKapali = true),
+                  onPressed: () => setState(() => _locationBannerDismissed = true),
                 ),
               ],
             ),
@@ -317,18 +317,18 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     );
   }
 
-  Future<void> _konumIste() async {
+  Future<void> _requestLocation() async {
     final notifier = ref.read(selectedLocationProvider.notifier);
     final r = await notifier.requestGps();
     if (!mounted) return;
     if (r.isOk) {
       setState(() {
-        _izinVar = true;
-        _konumSeridiKapali = true;
+        _hasPermission = true;
+        _locationBannerDismissed = true;
       });
       return;
     }
-    final mesaj = switch (r.outcome) {
+    final message = switch (r.outcome) {
       LocationOutcome.serviceDisabled =>
         'Cihazının konum servisi kapalı. Ayarlardan açabilirsin.',
       LocationOutcome.deniedForever =>
@@ -337,7 +337,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mesaj),
+        content: Text(message),
         behavior: SnackBarBehavior.floating,
         action: r.outcome == LocationOutcome.deniedForever
             ? const SnackBarAction(
@@ -373,7 +373,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
           // Engellemez, kapatılabilir. Konum izni olmayan kullanıcı
           // haritayı yine de kullanabilsin diye böyle: haritanın işi
           // "restoranlar nerede", "ben neredeyim" değil.
-          if (!_konumSeridiKapali && _izinVar == false) _buildKonumSeridi(),
+          if (!_locationBannerDismissed && _hasPermission == false) _buildLocationBanner(),
 
           // ── Üst sıra: geri + "Puanladıklarım" ────────────────────────
           SafeArea(
@@ -387,12 +387,12 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                         color: Colors.white, size: 20),
                   ),
                   const Spacer(),
-                  if (_puanlarim.isNotEmpty)
+                  if (_myRatings.isNotEmpty)
                     _CategoryChip(
                       label: '★ Puanladıklarım',
-                      isSelected: _sadecePuanladiklarim,
+                      isSelected: _onlyRated,
                       onTap: () => setState(() =>
-                          _sadecePuanladiklarim = !_sadecePuanladiklarim),
+                          _onlyRated = !_onlyRated),
                     ),
                 ],
               ),
@@ -441,8 +441,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
 
 /// Harita işaretinin kartı: restoran künyesi, varsa puanladığın yemekler ve
 /// menüye giden düğme. Uzun değil — menünün kendisi restoran sayfasında.
-class _OnizlemeKarti extends StatelessWidget {
-  const _OnizlemeKarti({required this.restaurant, required this.ratings});
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.restaurant, required this.ratings});
 
   final RestaurantModel restaurant;
   final List<RatingModel> ratings;

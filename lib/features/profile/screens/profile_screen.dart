@@ -2219,7 +2219,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                   style: AppTextStyles.bodyMedium,
                 ),
                 const SizedBox(height: 10),
-                for (final madde in const [
+                for (final bullet in const [
                   'Bütün puanların, yorumların ve yorum fotoğrafların',
                   'İstek listen',
                   'Profil bilgilerin ve profil fotoğrafın',
@@ -2236,7 +2236,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(madde, style: AppTextStyles.bodySmall),
+                          child: Text(bullet, style: AppTextStyles.bodySmall),
                         ),
                       ],
                     ),

@@ -15,9 +15,11 @@ import '../../features/reviews/screens/menu_item_reviews_screen.dart';
 import '../models/menu_item_model.dart';
 import '../models/menu_item_review_model.dart';
 import '../models/restaurant_model.dart';
+import '../providers/data_refresh.dart';
 import 'dish_photo.dart';
 import 'pressable.dart';
 import 'rating_sheet.dart';
+import 'main_scaffold.dart';
 import 'rating_stars.dart';
 import 'review_tile.dart';
 import 'skeleton.dart';
@@ -75,22 +77,29 @@ abstract final class DishSheet {
 /// yorum listesine çeviriyor ve "Değerlendir" ekranın dışına itiliyordu.
 const int _previewCount = 3;
 
-class _DishSheetBody extends StatefulWidget {
+class _DishSheetBody extends ConsumerStatefulWidget {
   const _DishSheetBody({required this.item, required this.showRestaurantLink});
 
   final MenuItemModel item;
   final bool showRestaurantLink;
 
   @override
-  State<_DishSheetBody> createState() => _DishSheetBodyState();
+  ConsumerState<_DishSheetBody> createState() => _DishSheetBodyState();
 }
 
-class _DishSheetBodyState extends State<_DishSheetBody> {
+class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
   bool _inWishlist = false;
   bool _wishlistLoading = true;
 
   List<MenuItemReviewModel>? _reviews;
   bool _reviewsFailed = false;
+
+  /// Kullanıcının bu yemeğe verdiği puanın kimliği — yoksa `null`.
+  /// Yorum listesinden çıkıyor: kendi değerlendirmesi `mine` ile işaretli.
+  int? _ownRatingId;
+
+  /// "Bu ürünü daha önce denedin" şeridi görünüyor mu?
+  bool _showTriedBanner = false;
 
   /// İçerik en üstteyken aşağı çekilen mesafe.
   double _pull = 0;
@@ -162,6 +171,16 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
       if (_inWishlist) {
         await WishlistRepository.instance
             .removeByMenuItemId(userId, widget.item.menuItemId);
+      } else if (_ownRatingId != null) {
+        // İstek listesi "denemek istediklerim" demek; puanlanmış yemek oraya
+        // girmez. Listeden çıkarmak her zaman serbest, yalnızca ekleme durur.
+        if (mounted) {
+          setState(() {
+            _showTriedBanner = true;
+            _wishlistLoading = false;
+          });
+        }
+        return;
       } else {
         await WishlistRepository.instance
             .addToWishlist(userId, widget.item.menuItemId);
@@ -184,7 +203,15 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
           .getMenuItemReviews(widget.item.menuItemId);
       // En yeni önce — tüm yorumlar ekranıyla aynı sıra.
       reviews.sort((a, b) => b.ratingId.compareTo(a.ratingId));
-      if (mounted) setState(() => _reviews = reviews);
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          final own = reviews.where((r) => r.mine);
+          _ownRatingId = own.isEmpty ? null : own.first.ratingId;
+          // Kullanıcı bu arada puanını silmiş olabilir.
+          if (_ownRatingId == null) _showTriedBanner = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _reviewsFailed = true);
     }
@@ -205,6 +232,19 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
         ),
       ),
     );
+  }
+
+  /// Şeritteki "Günlüğe git": paneli kapatır, Günlük sekmesine geçer ve
+  /// o değerlendirmenin vurgulanmasını ister.
+  void _openInDiary() {
+    final ratingId = _ownRatingId;
+    if (ratingId == null) return;
+    ref.read(diaryFocusProvider.notifier).state = ratingId;
+    ref.read(selectedTabProvider.notifier).state = 2;
+    // Yalnızca paneli kapatmak yetmiyor: panel restoran ya da "Tümünü gör"
+    // sayfasından açıldıysa o sayfa üstte kalıyor ve sekme değişse de günlük
+    // görünmüyordu. Ana iskelete kadar geri dönülür.
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _openAllReviews() {
@@ -338,6 +378,19 @@ class _DishSheetBodyState extends State<_DishSheetBody> {
               // eşit genişlikte yan yana durunca ikisi aynı önemde okunuyordu
               // (ve "İstek Listesi'ne Ekle" iki satıra taşıyordu). İstek
               // listesi artık ikon butonu.
+              // Puanlanmış yemek istek listesine eklenmek istenince çıkan şerit.
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                child: _showTriedBanner
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                            AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
+                        child: _AlreadyTriedBanner(onOpenDiary: _openInDiary),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+
               Padding(
                 padding: EdgeInsets.fromLTRB(AppSpace.screen, AppSpace.md,
                     AppSpace.screen, media.padding.bottom + AppSpace.md),
@@ -533,6 +586,47 @@ class _RatingSummary extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+// ── "Daha önce denedin" şeridi ────────────────────────────────────────────────
+
+/// Panelin içinde gösterilir. SnackBar kullanılamaz: ScaffoldMessenger panelin
+/// ALTINDAKİ Scaffold'a bağlı olduğu için mesaj panelin arkasında kalıyor.
+class _AlreadyTriedBanner extends StatelessWidget {
+  const _AlreadyTriedBanner({required this.onOpenDiary});
+
+  final VoidCallback onOpenDiary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpace.md, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: context.surfaceElevatedColor,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.dividerColor),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded,
+              size: 18, color: context.textSecondaryColor),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Text(
+              'Bu ürünü daha önce denedin.',
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: context.textPrimaryColor),
+            ),
+          ),
+          TextButton(
+            onPressed: onOpenDiary,
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('Günlüğe git'),
+          ),
+        ],
+      ),
     );
   }
 }

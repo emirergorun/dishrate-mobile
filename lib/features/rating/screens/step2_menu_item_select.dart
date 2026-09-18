@@ -5,7 +5,7 @@ import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/utils/turkce.dart';
+import '../../../core/utils/turkish_text.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -210,7 +210,7 @@ class _Step2MenuItemSelectState extends ConsumerState<Step2MenuItemSelect> {
                   AppSpace.screen, AppSpace.screen, AppSpace.screen, 2),
               child: Text(
                 // Dart'ın toUpperCase()'i "Diğer"i DIĞER yapıyor (İ yerine I).
-                Turkce.buyuk(category),
+                TurkishText.upper(category),
                 style: AppTextStyles.label.copyWith(
                   fontSize: 12,
                   letterSpacing: 0.8,

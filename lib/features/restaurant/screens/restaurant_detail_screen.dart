@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
-import '../../../core/data/turkiye_adres.dart';
+import '../../../core/data/turkey_addresses.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
@@ -44,29 +44,29 @@ class _RestaurantDetailScreenState
 
   /// Menü içi arama. Uzun menülerde aradığın yemeği kaydırarak aramak
   /// zorunda kalmayasın diye; kısa menüde kutu hiç gösterilmiyor.
-  final _aramaCtrl = TextEditingController();
-  String _arama = '';
-  static const int _aramaEsigi = 8;
+  final _menuSearchCtrl = TextEditingController();
+  String _menuQuery = '';
+  static const int _menuSearchThreshold = 8;
 
   @override
   void dispose() {
-    _aramaCtrl.dispose();
+    _menuSearchCtrl.dispose();
     super.dispose();
   }
 
   /// Arama metnine uyan yemekler (Türkçe karakter ve harf büyüklüğü yok sayılır).
-  List<MenuItemModel> get _filtreliMenu {
-    if (_arama.trim().isEmpty) return _menu;
-    final anahtar = TurkiyeAdres.aramaAnahtari(_arama.trim());
+  List<MenuItemModel> get _filteredMenu {
+    if (_menuQuery.trim().isEmpty) return _menu;
+    final queryKey = TurkeyAddresses.searchKey(_menuQuery.trim());
     return _menu
-        .where((m) => TurkiyeAdres.aramaAnahtari(m.name).contains(anahtar))
+        .where((m) => TurkeyAddresses.searchKey(m.name).contains(queryKey))
         .toList();
   }
 
   /// Seçili sıralamaya göre menü. Eşitlikte öbür ölçüt devreye giriyor:
   /// tek kişinin 5 verdiği yemek, 40 kişinin 5 verdiğinin önüne geçmesin.
   List<MenuItemModel> get _sortedMenu {
-    final l = [..._filtreliMenu];
+    final l = [..._filteredMenu];
     switch (_sort) {
       case _MenuSort.rating:
         l.sort((a, b) {
@@ -205,16 +205,16 @@ class _RestaurantDetailScreenState
         ),
         // Önceden burada "12 yemek, puana göre sıralı" yazıyordu; sıralama
         // artık seçilebildiği için yerini seçici aldı.
-        if (_menu.length >= _aramaEsigi) ...[
+        if (_menu.length >= _menuSearchThreshold) ...[
           const SizedBox(height: AppSpace.md),
           TextField(
-            controller: _aramaCtrl,
+            controller: _menuSearchCtrl,
             style: AppTextStyles.bodyMedium,
             decoration: const InputDecoration(
               hintText: 'Menüde ara',
               prefixIcon: Icon(TablerIcons.search, size: 20),
             ),
-            onChanged: (v) => setState(() => _arama = v),
+            onChanged: (v) => setState(() => _menuQuery = v),
           ),
         ],
         if (_menu.isNotEmpty) ...[
