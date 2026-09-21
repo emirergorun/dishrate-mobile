@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/rating_request_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/info_banner.dart';
+import '../../../shared/widgets/swipe_to_delete.dart';
 
 // ── Sıralama seçenekleri ──────────────────────────────────────────────────────
 
@@ -58,15 +61,33 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   /// Kart bulunamayınca bir kez tazelenir; sonsuz döngü olmasın.
   bool _refreshedForFocus = false;
 
+  /// Silinip "Geri al" süresi dolmamış değerlendirmeler, eskiden yeniye.
+  /// Kayıt `_allRatings`'ten çıkmaz, yalnızca gizlenir; böylece geri alınınca
+  /// tam eski yerine döner. Sunucuya istek her birinin kendi süresi dolunca gider.
+  final List<_PendingDelete> _pendingDeletes = [];
+
+  /// Silme hatası gibi eylemsiz şerit mesajları (kısa süre görünür).
+  final List<_Notice> _notices = [];
+  int _noticeSeq = 0;
+
+  /// Listeye geri dönen kayıtlar; kartları bir kez açılarak girer.
+  final Set<int> _restoredIds = {};
+
+  static const _undoWindow = Duration(seconds: 5);
+
   /// Yaklaşık kart yüksekliği — tembel listede ekran dışındaki kartın context'i
   /// olmadığı için önce buna göre yaklaşılır, sonra tam hizalanır.
   static const double _cardHeight = 132;
 
   // Yüklenen puanlardan dinamik kategori listesi
-  Set<String> get _availableCategories => _allRatings
-      .map((r) => r.categoryName)
-      .whereType<String>()
-      .toSet();
+  Set<String> get _availableCategories =>
+      _visibleRatings.map((r) => r.categoryName).whereType<String>().toSet();
+
+  /// Geri alma süresindekiler hariç değerlendirmeler.
+  Iterable<RatingModel> get _visibleRatings {
+    final hidden = {for (final p in _pendingDeletes) p.rating.ratingId};
+    return _allRatings.where((r) => !hidden.contains(r.ratingId));
+  }
 
   bool get _hasActiveFilter =>
       _categoryFilter != null || _sortBy != _SortBy.newest;
@@ -85,6 +106,14 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   @override
   void dispose() {
+    // Ekran kapanıyorsa bekleyen silme artık geri alınamaz; hemen gönderilir.
+    for (final pending in _pendingDeletes) {
+      pending.timer.cancel();
+      RatingRepository.instance.deleteRating(pending.rating.ratingId).ignore();
+    }
+    for (final notice in _notices) {
+      notice.timer.cancel();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -168,11 +197,12 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       _error = null;
     });
     try {
-      final ratings =
-          await RatingRepository.instance.getRatingsByUser(userId);
+      final ratings = await RatingRepository.instance.getRatingsByUser(userId);
+      // Geri alma süresindekiler sunucuda hâlâ duruyor; `_visibleRatings`
+      // onları gizlemeye devam eder.
       if (mounted) {
         setState(() {
-          _allRatings = List.from(ratings); // unmodifiable → mutable copy
+          _allRatings = ratings;
           _applyFilters();
         });
       }
@@ -184,7 +214,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   }
 
   void _applyFilters() {
-    var list = _allRatings.where((r) {
+    var list = _visibleRatings.where((r) {
       if (_categoryFilter == null) return true;
       return r.categoryName == _categoryFilter;
     }).toList();
@@ -205,23 +235,92 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     _displayed = list;
   }
 
-  Future<void> _deleteRating(RatingModel rating) async {
+  /// Kaydırma ve kart menüsündeki "Sil" buraya gelir. Kart hemen gizlenir,
+  /// altta "… silindi · Geri al" şeridi çıkar; sunucuya istek şerit
+  /// kapanınca gider. Geri alınırsa hiç gitmez, kayıt olduğu gibi kalır.
+  /// Art arda silmelerde her birinin kendi şeridi ve süresi var.
+  void _deleteRating(RatingModel rating) {
+    if (_pendingDeletes.any((p) => p.rating.ratingId == rating.ratingId)) {
+      return;
+    }
+    late final _PendingDelete pending;
+    pending = _PendingDelete(
+        rating, Timer(_undoWindow, () => _commitDelete(pending)));
+    setState(() {
+      _pendingDeletes.add(pending);
+      _applyFilters();
+    });
+  }
+
+  void _undoDelete(_PendingDelete pending) {
+    pending.timer.cancel();
+    _markRestored(pending.rating.ratingId);
+    setState(() {
+      _pendingDeletes.remove(pending);
+      _applyFilters();
+    });
+  }
+
+  /// Kart yeniden oluşurken açılma animasyonu oynasın; bir kare sonra iz
+  /// silinir ki sonraki yeniden çizimlerde tekrar oynamasın.
+  void _markRestored(int ratingId) {
+    _restoredIds.add(ratingId);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _restoredIds.remove(ratingId));
+  }
+
+  Future<void> _commitDelete(_PendingDelete pending) async {
+    pending.timer.cancel();
+    if (!mounted || !_pendingDeletes.contains(pending)) return;
+    final rating = pending.rating;
+    setState(() {
+      _pendingDeletes.remove(pending);
+      _allRatings.removeWhere((r) => r.ratingId == rating.ratingId);
+      _applyFilters();
+    });
     try {
       await RatingRepository.instance.deleteRating(rating.ratingId);
+      if (mounted) ref.read(userDataRefreshProvider.notifier).state++;
+    } catch (_) {
       if (!mounted) return;
+      // Sunucu silmediyse kart geri gelir.
+      _markRestored(rating.ratingId);
       setState(() {
-        _allRatings.removeWhere((r) => r.ratingId == rating.ratingId);
+        _allRatings.add(rating);
         _applyFilters();
       });
-      ref.read(userDataRefreshProvider.notifier).state++;
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Silinemedi, tekrar dene.')),
-        );
-      }
+      _showNotice('Silinemedi, tekrar dene.');
     }
   }
+
+  void _showNotice(String message) {
+    late final _Notice notice;
+    notice = _Notice(
+        _noticeSeq++,
+        message,
+        Timer(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _notices.remove(notice));
+        }));
+    setState(() => _notices.add(notice));
+  }
+
+  List<Widget> _buildBanners() => [
+        for (final pending in _pendingDeletes)
+          InfoBanner(
+            key: ValueKey('deleted_${pending.rating.ratingId}'),
+            icon: Icons.delete_outline_rounded,
+            message:
+                '${pending.rating.restaurantName} - ${pending.rating.menuItemName} silindi.',
+            actionLabel: 'Geri al',
+            onAction: () => _undoDelete(pending),
+          ),
+        for (final notice in _notices)
+          InfoBanner(
+            key: ValueKey('notice_${notice.id}'),
+            icon: Icons.error_outline_rounded,
+            message: notice.message,
+          ),
+      ];
 
   Future<void> _editRating(RatingModel rating) async {
     final result = await showModalBottomSheet<Map<String, dynamic>?>(
@@ -292,138 +391,191 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       if (next != null) _focusOn(next);
     });
 
+    final bannerCount = _pendingDeletes.length + _notices.length;
+
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: AppColors.primary,
-        child: CustomScrollView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        slivers: [
-          // ── App Bar ──────────────────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: context.bgColor,
-            title: const Text('Günlüğüm', style: AppTextStyles.headlineMedium),
-            actions: [
-              // Filtre butonu — aktifse vurgulu
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    onPressed: _openFilterSheet,
-                    icon: Icon(
-                      Icons.tune_rounded,
-                      color: _hasActiveFilter
-                          ? AppColors.primary
-                          : context.textSecondaryColor,
-                    ),
-                  ),
-                  if (_hasActiveFilter)
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _load,
+            color: AppColors.primary,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                // ── App Bar ──────────────────────────────────────────────────
+                SliverAppBar(
+                  pinned: true,
+                  backgroundColor: context.bgColor,
+                  title: const Text('Günlüğüm',
+                      style: AppTextStyles.headlineMedium),
+                  actions: [
+                    // Listelenen kart sayısı (filtre açıksa süzülmüş hâli).
+                    if (!_isLoading && _error == null)
+                      Center(
+                        child: Text(
+                          '${_displayed.length} değerlendirme',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: context.textSecondaryColor),
                         ),
                       ),
+                    // Filtre butonu — aktifse vurgulu
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: _openFilterSheet,
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            color: _hasActiveFilter
+                                ? AppColors.primary
+                                : context.textSecondaryColor,
+                          ),
+                        ),
+                        if (_hasActiveFilter)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                    IconButton(
+                      onPressed: _load,
+                      icon: Icon(Icons.refresh_rounded,
+                          color: context.textSecondaryColor),
+                    ),
+                  ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(0.5),
+                    child: Builder(
+                        builder: (ctx) =>
+                            Container(height: 0.5, color: ctx.dividerColor)),
+                  ),
+                ),
+
+                // ── Aktif filtre bildirimi ────────────────────────────────────
+                if (_hasActiveFilter && !_isLoading && _error == null)
+                  SliverToBoxAdapter(
+                    child: _ActiveFilterBar(
+                      sortBy: _sortBy,
+                      category: _categoryFilter,
+                      onClear: () => setState(() {
+                        _sortBy = _SortBy.newest;
+                        _categoryFilter = null;
+                        _applyFilters();
+                      }),
+                    ),
+                  ),
+
+                // ── İçerik ───────────────────────────────────────────────────
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary),
+                    ),
+                  )
+                else if (_error != null)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: AppColors.error, size: 40),
+                          const SizedBox(height: 12),
+                          Text(_error!, style: AppTextStyles.bodyMedium),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                              onPressed: _load,
+                              child: const Text('Tekrar Dene')),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_visibleRatings.isEmpty)
+                  const SliverFillRemaining(child: _EmptyDiary())
+                else if (_displayed.isEmpty)
+                  SliverFillRemaining(
+                      child: _NoFilterResults(
+                    onClear: () => setState(() {
+                      _categoryFilter = null;
+                      _applyFilters();
+                    }),
+                  ))
+                else ...[
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final rating = _displayed[index];
+                        final highlighted = rating.ratingId == _highlightedId;
+                        return SwipeToDelete(
+                          key: Key('rating_${rating.ratingId}'),
+                          sideInset: 20,
+                          bottomGap: 12,
+                          animateIn: _restoredIds.contains(rating.ratingId),
+                          onDelete: () => _deleteRating(rating),
+                          // Menüdeki "Sil" de aynı kayma ve kapanmayı oynatır.
+                          builder: (_, swipeAway) => _RatingCard(
+                            key: highlighted ? _highlightKey : null,
+                            rating: rating,
+                            highlighted: highlighted,
+                            onDelete: swipeAway,
+                            onEdit: () => _editRating(rating),
+                          ),
+                        );
+                      },
+                      childCount: _displayed.length,
+                    ),
+                  ),
+                  // Şeritler açıkken son kart altlarında kalmasın (şerit ~56 + 8 aralık).
+                  SliverToBoxAdapter(
+                      child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeInOut,
+                          height:
+                              bannerCount == 0 ? 24 : 32 + bannerCount * 64)),
                 ],
-              ),
-              IconButton(
-                onPressed: _load,
-                icon: Icon(Icons.refresh_rounded,
-                    color: context.textSecondaryColor),
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(0.5),
-              child: Builder(builder: (ctx) => Container(height: 0.5, color: ctx.dividerColor)),
+              ],
             ),
           ),
-
-          // ── Aktif filtre bildirimi ────────────────────────────────────
-          if (_hasActiveFilter && !_isLoading && _error == null)
-            SliverToBoxAdapter(
-              child: _ActiveFilterBar(
-                sortBy: _sortBy,
-                category: _categoryFilter,
-                onClear: () => setState(() {
-                  _sortBy = _SortBy.newest;
-                  _categoryFilter = null;
-                  _applyFilters();
-                }),
-              ),
-            ),
-
-          // ── İçerik ───────────────────────────────────────────────────
-          if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else if (_error != null)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        color: AppColors.error, size: 40),
-                    const SizedBox(height: 12),
-                    Text(_error!, style: AppTextStyles.bodyMedium),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                        onPressed: _load, child: const Text('Tekrar Dene')),
-                  ],
-                ),
-              ),
-            )
-          else if (_allRatings.isEmpty)
-            const SliverFillRemaining(child: _EmptyDiary())
-          else if (_displayed.isEmpty)
-            SliverFillRemaining(child: _NoFilterResults(
-              onClear: () => setState(() {
-                _categoryFilter = null;
-                _applyFilters();
-              }),
-            ))
-          else ...[
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final rating = _displayed[index];
-                  final highlighted = rating.ratingId == _highlightedId;
-                  return _SwipeCard(
-                    key: Key('rating_${rating.ratingId}'),
-                    onDelete: () => _deleteRating(rating),
-                    child: _RatingCard(
-                      key: highlighted ? _highlightKey : null,
-                      rating: rating,
-                      highlighted: highlighted,
-                      onDelete: () => _deleteRating(rating),
-                      onEdit: () => _editRating(rating),
-                    ),
-                  );
-                },
-                childCount: _displayed.length,
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
+          // Silme şeritleri — listenin altında, alt menünün hemen üstünde.
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 12,
+            child: InfoBannerStack(banners: _buildBanners()),
+          ),
         ],
-        ),
       ),
     );
   }
+}
+
+/// Geri alma süresindeki silme ve süresi dolunca onu gönderecek zamanlayıcı.
+class _PendingDelete {
+  _PendingDelete(this.rating, this.timer);
+  final RatingModel rating;
+  final Timer timer;
+}
+
+/// Kısa süre görünen eylemsiz şerit mesajı.
+class _Notice {
+  _Notice(this.id, this.message, this.timer);
+  final int id;
+  final String message;
+  final Timer timer;
 }
 
 // ── Aktif filtre bildirimi ────────────────────────────────────────────────────
@@ -451,19 +603,16 @@ class _ActiveFilterBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.tune_rounded,
-              color: AppColors.primary, size: 15),
+          const Icon(Icons.tune_rounded, color: AppColors.primary, size: 15),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               parts.join(' · '),
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.primary),
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
             ),
           ),
           GestureDetector(
@@ -623,9 +772,8 @@ class _SortOption extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.textDisabled,
+                    color:
+                        isSelected ? AppColors.primary : AppColors.textDisabled,
                     width: isSelected ? 5 : 1.5,
                   ),
                 ),
@@ -703,8 +851,18 @@ class _RatingCard extends StatelessWidget {
   final bool highlighted;
 
   static const _months = [
-    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
-    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+    'Oca',
+    'Şub',
+    'Mar',
+    'Nis',
+    'May',
+    'Haz',
+    'Tem',
+    'Ağu',
+    'Eyl',
+    'Eki',
+    'Kas',
+    'Ara',
   ];
 
   String _formatDate(DateTime dt) {
@@ -753,11 +911,9 @@ class _RatingCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(rating.menuItemName,
-                        style: AppTextStyles.titleSmall),
+                    Text(rating.menuItemName, style: AppTextStyles.titleSmall),
                     const SizedBox(height: 2),
-                    Text(rating.restaurantName,
-                        style: AppTextStyles.bodySmall),
+                    Text(rating.restaurantName, style: AppTextStyles.bodySmall),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -811,8 +967,7 @@ class _RatingCard extends StatelessWidget {
                           child: Row(
                             children: [
                               Icon(Icons.edit_rounded,
-                                  size: 16,
-                                  color: context.textSecondaryColor),
+                                  size: 16, color: context.textSecondaryColor),
                               const SizedBox(width: 10),
                               Text('Düzenle',
                                   style: AppTextStyles.bodySmall.copyWith(
@@ -945,7 +1100,8 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
   XFile? _newPhoto;
   Uint8List? _newPhotoBytes;
 
-  bool get _hasPhoto => _newPhotoBytes != null || (!_photoRemoved && _currentPhoto != null);
+  bool get _hasPhoto =>
+      _newPhotoBytes != null || (!_photoRemoved && _currentPhoto != null);
 
   @override
   void initState() {
@@ -991,7 +1147,8 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.');
+        setState(() =>
+            _error = 'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.');
       }
     }
   }
@@ -1015,7 +1172,10 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       setState(() => _error = 'Lütfen bir puan ver.');
       return;
     }
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     // Yeni fotoğraf varsa yüklenir; kaldırıldıysa boş metin gider (sunucu
     // fotoğrafı siler); ikisi de yoksa null gider ve mevcut fotoğraf kalır.
@@ -1054,7 +1214,10 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() { _isLoading = false; _error = 'Güncellenemedi, tekrar dene.'; });
+        setState(() {
+          _isLoading = false;
+          _error = 'Güncellenemedi, tekrar dene.';
+        });
       }
     }
   }
@@ -1130,8 +1293,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                 children: [
                   Text(
                     _score == 0 ? '—' : _score.toStringAsFixed(1),
-                    style:
-                        AppTextStyles.ratingLarge.copyWith(fontSize: 46),
+                    style: AppTextStyles.ratingLarge.copyWith(fontSize: 46),
                   ),
                   const SizedBox(height: 12),
                   RatingBar.builder(
@@ -1236,156 +1398,6 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Kaydırarak sil (partial swipe reveal) ────────────────────────────────────
-
-class _SwipeCard extends StatefulWidget {
-  const _SwipeCard({super.key, required this.child, required this.onDelete});
-
-  final Widget child;
-  final VoidCallback onDelete;
-
-  @override
-  State<_SwipeCard> createState() => _SwipeCardState();
-}
-
-class _SwipeCardState extends State<_SwipeCard>
-    with SingleTickerProviderStateMixin {
-  static const _revealWidth = 80.0;
-
-  late final AnimationController _ctrl;
-  double _offset = 0;
-  double _animStart = 0;
-  double _animEnd = 0;
-  bool _deleting = false;
-  OverlayEntry? _overlayEntry;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-    )
-      ..addListener(() {
-        final t = Curves.easeOutCubic.transform(_ctrl.value);
-        if (mounted) {
-          setState(() => _offset = _animStart + (_animEnd - _animStart) * t);
-        }
-      })
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed && _deleting && mounted) {
-          widget.onDelete();
-        }
-      });
-  }
-
-  @override
-  void dispose() {
-    _removeOverlay();
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _animateTo(double target, {bool delete = false}) {
-    _deleting = delete;
-    _animStart = _offset;
-    _animEnd = target;
-    _ctrl.forward(from: 0);
-  }
-
-  // Kart açıkken ekranın tamamına şeffaf overlay — herhangi bir yere tap = kapat
-  void _showOverlay() {
-    _removeOverlay();
-    _overlayEntry = OverlayEntry(
-      builder: (_) => Positioned.fill(
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: _snapBack,
-        ),
-      ),
-    );
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
-  void _snapBack() {
-    _removeOverlay();
-    _animateTo(0);
-  }
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    if (_deleting) return;
-    _ctrl.stop();
-    setState(() => _offset = (_offset + d.delta.dx).clamp(-300.0, 0.0));
-  }
-
-  void _onDragEnd(DragEndDetails d) {
-    if (_deleting) return;
-    final velocity = d.primaryVelocity ?? 0;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-
-    if (velocity < -1200 || _offset < -(screenWidth * 0.5)) {
-      _removeOverlay();
-      _animateTo(-(screenWidth + 40), delete: true);
-    } else if (_offset < -(_revealWidth * 0.35) || velocity < -300) {
-      _animateTo(-_revealWidth);
-      _showOverlay();
-    } else {
-      _snapBack();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.hardEdge,
-      children: [
-        // Çöp kovası — kart kaymaya başlamadan önce göstermiyoruz (köşe bleeding önlemi)
-        if (_offset < -1)
-          Positioned(
-            top: 0,
-            right: 20,
-            bottom: 12,
-            child: SizedBox(
-              width: _revealWidth,
-              child: GestureDetector(
-                onTap: widget.onDelete,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.delete_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        // Kart (kaydırılabilir) — overlay zaten tap'leri yakalar
-        Transform.translate(
-          offset: Offset(_offset, 0),
-          child: GestureDetector(
-            onHorizontalDragUpdate: _onDragUpdate,
-            onHorizontalDragEnd: _onDragEnd,
-            child: widget.child,
-          ),
-        ),
-      ],
     );
   }
 }

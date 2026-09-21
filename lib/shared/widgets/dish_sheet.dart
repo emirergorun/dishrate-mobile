@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,7 @@ import '../models/menu_item_review_model.dart';
 import '../models/restaurant_model.dart';
 import '../providers/data_refresh.dart';
 import 'dish_photo.dart';
+import 'info_banner.dart';
 import 'pressable.dart';
 import 'rating_sheet.dart';
 import 'main_scaffold.dart';
@@ -101,6 +104,11 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
   /// Eylem satırının üstündeki bilgi şeridi.
   _InfoBannerKind _banner = _InfoBannerKind.none;
 
+  /// "Eklendi" / "çıkarıldı" şeritlerini süresi dolunca kapatır. "Daha önce
+  /// denedin" şeridinde eylem ("Günlüğe git") olduğu için o kendiliğinden kapanmaz.
+  Timer? _bannerTimer;
+  static const _bannerDuration = Duration(seconds: 5);
+
   /// İçerik en üstteyken aşağı çekilen mesafe.
   double _pull = 0;
   bool _closing = false;
@@ -141,6 +149,12 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     _loadReviews();
   }
 
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _checkWishlist() async {
     try {
       final userId = await TokenStorage.instance.getUserId();
@@ -174,6 +188,7 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       } else if (_ownRatingId != null) {
         // İstek listesi "denemek istediklerim" demek; puanlanmış yemek oraya
         // girmez. Listeden çıkarmak her zaman serbest, yalnızca ekleme durur.
+        _bannerTimer?.cancel();
         if (mounted) {
           setState(() {
             _banner = _InfoBannerKind.alreadyTried;
@@ -190,10 +205,17 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       setState(() {
         _inWishlist = !_inWishlist;
         _wishlistLoading = false;
-        // Çıkarınca "eklendi" yazısı yanlış kalmasın.
+        // Eklenip hemen çıkarılırsa "eklendi" gider, "çıkarıldı" gelir.
         _banner = _inWishlist
             ? _InfoBannerKind.addedToWishlist
-            : _InfoBannerKind.none;
+            : _InfoBannerKind.removedFromWishlist;
+      });
+      _bannerTimer?.cancel();
+      final shown = _banner;
+      _bannerTimer = Timer(_bannerDuration, () {
+        if (mounted && _banner == shown) {
+          setState(() => _banner = _InfoBannerKind.none);
+        }
       });
     } catch (_) {
       if (mounted) setState(() => _wishlistLoading = false);
@@ -262,17 +284,32 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  Widget _buildBanner() {
+  /// Şerit yığınına giden liste: en fazla bir şerit. Değişince eskisi solup
+  /// kapanırken yenisi açılır.
+  List<Widget> _buildBanners() {
     return switch (_banner) {
-      _InfoBannerKind.none => const SizedBox(width: double.infinity),
-      _InfoBannerKind.alreadyTried => _InfoBanner(
+      _InfoBannerKind.none => const [],
+      final kind => [_buildBanner(kind)],
+    };
+  }
+
+  Widget _buildBanner(_InfoBannerKind kind) {
+    return switch (kind) {
+      _InfoBannerKind.none ||
+      _InfoBannerKind.removedFromWishlist =>
+        const InfoBanner(
+          key: ValueKey(_InfoBannerKind.removedFromWishlist),
+          icon: Icons.bookmark_remove_outlined,
+          message: "İstek Listesi'nden çıkarıldı.",
+        ),
+      _InfoBannerKind.alreadyTried => InfoBanner(
           key: const ValueKey(_InfoBannerKind.alreadyTried),
           icon: Icons.info_outline_rounded,
           message: 'Bu ürünü daha önce denedin.',
           actionLabel: 'Günlüğe git',
           onAction: _openInDiary,
         ),
-      _InfoBannerKind.addedToWishlist => _InfoBanner(
+      _InfoBannerKind.addedToWishlist => InfoBanner(
           key: const ValueKey(_InfoBannerKind.addedToWishlist),
           icon: Icons.check_circle_outline_rounded,
           message: "İstek Listesi'ne eklendi.",
@@ -413,19 +450,16 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
               // eşit genişlikte yan yana durunca ikisi aynı önemde okunuyordu
               // (ve "İstek Listesi'ne Ekle" iki satıra taşıyordu). İstek
               // listesi artık ikon butonu.
-              // Bilgi şeridi: "daha önce denedin" ya da "istek listesine eklendi".
-              AnimatedSize(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                child: Padding(
-                  padding: _banner == _InfoBannerKind.none
-                      ? EdgeInsets.zero
-                      : const EdgeInsets.fromLTRB(
-                          AppSpace.screen, AppSpace.md, AppSpace.screen, 0),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _buildBanner(),
-                  ),
+              // Bilgi şeridi: "daha önce denedin", "istek listesine eklendi"
+              // ya da "istek listesinden çıkarıldı". Önceden AnimatedSwitcher
+              // eski şeridi küçülen kutuda ortalayıp sıkıştırıyordu; yazı
+              // kayboluşta kayıp bozuluyordu. Yığın şeridi solup kapatır.
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpace.screen),
+                child: InfoBannerStack(
+                  banners: _buildBanners(),
+                  gap: AppSpace.md,
                 ),
               ),
 
@@ -630,53 +664,11 @@ class _RatingSummary extends StatelessWidget {
 
 // ── Bilgi şeridi ──────────────────────────────────────────────────────────────
 
-enum _InfoBannerKind { none, alreadyTried, addedToWishlist }
-
-/// Panelin içinde gösterilir. SnackBar kullanılamaz: ScaffoldMessenger panelin
-/// ALTINDAKİ Scaffold'a bağlı olduğu için mesaj panelin arkasında kalıyor.
-class _InfoBanner extends StatelessWidget {
-  const _InfoBanner({
-    super.key,
-    required this.icon,
-    required this.message,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpace.md, 4, 4, 4),
-      decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: context.dividerColor),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: context.textSecondaryColor),
-          const SizedBox(width: AppSpace.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodyMedium
-                  .copyWith(color: context.textPrimaryColor),
-            ),
-          ),
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
-    );
-  }
+enum _InfoBannerKind {
+  none,
+  alreadyTried,
+  addedToWishlist,
+  removedFromWishlist
 }
 
 // ── İstek listesi butonu ──────────────────────────────────────────────────────

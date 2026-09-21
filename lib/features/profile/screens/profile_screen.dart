@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
@@ -17,6 +19,8 @@ import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/info_banner.dart';
+import '../../../shared/widgets/swipe_to_delete.dart';
 import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
 
@@ -131,7 +135,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         wishlist: _wishlist,
         onRemove: (wishId) async {
           await WishlistRepository.instance.removeFromWishlist(wishId);
-          setState(() => _wishlist.removeWhere((w) => w.wishId == wishId));
+          if (mounted) {
+            setState(() => _wishlist.removeWhere((w) => w.wishId == wishId));
+          }
         },
         onRate: _openRatingForWishlistItem,
       ),
@@ -1589,6 +1595,25 @@ class _WishlistSheet extends StatefulWidget {
 class _WishlistSheetState extends State<_WishlistSheet> {
   late List<WishlistModel> _items;
 
+  /// Çıkarılıp "Geri al" süresi dolmamış öğeler, eskiden yeniye. Öğe
+  /// `_items`'tan çıkmaz, yalnızca gizlenir; geri alınınca tam eski yerine
+  /// döner. Sunucuya istek her birinin kendi süresi dolunca gider.
+  final List<_PendingRemoval> _pendingRemovals = [];
+
+  /// Çıkarma başarısız olursa kısa süre görünen, eylemsiz şeritler.
+  final List<_SheetNotice> _notices = [];
+  int _noticeSeq = 0;
+
+  /// Listeye geri dönen öğeler; satırları bir kez açılarak girer.
+  final Set<int> _restoredIds = {};
+
+  static const _undoWindow = Duration(seconds: 5);
+
+  List<WishlistModel> get _visibleItems {
+    final hidden = {for (final p in _pendingRemovals) p.item.wishId};
+    return _items.where((w) => !hidden.contains(w.wishId)).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1596,7 +1621,93 @@ class _WishlistSheetState extends State<_WishlistSheet> {
   }
 
   @override
+  void dispose() {
+    // Panel kapanıyorsa bekleyen çıkarmalar artık geri alınamaz; hemen gönderilir.
+    for (final pending in _pendingRemovals) {
+      pending.timer.cancel();
+      widget.onRemove(pending.item.wishId).ignore();
+    }
+    for (final notice in _notices) {
+      notice.timer.cancel();
+    }
+    super.dispose();
+  }
+
+  /// "Listeden çıkar" düğmesi ve kaydırma buraya gelir.
+  void _remove(WishlistModel item) {
+    if (_pendingRemovals.any((p) => p.item.wishId == item.wishId)) return;
+    late final _PendingRemoval pending;
+    pending = _PendingRemoval(
+        item, Timer(_undoWindow, () => _commitRemove(pending)));
+    setState(() => _pendingRemovals.add(pending));
+  }
+
+  void _undoRemove(_PendingRemoval pending) {
+    pending.timer.cancel();
+    _markRestored(pending.item.wishId);
+    setState(() => _pendingRemovals.remove(pending));
+  }
+
+  /// Satır yeniden oluşurken açılma animasyonu oynasın; bir kare sonra iz
+  /// silinir ki sonraki yeniden çizimlerde tekrar oynamasın.
+  void _markRestored(int wishId) {
+    _restoredIds.add(wishId);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _restoredIds.remove(wishId));
+  }
+
+  Future<void> _commitRemove(_PendingRemoval pending) async {
+    pending.timer.cancel();
+    if (!mounted || !_pendingRemovals.contains(pending)) return;
+    final item = pending.item;
+    final index = _items.indexWhere((w) => w.wishId == item.wishId);
+    setState(() {
+      _pendingRemovals.remove(pending);
+      _items.removeWhere((w) => w.wishId == item.wishId);
+    });
+    try {
+      await widget.onRemove(item.wishId);
+    } catch (_) {
+      if (!mounted) return;
+      _markRestored(item.wishId);
+      setState(() => _items.insert(index.clamp(0, _items.length), item));
+      _showNotice('Listeden çıkarılamadı, tekrar dene.');
+    }
+  }
+
+  void _showNotice(String message) {
+    late final _SheetNotice notice;
+    notice = _SheetNotice(
+        _noticeSeq++,
+        message,
+        Timer(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _notices.remove(notice));
+        }));
+    setState(() => _notices.add(notice));
+  }
+
+  List<Widget> _buildBanners() => [
+        for (final pending in _pendingRemovals)
+          InfoBanner(
+            key: ValueKey('removed_${pending.item.wishId}'),
+            icon: Icons.bookmark_remove_outlined,
+            message:
+                '${pending.item.restaurantName} - ${pending.item.menuItemName} listeden çıkarıldı.',
+            actionLabel: 'Geri al',
+            onAction: () => _undoRemove(pending),
+          ),
+        for (final notice in _notices)
+          InfoBanner(
+            key: ValueKey('notice_${notice.id}'),
+            icon: Icons.error_outline_rounded,
+            message: notice.message,
+          ),
+      ];
+
+  @override
   Widget build(BuildContext context) {
+    final items = _visibleItems;
+    final banners = _buildBanners();
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.55,
@@ -1614,13 +1725,13 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 const SizedBox(width: 8),
                 const Text('İstek Listesi', style: AppTextStyles.titleSmall),
                 const Spacer(),
-                Text('${_items.length} ürün', style: AppTextStyles.bodySmall),
+                Text('${items.length} ürün', style: AppTextStyles.bodySmall),
               ],
             ),
           ),
           Container(height: 0.5, color: context.dividerColor),
           Expanded(
-            child: _items.isEmpty
+            child: items.isEmpty
                 ? Center(
                     child: Text('İstek listesi boş',
                         style: AppTextStyles.bodyMedium
@@ -1629,17 +1740,21 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 : ListView.builder(
                     controller: controller,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: _items.length,
+                    itemCount: items.length,
                     itemBuilder: (_, i) {
-                      final item = _items[i];
-                      return _WishlistSwipeItem(
+                      final item = items[i];
+                      return SwipeToDelete(
                         key: Key('wish_${item.wishId}'),
-                        onDelete: () async {
-                          await widget.onRemove(item.wishId);
-                          if (mounted) setState(() => _items.removeAt(i));
-                        },
-                        child: _WishlistItemRow(
+                        radius: 12,
+                        bottomGap: 8,
+                        revealWidth: 72,
+                        iconSize: 22,
+                        animateIn: _restoredIds.contains(item.wishId),
+                        onDelete: () => _remove(item),
+                        // "Listeden çıkar" de aynı kayma ve kapanmayı oynatır.
+                        builder: (_, swipeAway) => _WishlistItemRow(
                           item: item,
+                          onRemove: swipeAway,
                           onRate: () {
                             Navigator.pop(context);
                             widget.onRate(item);
@@ -1649,25 +1764,58 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                     },
                   ),
           ),
+          // Çıkarma şeritleri — panelin altında, en yenisi en altta.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: InfoBannerStack(
+              banners: banners,
+              trailingGap: 12 + MediaQuery.paddingOf(context).bottom,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
+/// Geri alma süresindeki çıkarma ve süresi dolunca onu gönderecek zamanlayıcı.
+class _PendingRemoval {
+  _PendingRemoval(this.item, this.timer);
+  final WishlistModel item;
+  final Timer timer;
+}
+
+/// Kısa süre görünen eylemsiz şerit mesajı.
+class _SheetNotice {
+  _SheetNotice(this.id, this.message, this.timer);
+  final int id;
+  final String message;
+  final Timer timer;
+}
+
 class _WishlistItemRow extends StatelessWidget {
-  const _WishlistItemRow({required this.item, required this.onRate});
+  const _WishlistItemRow({
+    required this.item,
+    required this.onRate,
+    required this.onRemove,
+  });
   final WishlistModel item;
   final VoidCallback onRate;
+
+  /// Sağ üstteki "Listeden çıkar". Kaydırarak çıkarma ilk kullanımda
+  /// keşfedilmiyordu; görünür bir yol da var.
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      // Günlük kartıyla aynı: zemin yüzey rengi, ayrım kenarlıkla.
       decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1692,6 +1840,17 @@ class _WishlistItemRow extends StatelessWidget {
                     Text(item.restaurantName, style: AppTextStyles.bodySmall),
                   ],
                 ),
+              ),
+              TextButton(
+                onPressed: onRemove,
+                style: TextButton.styleFrom(
+                  foregroundColor: context.textSecondaryColor,
+                  textStyle: AppTextStyles.label,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(44, 36),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                child: const Text('Listeden çıkar'),
               ),
             ],
           ),
@@ -1770,25 +1929,25 @@ class _FavoriteItemRow extends StatelessWidget {
   final int rank;
   final RatingModel rating;
 
-  static const _rankColors = [
-    Color(0xFFFFD700), // 1 — altın
-    Color(0xFFC0C0C0), // 2 — gümüş
-    Color(0xFFCD7F32), // 3 — bronz
-    Color(0xFF9E9E9E), // 4
-    Color(0xFF9E9E9E), // 5
+  /// İlk üç sıra dolgulu rozet. Soluk tonlar açık zeminde seçilmiyordu;
+  /// gümüş de 4-5'in nötr grisiyle karışıyordu, mavimsi tona çekildi.
+  static const _podiumColors = [
+    Color(0xFFE0A100), // 1 — altın
+    Color(0xFF8E9AAB), // 2 — gümüş
+    Color(0xFFB8662E), // 3 — bronz
   ];
-
-  Color get _rankColor =>
-      _rankColors[(rank - 1).clamp(0, _rankColors.length - 1)];
 
   @override
   Widget build(BuildContext context) {
+    final podium = rank <= _podiumColors.length;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      // İstek listesi ve günlük kartlarıyla aynı yüzey.
       decoration: BoxDecoration(
-        color: context.surfaceElevatedColor,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.dividerColor),
       ),
       child: Row(
         children: [
@@ -1796,16 +1955,15 @@ class _FavoriteItemRow extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: _rankColor.withValues(alpha: 0.15),
+              color: podium ? _podiumColors[rank - 1] : context.fillColor,
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 '$rank',
-                style: TextStyle(
-                  color: _rankColor,
+                style: AppTextStyles.label.copyWith(
+                  color: podium ? Colors.white : context.textSecondaryColor,
                   fontWeight: FontWeight.w700,
-                  fontSize: 14,
                 ),
               ),
             ),
@@ -2317,9 +2475,8 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
-                  onPressed: _deleting || _passwordCtrl.text.isEmpty
-                      ? null
-                      : _delete,
+                  onPressed:
+                      _deleting || _passwordCtrl.text.isEmpty ? null : _delete,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.error,
                     disabledBackgroundColor:
@@ -2486,150 +2643,3 @@ class _ProfileRatingSheet extends StatelessWidget {
   }
 }
 
-// ── İstek listesi swipe-to-delete ────────────────────────────────────────────
-
-class _WishlistSwipeItem extends StatefulWidget {
-  const _WishlistSwipeItem({
-    super.key,
-    required this.child,
-    required this.onDelete,
-  });
-
-  final Widget child;
-  final VoidCallback onDelete;
-
-  @override
-  State<_WishlistSwipeItem> createState() => _WishlistSwipeItemState();
-}
-
-class _WishlistSwipeItemState extends State<_WishlistSwipeItem>
-    with SingleTickerProviderStateMixin {
-  static const _revealWidth = 72.0;
-
-  late final AnimationController _ctrl;
-  double _offset = 0;
-  double _animStart = 0;
-  double _animEnd = 0;
-  bool _deleting = false;
-  OverlayEntry? _overlayEntry;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-    )
-      ..addListener(() {
-        final t = Curves.easeOutCubic.transform(_ctrl.value);
-        if (mounted) {
-          setState(() => _offset = _animStart + (_animEnd - _animStart) * t);
-        }
-      })
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed && _deleting && mounted) {
-          widget.onDelete();
-        }
-      });
-  }
-
-  @override
-  void dispose() {
-    _removeOverlay();
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _animateTo(double target, {bool delete = false}) {
-    _deleting = delete;
-    _animStart = _offset;
-    _animEnd = target;
-    _ctrl.forward(from: 0);
-  }
-
-  void _showOverlay() {
-    _removeOverlay();
-    _overlayEntry = OverlayEntry(
-      builder: (_) => Positioned.fill(
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: _snapBack,
-        ),
-      ),
-    );
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
-  void _snapBack() {
-    _removeOverlay();
-    _animateTo(0);
-  }
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    if (_deleting) return;
-    _ctrl.stop();
-    setState(() => _offset = (_offset + d.delta.dx).clamp(-300.0, 0.0));
-  }
-
-  void _onDragEnd(DragEndDetails d) {
-    if (_deleting) return;
-    final velocity = d.primaryVelocity ?? 0;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-
-    if (velocity < -1200 || _offset < -(screenWidth * 0.5)) {
-      _removeOverlay();
-      _animateTo(-(screenWidth + 40), delete: true);
-    } else if (_offset < -(_revealWidth * 0.35) || velocity < -300) {
-      _animateTo(-_revealWidth);
-      _showOverlay();
-    } else {
-      _snapBack();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.hardEdge,
-      children: [
-        if (_offset < -1)
-          Positioned(
-            top: 0,
-            right: 0,
-            bottom: 8,
-            child: SizedBox(
-              width: _revealWidth,
-              child: GestureDetector(
-                onTap: widget.onDelete,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
-                    ),
-                  ),
-                  child: const Icon(Icons.delete_rounded,
-                      color: Colors.white, size: 22),
-                ),
-              ),
-            ),
-          ),
-        Transform.translate(
-          offset: Offset(_offset, 0),
-          child: GestureDetector(
-            onHorizontalDragUpdate: _onDragUpdate,
-            onHorizontalDragEnd: _onDragEnd,
-            child: widget.child,
-          ),
-        ),
-      ],
-    );
-  }
-}
