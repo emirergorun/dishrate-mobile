@@ -59,6 +59,11 @@ abstract final class AppColors {
   static const Color lightNavBackground = lightBackground;
   static const Color lightNavUnselected = Color(0xFF8A847E);
 
+  /// Açık temada seçili alt menü sekmesi. `primary` + butonuyla aynı olunca
+  /// buton ile seçili sekme birbirine karışıyordu; `lightAccentText` ise
+  /// soluk kalıyordu. İkisinin ortası (açık zeminde 3.4:1).
+  static const Color lightNavSelected = Color(0xFFE05620);
+
   /// Açık zeminde küçük turuncu metin. Marka turuncusu burada 2.6:1 kalıyordu;
   /// bu ton 4.8:1 veriyor ve yan yana görüldüğünde hâlâ "aynı turuncu" okunuyor.
   static const Color lightAccentText = Color(0xFFC2410C);

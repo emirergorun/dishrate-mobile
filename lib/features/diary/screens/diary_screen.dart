@@ -4,18 +4,24 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/file_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/rating_request_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/info_banner.dart';
+import '../../../shared/widgets/pressable.dart';
+import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../../../shared/widgets/swipe_to_delete.dart';
 
 // ── Sıralama seçenekleri ──────────────────────────────────────────────────────
@@ -293,11 +299,13 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     }
   }
 
-  void _showNotice(String message) {
+  void _showNotice(String message,
+      {IconData icon = Icons.error_outline_rounded}) {
     late final _Notice notice;
     notice = _Notice(
         _noticeSeq++,
         message,
+        icon,
         Timer(const Duration(seconds: 3), () {
           if (mounted) setState(() => _notices.remove(notice));
         }));
@@ -317,7 +325,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         for (final notice in _notices)
           InfoBanner(
             key: ValueKey('notice_${notice.id}'),
-            icon: Icons.error_outline_rounded,
+            icon: notice.icon,
             message: notice.message,
           ),
       ];
@@ -344,28 +352,21 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     });
     ref.read(userDataRefreshProvider.notifier).state++;
 
+    // Yeşil SnackBar yerine silme şeritleriyle aynı yığın: ekranda tek tür
+    // bildirim olsun.
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(children: [
-          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
-          Text('Puan güncellendi!',
-              style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
-        ]),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+      _showNotice('Puan güncellendi.',
+          icon: Icons.check_circle_outline_rounded);
     }
   }
 
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: context.surfaceColor,
+      backgroundColor: context.sheetColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _FilterSheet(
         currentSort: _sortBy,
@@ -429,7 +430,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                         IconButton(
                           onPressed: _openFilterSheet,
                           icon: Icon(
-                            Icons.tune_rounded,
+                            TablerIcons.adjustments_horizontal,
                             color: _hasActiveFilter
                                 ? AppColors.primary
                                 : context.textSecondaryColor,
@@ -452,7 +453,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     ),
                     IconButton(
                       onPressed: _load,
-                      icon: Icon(Icons.refresh_rounded,
+                      icon: Icon(TablerIcons.refresh,
                           color: context.textSecondaryColor),
                     ),
                   ],
@@ -480,40 +481,34 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
                 // ── İçerik ───────────────────────────────────────────────────
                 if (_isLoading)
-                  const SliverFillRemaining(
-                    child: Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.primary),
-                    ),
-                  )
+                  const SliverToBoxAdapter(child: _DiarySkeleton())
                 else if (_error != null)
-                  SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.error, size: 40),
-                          const SizedBox(height: 12),
-                          Text(_error!, style: AppTextStyles.bodyMedium),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                              onPressed: _load,
-                              child: const Text('Tekrar Dene')),
-                        ],
-                      ),
+                  _StateSliver(
+                    child: StateMessage(
+                      title: _error!,
+                      message: 'Bağlantını kontrol edip tekrar dene.',
+                      actionLabel: 'Tekrar dene',
+                      onAction: _load,
                     ),
                   )
                 else if (_visibleRatings.isEmpty)
-                  const SliverFillRemaining(child: _EmptyDiary())
+                  const _StateSliver(
+                    child: StateMessage(
+                      title: 'Henüz puan vermedin',
+                      message: '+ butonuna basarak ilk puanını ekle.',
+                    ),
+                  )
                 else if (_displayed.isEmpty)
-                  SliverFillRemaining(
-                      child: _NoFilterResults(
-                    onClear: () => setState(() {
-                      _categoryFilter = null;
-                      _applyFilters();
-                    }),
-                  ))
+                  _StateSliver(
+                    child: StateMessage(
+                      title: 'Bu filtreye uyan puan yok',
+                      actionLabel: 'Filtreyi temizle',
+                      onAction: () => setState(() {
+                        _categoryFilter = null;
+                        _applyFilters();
+                      }),
+                    ),
+                  )
                 else ...[
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
@@ -572,9 +567,10 @@ class _PendingDelete {
 
 /// Kısa süre görünen eylemsiz şerit mesajı.
 class _Notice {
-  _Notice(this.id, this.message, this.timer);
+  _Notice(this.id, this.message, this.icon, this.timer);
   final int id;
   final String message;
+  final IconData icon;
   final Timer timer;
 }
 
@@ -597,28 +593,36 @@ class _ActiveFilterBar extends StatelessWidget {
     if (sortBy != _SortBy.newest) parts.add(sortBy.label);
     if (category != null) parts.add(category!);
 
+    // Kartlarla aynı yüzey: turuncu ana eyleme ayrılmış, gri dolgu da açık
+    // temada sönük duruyordu.
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.md, AppSpace.screen, AppSpace.xs),
+      padding: const EdgeInsets.only(left: AppSpace.md),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        color: context.surfaceColor,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.dividerColor),
       ),
       child: Row(
         children: [
-          const Icon(Icons.tune_rounded, color: AppColors.primary, size: 15),
-          const SizedBox(width: 6),
+          Icon(TablerIcons.adjustments_horizontal,
+              color: context.textSecondaryColor, size: 16),
+          const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Text(
               parts.join(' · '),
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: context.textPrimaryColor),
             ),
           ),
-          GestureDetector(
-            onTap: onClear,
-            child: const Icon(Icons.close_rounded,
-                color: AppColors.primary, size: 16),
+          IconButton(
+            onPressed: onClear,
+            tooltip: 'Filtreyi temizle',
+            constraints: const BoxConstraints(
+                minWidth: AppSize.minTap, minHeight: AppSize.minTap),
+            icon: Icon(TablerIcons.x,
+                color: context.textSecondaryColor, size: 16),
           ),
         ],
       ),
@@ -671,13 +675,14 @@ class _FilterSheetState extends State<_FilterSheet> {
           // Handle
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 16),
+              padding:
+                  const EdgeInsets.only(top: AppSpace.md, bottom: AppSpace.lg),
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
                   color: context.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
@@ -685,12 +690,12 @@ class _FilterSheetState extends State<_FilterSheet> {
 
           // ── Sıralama ─────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
             child: Text('Sırala',
                 style: AppTextStyles.titleSmall
                     .copyWith(color: context.textSecondaryColor)),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpace.sm),
           ..._SortBy.values.map((s) => _SortOption(
                 label: s.label,
                 isSelected: _sort == s,
@@ -702,17 +707,17 @@ class _FilterSheetState extends State<_FilterSheet> {
 
           // ── Kategori (varsa) ─────────────────────────────────────────
           if (widget.availableCategories.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpace.lg),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               child: Text('Kategori',
                   style: AppTextStyles.titleSmall
                       .copyWith(color: context.textSecondaryColor)),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpace.md),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               child: Row(
                 children: [
                   // Tümü chip
@@ -738,7 +743,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
           ],
 
-          const SizedBox(height: 24),
+          SizedBox(height: AppSpace.xl + MediaQuery.paddingOf(context).bottom),
         ],
       ),
     );
@@ -758,28 +763,32 @@ class _SortOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Seçili seçenek metin renginde; turuncu ana eyleme ayrılmış
+    // (Keşfet'teki kategori çipleriyle aynı kural).
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 20, 4),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: AppSize.minTap),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
         child: Row(
           children: [
             SizedBox(
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: AppMotion.fast,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color:
-                        isSelected ? AppColors.primary : AppColors.textDisabled,
-                    width: isSelected ? 5 : 1.5,
+                    color: isSelected
+                        ? context.textPrimaryColor
+                        : context.textTertiaryColor,
+                    width: isSelected ? 6 : 1.5,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpace.md),
             Text(
               label,
               style: AppTextStyles.bodyMedium.copyWith(
@@ -808,24 +817,28 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : context.surfaceElevatedColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : context.dividerColor,
+    // Keşfet'teki kategori çipinin aynısı: seçili çip metin renginde dolu.
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpace.sm),
+      child: Pressable(
+        onTap: onTap,
+        semanticLabel: label,
+        child: AnimatedContainer(
+          duration: AppMotion.base,
+          curve: AppMotion.curve,
+          height: 36,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          decoration: BoxDecoration(
+            color: isSelected ? context.textPrimaryColor : context.fillColor,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: isSelected ? Colors.white : context.textPrimaryColor,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          child: Text(
+            label,
+            style: AppTextStyles.label.copyWith(
+              fontSize: 14,
+              color: isSelected ? context.bgColor : context.textPrimaryColor,
+            ),
           ),
         ),
       ),
@@ -849,6 +862,11 @@ class _RatingCard extends StatelessWidget {
 
   /// "Günlüğe git" ile gelindiğinde kart kısa süre aydınlanır.
   final bool highlighted;
+
+  /// Kart köşesi. Ölçekte (12 / 20) yok: kart hem fotoğraftan (8) hem panel
+  /// köşesinden ayrı durmalı. Kaydırarak silmedeki kırmızı alan da bununla
+  /// aynı yarıçapı kullanıyor.
+  static const double cardRadius = 16;
 
   static const _months = [
     'Oca',
@@ -878,12 +896,13 @@ class _RatingCard extends StatelessWidget {
       duration: Duration(milliseconds: highlighted ? 1200 : 0),
       curve: Curves.easeOut,
       builder: (context, t, child) => Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.fromLTRB(
+            AppSpace.screen, 0, AppSpace.screen, AppSpace.md),
+        padding: const EdgeInsets.all(AppSpace.lg),
         decoration: BoxDecoration(
           color: Color.lerp(context.surfaceColor,
               AppColors.primary.withValues(alpha: 0.14), t),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(cardRadius),
           border: Border.all(
             color: Color.lerp(context.dividerColor, AppColors.primary, t)!,
           ),
@@ -902,36 +921,31 @@ class _RatingCard extends StatelessWidget {
                 url: rating.reviewPhotoUrl ?? rating.photoUrl,
                 width: 48,
                 height: 48,
-                radius: 10,
+                radius: AppRadius.sm,
                 iconSize: 22,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpace.md),
               // Orta: yemek adı + restoran + yıldızlar
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(rating.menuItemName, style: AppTextStyles.titleSmall),
-                    const SizedBox(height: 2),
-                    Text(rating.restaurantName, style: AppTextStyles.bodySmall),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpace.xxs),
+                    Text(rating.restaurantName,
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: context.textSecondaryColor)),
+                    const SizedBox(height: AppSpace.sm),
                     Row(
                       children: [
-                        RatingBarIndicator(
-                          rating: rating.score,
-                          itemSize: 16,
-                          itemBuilder: (_, __) => const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.star,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
+                        StarRow(rating: rating.score, size: 14),
+                        const SizedBox(width: AppSpace.sm),
                         // Tarih
                         if (rating.ratedAt != null)
                           Text(
                             _formatDate(rating.ratedAt!),
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.textDisabled,
+                            style: AppTextStyles.caption.copyWith(
+                              color: context.textTertiaryColor,
                             ),
                           ),
                       ],
@@ -947,16 +961,19 @@ class _RatingCard extends StatelessWidget {
                     rating.score.toStringAsFixed(1),
                     style: AppTextStyles.ratingSmall.copyWith(fontSize: 18),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpace.xs),
                   SizedBox(
                     width: 28,
                     height: 28,
                     child: PopupMenuButton<String>(
                       padding: EdgeInsets.zero,
                       iconSize: 18,
+                      tooltip: 'Seçenekler',
                       color: context.surfaceColor,
-                      icon: const Icon(Icons.more_vert_rounded,
-                          color: AppColors.textDisabled),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      icon: Icon(TablerIcons.dots_vertical,
+                          color: context.textTertiaryColor),
                       onSelected: (value) {
                         if (value == 'delete') onDelete();
                         if (value == 'edit') onEdit();
@@ -966,9 +983,9 @@ class _RatingCard extends StatelessWidget {
                           value: 'edit',
                           child: Row(
                             children: [
-                              Icon(Icons.edit_rounded,
+                              Icon(TablerIcons.pencil,
                                   size: 16, color: context.textSecondaryColor),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: AppSpace.md),
                               Text('Düzenle',
                                   style: AppTextStyles.bodySmall.copyWith(
                                       color: context.textPrimaryColor)),
@@ -979,12 +996,12 @@ class _RatingCard extends StatelessWidget {
                           value: 'delete',
                           child: Row(
                             children: [
-                              const Icon(Icons.delete_outline_rounded,
-                                  size: 16, color: AppColors.error),
-                              const SizedBox(width: 10),
+                              Icon(TablerIcons.trash,
+                                  size: 16, color: context.errorTextColor),
+                              const SizedBox(width: AppSpace.md),
                               Text('Sil',
                                   style: AppTextStyles.bodySmall
-                                      .copyWith(color: AppColors.error)),
+                                      .copyWith(color: context.errorTextColor)),
                             ],
                           ),
                         ),
@@ -997,13 +1014,14 @@ class _RatingCard extends StatelessWidget {
           ),
           // Yorum
           if (rating.comment != null && rating.comment!.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpace.md),
+            // Gri kutu bilinçli: yorum kartın içinde ayrışmalı (açık temada da).
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(AppSpace.md),
               decoration: BoxDecoration(
                 color: context.surfaceElevatedColor,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Text(
                 '"${rating.comment}"',
@@ -1020,57 +1038,67 @@ class _RatingCard extends StatelessWidget {
   }
 }
 
-// ── Boş durumlar ──────────────────────────────────────────────────────────────
+// ── Yükleniyor ve durum mesajları ────────────────────────────────────────────
 
-class _EmptyDiary extends StatelessWidget {
-  const _EmptyDiary();
+/// Kart biçiminde yükleniyor iskeleti; liste gelince yerine aynı ölçüde
+/// kartlar oturur.
+class _DiarySkeleton extends StatelessWidget {
+  const _DiarySkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return SkeletonPulse(
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.menu_book_rounded,
-              color: AppColors.textDisabled, size: 56),
-          const SizedBox(height: 16),
-          Text('Henüz puan vermedin.',
-              style: AppTextStyles.titleMedium
-                  .copyWith(color: context.textSecondaryColor)),
-          const SizedBox(height: 8),
-          Text(
-            '+ butonuna basarak ilk puanını ekle.',
-            style: AppTextStyles.bodySmall,
-            textAlign: TextAlign.center,
-          ),
+          const SizedBox(height: AppSpace.md),
+          for (var i = 0; i < 4; i++)
+            Container(
+              margin: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, 0, AppSpace.screen, AppSpace.md),
+              padding: const EdgeInsets.all(AppSpace.lg),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_RatingCard.cardRadius),
+                border: Border.all(color: context.dividerColor),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 48, height: 48, radius: AppRadius.sm),
+                  SizedBox(width: AppSpace.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(width: 150, height: 14),
+                        SizedBox(height: AppSpace.sm),
+                        SkeletonBox(width: 100, height: 12),
+                        SizedBox(height: AppSpace.sm),
+                        SkeletonBox(width: 120, height: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _NoFilterResults extends StatelessWidget {
-  const _NoFilterResults({required this.onClear});
-  final VoidCallback onClear;
+/// Boş, sonuçsuz ve hata durumları: Keşfet'teki gibi sola hizalı, ekran
+/// kenarından başlayan mesaj.
+class _StateSliver extends StatelessWidget {
+  const _StateSliver({required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.filter_list_off_rounded,
-              color: AppColors.textDisabled, size: 48),
-          const SizedBox(height: 16),
-          Text('Bu filtreye uyan puan yok.',
-              style: AppTextStyles.titleMedium
-                  .copyWith(color: context.textSecondaryColor)),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: onClear,
-            child: const Text('Filtreyi Temizle'),
-          ),
-        ],
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpace.screen, AppSpace.xxl, AppSpace.screen, 0),
+        child: child,
       ),
     );
   }
@@ -1120,12 +1148,12 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera_rounded),
+              leading: const Icon(TablerIcons.camera),
               title: const Text('Fotoğraf çek'),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded),
+              leading: const Icon(TablerIcons.photo),
               title: const Text('Galeriden seç'),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
@@ -1240,52 +1268,47 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: context.surfaceElevatedColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          color: context.sheetColor,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Handle
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpace.md),
             Center(
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
                   color: context.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpace.screen),
 
             // Başlık
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
+              // Tam genişlik: yoksa sütun metin kadar daralıp ortada kalıyordu.
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text('Değerlendirmeyi Düzenle',
                       style: AppTextStyles.titleSmall),
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    const Icon(Icons.storefront_rounded,
-                        color: AppColors.primary, size: 13),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '${widget.rating.restaurantName} · ${widget.rating.menuItemName}',
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.primary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ]),
+                  const SizedBox(height: AppSpace.xxs),
+                  Text(
+                    '${widget.rating.restaurantName} · ${widget.rating.menuItemName}',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: context.textSecondaryColor),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: AppSpace.xl),
 
             // Yıldız
             Center(
@@ -1295,65 +1318,80 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                     _score == 0 ? '—' : _score.toStringAsFixed(1),
                     style: AppTextStyles.ratingLarge.copyWith(fontSize: 46),
                   ),
-                  const SizedBox(height: 12),
-                  RatingBar.builder(
+                  const SizedBox(height: AppSpace.md),
+                  // Değerlendirme akışındaki yıldızların aynısı: boşlar
+                  // çerçeveli, koyu temada da görünür.
+                  RatingBar(
                     initialRating: _score,
                     minRating: 0.5,
                     allowHalfRating: true,
                     itemCount: 5,
                     itemSize: 40,
-                    unratedColor: context.surfaceColor,
-                    itemBuilder: (_, __) =>
-                        const Icon(Icons.star_rounded, color: AppColors.star),
+                    itemPadding: const EdgeInsets.symmetric(horizontal: 2),
+                    glow: false,
+                    ratingWidget: RatingWidget(
+                      full: const StarGlyph(fill: 1, size: 40),
+                      half: StarGlyph(
+                          fill: 0.5,
+                          size: 40,
+                          emptyColor:
+                              context.starColor.withValues(alpha: 0.55)),
+                      empty: StarGlyph(
+                          fill: 0,
+                          size: 40,
+                          emptyColor:
+                              context.starColor.withValues(alpha: 0.55)),
+                    ),
                     onRatingUpdate: (r) => setState(() => _score = r),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpace.sm),
                   Text(
                     _scoreLabel(_score),
                     style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.primary,
+                      color: context.textSecondaryColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpace.screen),
 
             // Yorum
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               child: TextField(
                 controller: _commentCtrl,
                 maxLines: 3,
                 maxLength: 500,
                 style: AppTextStyles.bodyMedium,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Yorumunu güncelle...',
                   alignLabelWithHint: true,
-                  counterStyle: TextStyle(color: AppColors.textDisabled),
+                  counterStyle: AppTextStyles.caption
+                      .copyWith(color: context.textTertiaryColor),
                 ),
               ),
             ),
 
             // ── Fotoğraf ──────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               child: Row(
                 children: [
                   if (_hasPhoto)
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: _newPhotoBytes != null
                           ? Image.memory(_newPhotoBytes!,
                               width: 56, height: 56, fit: BoxFit.cover)
                           : DishPhoto(
                               url: _currentPhoto, width: 56, height: 56),
                     ),
-                  if (_hasPhoto) const SizedBox(width: 12),
+                  if (_hasPhoto) const SizedBox(width: AppSpace.md),
                   TextButton.icon(
                     onPressed: _pickPhoto,
-                    icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                    icon: const Icon(TablerIcons.camera, size: 18),
                     label: Text(_hasPhoto ? 'Değiştir' : 'Fotoğraf ekle'),
                   ),
                   if (_hasPhoto)
@@ -1369,17 +1407,19 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
 
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.screen, AppSpace.xs, AppSpace.screen, 0),
                 child: Text(_error!,
                     style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.error)),
+                        .copyWith(color: context.errorTextColor)),
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpace.lg),
 
             // Kaydet butonu
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              padding: EdgeInsets.fromLTRB(AppSpace.screen, 0, AppSpace.screen,
+                  AppSpace.xl + MediaQuery.paddingOf(context).bottom),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

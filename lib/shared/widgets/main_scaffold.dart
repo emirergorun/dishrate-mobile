@@ -10,6 +10,7 @@ import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/rating/providers/rating_flow_provider.dart';
 import '../providers/data_refresh.dart';
+import 'home_filled_icon.dart';
 import 'pressable.dart';
 import 'rating_sheet.dart';
 
@@ -118,18 +119,15 @@ class _DishRateBottomNav extends StatelessWidget {
             children: [
               _NavItem(
                 icon: TablerIcons.home,
-                // Dolu ev simgesi (home_filled) bu font sürümünde bozuk:
-                // kendi kutusunun 7 pt soluna, 10 pt genişlikte çiziliyor ve
-                // seçilince simge sola kayıyordu. Seçim rengi zaten belli
-                // ediyor; Ara ve Günlük de aynı simgeyi kullanıyor.
-                activeIcon: TablerIcons.home,
+                // Fonttaki dolu ev karakteri kayık çiziliyor; çizimden gelir.
+                activeBuilder: (color) =>
+                    HomeFilledIcon(color: color, size: 24),
                 label: 'Keşfet',
                 isSelected: _activeNavIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
                 icon: TablerIcons.search,
-                activeIcon: TablerIcons.search,
                 label: 'Ara',
                 isSelected: _activeNavIndex == 1,
                 onTap: () => onTap(1),
@@ -138,7 +136,6 @@ class _DishRateBottomNav extends StatelessWidget {
               _AddButton(onTap: () => onTap(2)),
               _NavItem(
                 icon: TablerIcons.notebook,
-                activeIcon: TablerIcons.notebook,
                 label: 'Günlük',
                 isSelected: _activeNavIndex == 3,
                 onTap: () => onTap(3),
@@ -161,24 +158,30 @@ class _DishRateBottomNav extends StatelessWidget {
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
-    required this.activeIcon,
+    this.activeIcon,
+    this.activeBuilder,
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
 
+  /// Seçilince Keşfet ve Profil dolu ikona geçer (karar 21 Eylül); Ara ve
+  /// Günlük ikonlarının dolu karşılığı yok, renkle belli olur.
   final IconData icon;
+  final IconData? activeIcon;
 
-  /// Seçili sekmede dolu ikon: yalnızca renk farkı küçük ikonda zor seçiliyor.
-  final IconData activeIcon;
+  /// Dolu hâli font karakteri olarak çizilemeyen ikon için (Keşfet).
+  final Widget Function(Color color)? activeBuilder;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        isSelected ? context.accentTextColor : context.navUnselectedColor;
+    // Koyu temada + butonuyla aynı turuncu; açık temada ondan bir ton koyu.
+    final selectedColor =
+        context.isDark ? AppColors.primary : AppColors.lightNavSelected;
+    final color = isSelected ? selectedColor : context.navUnselectedColor;
 
     return Expanded(
       child: Semantics(
@@ -192,7 +195,10 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(isSelected ? activeIcon : icon, color: color, size: 24),
+              isSelected && activeBuilder != null
+                  ? activeBuilder!(color)
+                  : Icon(isSelected ? (activeIcon ?? icon) : icon,
+                      color: color, size: 24),
               const SizedBox(height: 3),
               Text(
                 label,
@@ -228,9 +234,12 @@ class _AddButton extends StatelessWidget {
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
+            // Beyaz + (karar 21 Eylül): turuncu üstünde 2.8:1 ama 22 pt kalın
+            // işaret rahat seçiliyor; koyu işaret ağır duruyordu. Turuncu
+            // butonların YAZILARI koyu kalır (AppColors.onPrimary).
             child: const Icon(
               TablerIcons.plus,
-              color: AppColors.onPrimary,
+              color: Colors.white,
               size: 22,
             ),
           ),

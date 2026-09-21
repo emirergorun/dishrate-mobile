@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/auth/token_storage.dart';
@@ -11,6 +11,7 @@ import '../../../core/network/rating_repository.dart';
 import '../../../core/network/user_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/rating_model.dart';
@@ -20,6 +21,9 @@ import '../../../shared/models/wishlist_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/info_banner.dart';
+import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/skeleton.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../../../shared/widgets/swipe_to_delete.dart';
 import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
@@ -130,7 +134,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => _WishlistSheet(
         wishlist: _wishlist,
         onRemove: (wishId) async {
@@ -178,7 +183,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => _FavoritesSheet(favorites: _topFavorites),
     );
   }
@@ -190,18 +196,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => _EditProfileSheet(
         user: _user!,
         onSave: (updated) {
           setState(() => _user = updated);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('Profil güncellendi.'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profil güncellendi.')),
+          );
         },
       ),
     );
@@ -213,7 +216,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => const _PrivacySheet(),
     );
   }
@@ -224,7 +228,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => const _NotificationsSheet(),
     );
   }
@@ -235,7 +240,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => const _ContactSheet(),
     );
   }
@@ -246,7 +252,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => const _TermsSheet(),
     );
   }
@@ -272,32 +279,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Oturumu kapat → _AuthGate otomatik giriş ekranına yönlendirir
               ref.read(authProvider.notifier).logout();
             },
-            child: const Text('Çıkış Yap',
-                style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDelete(String title, String subtitle, VoidCallback onConfirm) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.surfaceColor,
-        title: Text(title, style: AppTextStyles.titleSmall),
-        content: Text(subtitle, style: AppTextStyles.bodySmall),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onConfirm();
-            },
-            child: Text(title, style: const TextStyle(color: AppColors.error)),
+            style:
+                TextButton.styleFrom(foregroundColor: context.errorTextColor),
+            child: const Text('Çıkış Yap'),
           ),
         ],
       ),
@@ -310,7 +294,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.surfaceColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => _DeleteAccountSheet(
         onDeleted: () => ref.read(authProvider.notifier).clearDeletedAccount(),
       ),
@@ -341,8 +326,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
+          ? const SafeArea(child: _ProfileSkeleton())
           : CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -354,12 +338,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const Text('Profil', style: AppTextStyles.headlineMedium),
                   actions: [
                     IconButton(
-                      icon: Icon(Icons.settings_outlined,
+                      icon: Icon(TablerIcons.settings,
                           color: context.textSecondaryColor),
                       onPressed: () => _openSettings(context),
                       tooltip: 'Ayarlar',
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpace.xs),
                   ],
                   bottom: PreferredSize(
                     preferredSize: const Size.fromHeight(0.5),
@@ -387,13 +371,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         photoBusy: _photoBusy,
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpace.sm),
 
                       // ── KEŞFEDİN ───────────────────────────────────
                       const _SectionLabel('KEŞFEDİN'),
                       _ProfileItem(
-                        icon: Icons.favorite_rounded,
-                        iconColor: const Color(0xFFE57373),
+                        icon: TablerIcons.heart,
                         label: 'Favori Yemekler',
                         subtitle: _topFavorites.isEmpty
                             ? 'Henüz puan verilmedi'
@@ -401,8 +384,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         onTap: _showFavorites,
                       ),
                       _ProfileItem(
-                        icon: Icons.bookmark_rounded,
-                        iconColor: const Color(0xFF81C784),
+                        icon: TablerIcons.bookmark,
                         label: 'İstek Listesi',
                         subtitle: _wishlist.isEmpty
                             ? 'Boş'
@@ -410,94 +392,109 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         onTap: _showWishlist,
                       ),
 
-                      const SizedBox(height: 8),
-
                       // ── HESAP ───────────────────────────────────────
                       const _SectionLabel('HESAP'),
                       _ProfileItem(
-                        icon: Icons.edit_rounded,
+                        icon: TablerIcons.pencil,
                         label: 'Profili Düzenle',
                         subtitle: 'Kullanıcı adı ve biyografi',
                         onTap: _showEditProfile,
                       ),
                       _ProfileItem(
-                        icon: Icons.lock_rounded,
+                        icon: TablerIcons.lock,
                         label: 'Gizlilik ve Güvenlik',
                         subtitle: 'Şifre, hesap gizliliği',
                         onTap: _showPrivacy,
                       ),
                       _ProfileItem(
-                        icon: Icons.notifications_rounded,
+                        icon: TablerIcons.bell,
                         label: 'Bildirimler',
                         subtitle: 'Bildirim tercihlerini yönet',
                         onTap: _showNotifications,
                       ),
 
-                      const SizedBox(height: 8),
-
                       // ── DESTEK ──────────────────────────────────────
                       const _SectionLabel('DESTEK'),
                       _ProfileItem(
-                        icon: Icons.chat_bubble_rounded,
+                        icon: TablerIcons.message_circle,
                         label: 'Bize Ulaş',
                         subtitle: 'Öneri ve şikayetlerin için',
                         onTap: _showContactUs,
                       ),
                       _ProfileItem(
-                        icon: Icons.description_rounded,
+                        icon: TablerIcons.file_text,
                         label: 'Kullanım Şartları',
                         onTap: _showTerms,
                       ),
-                      _ProfileItem(
-                        icon: Icons.info_rounded,
-                        label: 'Uygulama Hakkında',
-                        subtitle: 'v1.0.0',
-                        onTap: () {},
-                        showChevron: false,
-                      ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpace.xl),
 
-                      // ── Oturumu kapat ───────────────────────────────
+                      // ── Oturum ve hesap ─────────────────────────────
+                      // "Tehlikeli bölge" başlığı yerine boşlukla ayrılıyor;
+                      // kırmızı yazı zaten uyarıyor.
                       _ProfileItem(
-                        icon: Icons.logout_rounded,
-                        iconColor: context.textSecondaryColor,
+                        icon: TablerIcons.logout,
                         label: 'Oturumu Kapat',
-                        labelColor: context.textSecondaryColor,
                         onTap: _confirmSignOut,
                         showChevron: false,
                       ),
-
-                      const SizedBox(height: 8),
-
-                      // ── TEHLİKELİ BÖLGE ─────────────────────────────
-                      const _SectionLabel('TEHLİKELİ BÖLGE',
-                          color: AppColors.error),
                       _ProfileItem(
-                        icon: Icons.ac_unit_rounded,
-                        iconColor: AppColors.error,
-                        label: 'Hesabı Dondur',
-                        labelColor: AppColors.error,
-                        onTap: () => _confirmDelete(
-                          'Hesabı Dondur',
-                          'Hesabın dondurulacak ve giriş yapılamayacak. Devam etmek istiyor musun?',
-                          () {},
-                        ),
-                      ),
-                      _ProfileItem(
-                        icon: Icons.delete_forever_rounded,
-                        iconColor: AppColors.error,
+                        icon: TablerIcons.trash,
                         label: 'Hesabı Sil',
-                        labelColor: AppColors.error,
+                        destructive: true,
                         onTap: _openDeleteAccount,
+                        showChevron: false,
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: AppSpace.section),
                     ],
                   ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+// ── Yükleniyor ────────────────────────────────────────────────────────────────
+
+/// Profil başlığının iskeleti: avatar, ad satırları ve sayaç kutusu.
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonPulse(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpace.screen, AppSpace.xxl + AppSpace.xl, AppSpace.screen, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                SkeletonBox(width: 72, height: 72, radius: 36),
+                SizedBox(width: AppSpace.lg),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(width: 140, height: 16),
+                    SizedBox(height: AppSpace.sm),
+                    SkeletonBox(width: 90, height: 12),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.lg),
+            const SkeletonBox(height: 72, radius: AppRadius.md),
+            const SizedBox(height: AppSpace.xl),
+            for (var i = 0; i < 4; i++) ...[
+              const SkeletonBox(width: 200, height: 14),
+              const SizedBox(height: AppSpace.xl),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -528,7 +525,8 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.screen, AppSpace.screen, AppSpace.lg),
       child: Column(
         children: [
           // Avatar + bilgi
@@ -555,8 +553,8 @@ class _ProfileHeader extends StatelessWidget {
                               child: Image.network(user!.profilePhotoUrl!,
                                   fit: BoxFit.cover),
                             )
-                          : const Icon(Icons.person_rounded,
-                              color: AppColors.textDisabled, size: 36),
+                          : Icon(TablerIcons.user,
+                              color: context.textTertiaryColor, size: 34),
                     ),
                     // Dokunulabilir olduğunu belli eden küçük rozet
                     if (user != null)
@@ -578,14 +576,14 @@ class _ProfileHeader extends StatelessWidget {
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2, color: Colors.white),
                                 )
-                              : const Icon(Icons.camera_alt_rounded,
+                              : const Icon(TablerIcons.camera,
                                   size: 12, color: Colors.white),
                         ),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpace.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,16 +591,17 @@ class _ProfileHeader extends StatelessWidget {
                     Text(user?.fullName ?? '—',
                         style: AppTextStyles.titleMedium),
                     if (user != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpace.xxs),
                       Text('@${user!.username}',
                           style: AppTextStyles.bodySmall.copyWith(
                             color: context.textSecondaryColor,
                           )),
                     ],
                     if (user?.bio != null && user!.bio!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpace.xs),
                       Text(user!.bio!,
-                          style: AppTextStyles.bodySmall,
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: context.textSecondaryColor),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
                     ],
@@ -611,13 +610,13 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpace.lg),
           // İstatistikler
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
             decoration: BoxDecoration(
               color: context.surfaceColor,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: context.dividerColor),
             ),
             child: Row(
@@ -657,16 +656,18 @@ class _StatItem extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
           child: Column(
             children: [
               Text(value,
                   style: AppTextStyles.ratingLarge
                       .copyWith(fontSize: 22, color: context.textPrimaryColor)),
-              const SizedBox(height: 2),
-              Text(label, style: AppTextStyles.bodySmall),
+              const SizedBox(height: AppSpace.xxs),
+              Text(label,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: context.textSecondaryColor)),
             ],
           ),
         ),
@@ -678,18 +679,18 @@ class _StatItem extends StatelessWidget {
 // ── Section label ─────────────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label, {this.color});
+  const _SectionLabel(this.label);
   final String label;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.xl, AppSpace.screen, AppSpace.xs),
       child: Text(
         label,
-        style: AppTextStyles.bodySmall.copyWith(
-          color: color ?? AppColors.textDisabled,
+        style: AppTextStyles.caption.copyWith(
+          color: context.textTertiaryColor,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
         ),
@@ -700,72 +701,63 @@ class _SectionLabel extends StatelessWidget {
 
 // ── Profil liste öğesi ────────────────────────────────────────────────────────
 
+/// Profil menüsü satırı. Renkli ikon kutuları kalktı: her satır başka renkte
+/// olunca ekranda vurgu kalmıyordu. İkon tek renk, yalnızca yıkıcı eylem
+/// (Hesabı Sil) kırmızı.
 class _ProfileItem extends StatelessWidget {
   const _ProfileItem({
     required this.icon,
     required this.label,
-    this.iconColor,
-    this.labelColor,
     this.subtitle,
     this.onTap,
     this.showChevron = true,
+    this.destructive = false,
   });
 
   final IconData icon;
   final String label;
-  final Color? iconColor;
-  final Color? labelColor;
   final String? subtitle;
   final VoidCallback? onTap;
   final bool showChevron;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color:
-                      (iconColor ?? AppColors.primary).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child:
-                    Icon(icon, color: iconColor ?? AppColors.primary, size: 18),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: labelColor ?? context.textPrimaryColor,
-                      ),
-                    ),
-                    if (subtitle != null)
-                      Text(subtitle!,
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textDisabled)),
+    final iconColor =
+        destructive ? context.errorTextColor : context.textSecondaryColor;
+    final labelColor =
+        destructive ? context.errorTextColor : context.textPrimaryColor;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: AppSize.minTap + 8),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.screen, vertical: AppSpace.sm),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(width: AppSpace.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label,
+                      style:
+                          AppTextStyles.bodyMedium.copyWith(color: labelColor)),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: AppSpace.xxs),
+                    Text(subtitle!,
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: context.textTertiaryColor)),
                   ],
-                ),
+                ],
               ),
-              if (showChevron)
-                Icon(Icons.chevron_right_rounded,
-                    color: onTap != null
-                        ? AppColors.textDisabled
-                        : AppColors.textDisabled.withValues(alpha: 0.4),
-                    size: 20),
-            ],
-          ),
+            ),
+            if (showChevron)
+              Icon(TablerIcons.chevron_right,
+                  color: context.textTertiaryColor, size: 18),
+          ],
         ),
       ),
     );
@@ -870,19 +862,19 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       fillColor:
           _canChangeName ? context.surfaceElevatedColor : context.surfaceColor,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: context.dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: context.dividerColor),
       ),
       disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: context.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
@@ -964,18 +956,20 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           _SheetHandle(),
           // Avatar
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.screen),
             child: Column(
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.edit_rounded,
-                        color: AppColors.primary, size: 20),
-                    SizedBox(width: 8),
-                    Text('Profili Düzenle', style: AppTextStyles.titleSmall),
+                    Icon(TablerIcons.pencil,
+                        color: context.textSecondaryColor, size: 20),
+                    const SizedBox(width: AppSpace.sm),
+                    const Text('Profili Düzenle',
+                        style: AppTextStyles.titleSmall),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpace.screen),
                 // Profil fotoğrafı — tıkla → galeriden seç → yükle
                 GestureDetector(
                   onTap: _pickPhoto,
@@ -1005,8 +999,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                                         width: 80,
                                         height: 80,
                                         fit: BoxFit.cover))
-                                : const Icon(Icons.person_rounded,
-                                    color: AppColors.textDisabled, size: 38),
+                                : Icon(TablerIcons.user,
+                                    color: context.textTertiaryColor, size: 38),
                       ),
                       Positioned(
                         right: 0,
@@ -1018,14 +1012,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                             color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.camera_alt_rounded,
+                          child: const Icon(TablerIcons.camera,
                               color: Colors.white, size: 14),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpace.screen),
                 // İsim + Soyisim (15 günde bir değiştirilebilir)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1036,28 +1030,28 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         enabled: _canChangeName,
                         style: AppTextStyles.bodyMedium,
                         textCapitalization: TextCapitalization.words,
-                        decoration: _nameDecoration(
-                            context, 'İsim', Icons.badge_outlined),
+                        decoration:
+                            _nameDecoration(context, 'İsim', TablerIcons.id),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpace.md),
                     Expanded(
                       child: TextField(
                         controller: _lastNameCtrl,
                         enabled: _canChangeName,
                         style: AppTextStyles.bodyMedium,
                         textCapitalization: TextCapitalization.words,
-                        decoration: _nameDecoration(
-                            context, 'Soyisim', Icons.badge_outlined),
+                        decoration:
+                            _nameDecoration(context, 'Soyisim', TablerIcons.id),
                       ),
                     ),
                   ],
                 ),
                 if (!_canChangeName) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpace.sm),
                   Row(
                     children: [
-                      Icon(Icons.lock_clock_rounded,
+                      Icon(TablerIcons.clock,
                           size: 14, color: context.textSecondaryColor),
                       const SizedBox(width: 6),
                       Expanded(
@@ -1070,7 +1064,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 // Kullanıcı adı
                 TextField(
                   controller: _usernameCtrl,
@@ -1078,26 +1072,26 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   decoration: InputDecoration(
                     labelText: 'Kullanıcı adı',
                     labelStyle: AppTextStyles.bodySmall,
-                    prefixIcon: Icon(Icons.alternate_email_rounded,
+                    prefixIcon: Icon(TablerIcons.at,
                         size: 18, color: context.textSecondaryColor),
                     filled: true,
                     fillColor: context.surfaceElevatedColor,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: const BorderSide(
                           color: AppColors.primary, width: 1.5),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 // Biyografi
                 TextField(
                   controller: _bioCtrl,
@@ -1109,10 +1103,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     labelStyle: AppTextStyles.bodySmall,
                     hintText: 'Kendinizi tanıtın...',
                     hintStyle: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.textDisabled),
+                        .copyWith(color: context.textTertiaryColor),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(bottom: 44),
-                      child: Icon(Icons.short_text_rounded,
+                      child: Icon(TablerIcons.align_left,
                           size: 18, color: context.textSecondaryColor),
                     ),
                     filled: true,
@@ -1120,21 +1114,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     counterStyle:
                         AppTextStyles.bodySmall.copyWith(fontSize: 10),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: const BorderSide(
                           color: AppColors.primary, width: 1.5),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpace.lg),
                 // Kaydet butonu
                 SizedBox(
                   width: double.infinity,
@@ -1144,7 +1138,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
                     ),
                     child: _saving
                         ? const SizedBox(
@@ -1188,20 +1182,23 @@ class _PrivacySheetState extends State<_PrivacySheet> {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
             child: Row(
               children: [
-                Icon(Icons.lock_rounded, color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Text('Gizlilik ve Güvenlik', style: AppTextStyles.titleSmall),
+                Icon(TablerIcons.lock,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Gizlilik ve Güvenlik',
+                    style: AppTextStyles.titleSmall),
               ],
             ),
           ),
           Container(height: 0.5, color: context.dividerColor),
           // Şifre değiştir
           _SheetItem(
-            icon: Icons.key_rounded,
+            icon: TablerIcons.key,
             label: 'Şifre Değiştir',
             subtitle: 'Hesap güvenliğini artır',
             onTap: () {
@@ -1211,19 +1208,20 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                 backgroundColor: context.surfaceColor,
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20))),
+                    borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppRadius.lg))),
                 builder: (_) => const _ChangePasswordSheet(),
               );
             },
           ),
           Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               height: 0.5,
               color: context.dividerColor),
           // Profil gizliliği toggle
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.screen, vertical: 14),
             child: Row(
               children: [
                 Container(
@@ -1231,9 +1229,9 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                   height: 36,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: const Icon(Icons.visibility_off_rounded,
+                  child: const Icon(TablerIcons.eye_off,
                       color: AppColors.primary, size: 18),
                 ),
                 const SizedBox(width: 14),
@@ -1246,7 +1244,7 @@ class _PrivacySheetState extends State<_PrivacySheet> {
                               .copyWith(color: context.textPrimaryColor)),
                       Text('Değerlendirmelerin sadece sana görünür',
                           style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textDisabled)),
+                              .copyWith(color: context.textTertiaryColor)),
                     ],
                   ),
                 ),
@@ -1289,42 +1287,43 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
             child: Row(
               children: [
-                Icon(Icons.notifications_rounded,
-                    color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Text('Bildirimler', style: AppTextStyles.titleSmall),
+                Icon(TablerIcons.bell,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Bildirimler', style: AppTextStyles.titleSmall),
               ],
             ),
           ),
           Container(height: 0.5, color: context.dividerColor),
           _NotifToggle(
-            icon: Icons.new_releases_rounded,
+            icon: TablerIcons.sparkles,
             label: 'Yeni Özellikler',
             subtitle: 'Güncellemeler ve yenilikler hakkında bilgi al',
             value: _newFeatures,
             onChanged: (v) => setState(() => _newFeatures = v),
           ),
           Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               height: 0.5,
               color: context.dividerColor),
           _NotifToggle(
-            icon: Icons.restaurant_menu_rounded,
+            icon: TablerIcons.tools_kitchen_2,
             label: 'Dishrate Önerileri',
             subtitle: 'Konumuna yakın lezzetleri keşfet',
             value: _recommendations,
             onChanged: (v) => setState(() => _recommendations = v),
           ),
           Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               height: 0.5,
               color: context.dividerColor),
           _NotifToggle(
-            icon: Icons.comment_rounded,
+            icon: TablerIcons.message,
             label: 'Yorum Bildirimleri',
             subtitle: 'Yakında geliyor',
             value: _comments,
@@ -1359,7 +1358,8 @@ class _NotifToggle extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1.0 : 0.45,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.screen, vertical: 14),
         child: Row(
           children: [
             Container(
@@ -1367,7 +1367,7 @@ class _NotifToggle extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Icon(icon, color: AppColors.primary, size: 18),
             ),
@@ -1381,7 +1381,7 @@ class _NotifToggle extends StatelessWidget {
                           .copyWith(color: context.textPrimaryColor)),
                   Text(subtitle,
                       style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.textDisabled)),
+                          .copyWith(color: context.textTertiaryColor)),
                 ],
               ),
             ),
@@ -1413,21 +1413,22 @@ class _ContactSheet extends StatelessWidget {
       builder: (_, __) => Column(
         children: [
           _SheetHandle(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
             child: Row(
               children: [
-                Icon(Icons.chat_bubble_rounded,
-                    color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Text('Bize Ulaş', style: AppTextStyles.titleSmall),
+                Icon(TablerIcons.message_circle,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Bize Ulaş', style: AppTextStyles.titleSmall),
               ],
             ),
           ),
           Container(height: 0.5, color: context.dividerColor),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpace.sm),
           _SheetItem(
-            icon: Icons.email_rounded,
+            icon: TablerIcons.mail,
             label: 'E-posta',
             subtitle: 'destek@dishrate.app',
             onTap: () {
@@ -1438,11 +1439,11 @@ class _ContactSheet extends StatelessWidget {
             },
           ),
           Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               height: 0.5,
               color: context.dividerColor),
           _SheetItem(
-            icon: Icons.camera_alt_rounded,
+            icon: TablerIcons.camera,
             label: 'Instagram',
             subtitle: '@dishrate_app',
             onTap: () {
@@ -1453,11 +1454,11 @@ class _ContactSheet extends StatelessWidget {
             },
           ),
           Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               height: 0.5,
               color: context.dividerColor),
           _SheetItem(
-            icon: Icons.forum_rounded,
+            icon: TablerIcons.messages,
             label: 'Geri Bildirim Gönder',
             subtitle: 'Öneri ve şikayetlerin için',
             onTap: () {
@@ -1489,14 +1490,16 @@ class _TermsSheet extends StatelessWidget {
       builder: (_, controller) => Column(
         children: [
           _SheetHandle(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.md),
             child: Row(
               children: [
-                Icon(Icons.description_rounded,
-                    color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Text('Kullanım Şartları', style: AppTextStyles.titleSmall),
+                Icon(TablerIcons.file_text,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Kullanım Şartları',
+                    style: AppTextStyles.titleSmall),
               ],
             ),
           ),
@@ -1504,7 +1507,8 @@ class _TermsSheet extends StatelessWidget {
           Expanded(
             child: ListView(
               controller: controller,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.lg, AppSpace.screen, 40),
               children: [
                 const _TermsSection(
                   title: '1. Kabul',
@@ -1536,11 +1540,11 @@ class _TermsSheet extends StatelessWidget {
                   body:
                       'Sorularınız için destek@dishrate.app adresine e-posta gönderebilirsiniz.',
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpace.sm),
                 Text(
                   'Son güncelleme: Mayıs 2026',
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textDisabled,
+                    color: context.textTertiaryColor,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -1561,7 +1565,7 @@ class _TermsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: AppSpace.screen),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1637,8 +1641,8 @@ class _WishlistSheetState extends State<_WishlistSheet> {
   void _remove(WishlistModel item) {
     if (_pendingRemovals.any((p) => p.item.wishId == item.wishId)) return;
     late final _PendingRemoval pending;
-    pending = _PendingRemoval(
-        item, Timer(_undoWindow, () => _commitRemove(pending)));
+    pending =
+        _PendingRemoval(item, Timer(_undoWindow, () => _commitRemove(pending)));
     setState(() => _pendingRemovals.add(pending));
   }
 
@@ -1690,7 +1694,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
         for (final pending in _pendingRemovals)
           InfoBanner(
             key: ValueKey('removed_${pending.item.wishId}'),
-            icon: Icons.bookmark_remove_outlined,
+            icon: TablerIcons.bookmark_off,
             message:
                 '${pending.item.restaurantName} - ${pending.item.menuItemName} listeden çıkarıldı.',
             actionLabel: 'Geri al',
@@ -1699,7 +1703,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
         for (final notice in _notices)
           InfoBanner(
             key: ValueKey('notice_${notice.id}'),
-            icon: Icons.error_outline_rounded,
+            icon: TablerIcons.alert_circle,
             message: notice.message,
           ),
       ];
@@ -1717,12 +1721,13 @@ class _WishlistSheetState extends State<_WishlistSheet> {
         children: [
           _SheetHandle(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.md),
             child: Row(
               children: [
-                const Icon(Icons.bookmark_rounded,
-                    color: Color(0xFF81C784), size: 20),
-                const SizedBox(width: 8),
+                Icon(TablerIcons.bookmark,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
                 const Text('İstek Listesi', style: AppTextStyles.titleSmall),
                 const Spacer(),
                 Text('${items.length} ürün', style: AppTextStyles.bodySmall),
@@ -1732,14 +1737,22 @@ class _WishlistSheetState extends State<_WishlistSheet> {
           Container(height: 0.5, color: context.dividerColor),
           Expanded(
             child: items.isEmpty
-                ? Center(
-                    child: Text('İstek listesi boş',
-                        style: AppTextStyles.bodyMedium
-                            .copyWith(color: context.textSecondaryColor)),
+                ? const Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        AppSpace.screen, AppSpace.xl, AppSpace.screen, 0),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: StateMessage(
+                        title: 'İstek listesi boş',
+                        message:
+                            'Denemek istediğin yemekleri yemek panelindeki yer imiyle buraya ekleyebilirsin.',
+                      ),
+                    ),
                   )
                 : ListView.builder(
                     controller: controller,
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xl),
                     itemCount: items.length,
                     itemBuilder: (_, i) {
                       final item = items[i];
@@ -1766,7 +1779,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
           ),
           // Çıkarma şeritleri — panelin altında, en yenisi en altta.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
             child: InfoBannerStack(
               banners: banners,
               trailingGap: 12 + MediaQuery.paddingOf(context).bottom,
@@ -1809,12 +1822,12 @@ class _WishlistItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      margin: const EdgeInsets.only(bottom: AppSpace.sm),
+      padding: const EdgeInsets.fromLTRB(14, AppSpace.md, 14, 10),
       // Günlük kartıyla aynı: zemin yüzey rengi, ayrım kenarlıkla.
       decoration: BoxDecoration(
         color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: context.dividerColor),
       ),
       child: Column(
@@ -1830,13 +1843,13 @@ class _WishlistItemRow extends StatelessWidget {
                 radius: 10,
                 iconSize: 18,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item.menuItemName, style: AppTextStyles.bodyMedium),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpace.xxs),
                     Text(item.restaurantName, style: AppTextStyles.bodySmall),
                   ],
                 ),
@@ -1846,7 +1859,7 @@ class _WishlistItemRow extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: context.textSecondaryColor,
                   textStyle: AppTextStyles.label,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
                   minimumSize: const Size(44, 36),
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
@@ -1864,14 +1877,14 @@ class _WishlistItemRow extends StatelessWidget {
                 foregroundColor: AppColors.primary,
                 side:
                     BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(AppRadius.md)),
                 // Düğme stili temadan birleşmiyor, yerine geçiyor: font ailesi
                 // verilmezse yazı sistem fontuna düşüyordu.
                 textStyle: AppTextStyles.label,
               ),
-              icon: const Icon(Icons.star_rounded, size: 16),
+              icon: const Icon(TablerIcons.star, size: 16),
               label: const Text('Sonunda denedim!'),
             ),
           ),
@@ -1897,14 +1910,15 @@ class _FavoritesSheet extends StatelessWidget {
       builder: (_, controller) => Column(
         children: [
           _SheetHandle(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.md),
             child: Row(
               children: [
-                Icon(Icons.favorite_rounded,
-                    color: Color(0xFFE57373), size: 20),
-                SizedBox(width: 8),
-                Text('Favori Yemekler', style: AppTextStyles.titleSmall),
+                Icon(TablerIcons.heart,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Favori Yemekler', style: AppTextStyles.titleSmall),
               ],
             ),
           ),
@@ -1912,7 +1926,8 @@ class _FavoritesSheet extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               controller: controller,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xl),
               itemCount: favorites.length,
               itemBuilder: (_, i) =>
                   _FavoriteItemRow(rank: i + 1, rating: favorites[i]),
@@ -1941,12 +1956,13 @@ class _FavoriteItemRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final podium = rank <= _podiumColors.length;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.only(bottom: AppSpace.sm),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpace.md),
       // İstek listesi ve günlük kartlarıyla aynı yüzey.
       decoration: BoxDecoration(
         color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: context.dividerColor),
       ),
       child: Row(
@@ -1968,15 +1984,15 @@ class _FavoriteItemRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpace.md),
           _RatingThumb(photoUrl: rating.photoUrl, size: 44),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpace.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(rating.menuItemName, style: AppTextStyles.bodyMedium),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpace.xxs),
                 Text(rating.restaurantName, style: AppTextStyles.bodySmall),
               ],
             ),
@@ -1984,17 +2000,12 @@ class _FavoriteItemRow extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RatingBarIndicator(
-                rating: rating.score,
-                itemSize: 13,
-                itemBuilder: (_, __) =>
-                    const Icon(Icons.star_rounded, color: AppColors.star),
-              ),
-              const SizedBox(width: 4),
+              StarRow(rating: rating.score, size: 13),
+              const SizedBox(width: AppSpace.xs),
               Text(
                 rating.score.toStringAsFixed(1),
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.star,
+                  color: context.textPrimaryColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2024,11 +2035,11 @@ class _PasswordRules extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              ok ? Icons.check_circle_rounded : Icons.circle_outlined,
+              ok ? TablerIcons.circle_check : TablerIcons.circle,
               size: 14,
               color: ok ? AppColors.success : context.textSecondaryColor,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpace.xs),
             Text(
               rule.label,
               style: AppTextStyles.bodySmall.copyWith(
@@ -2148,20 +2159,20 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   InputDecoration _dec(String label) => InputDecoration(
         labelText: label,
         labelStyle: AppTextStyles.bodySmall,
-        prefixIcon: Icon(Icons.lock_outline_rounded,
-            size: 18, color: context.textSecondaryColor),
+        prefixIcon:
+            Icon(TablerIcons.lock, size: 18, color: context.textSecondaryColor),
         filled: true,
         fillColor: context.surfaceElevatedColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: context.dividerColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: context.dividerColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       );
@@ -2176,23 +2187,22 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
         children: [
           _SheetHandle(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.screen),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.key_rounded,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
+                    Icon(TablerIcons.key,
+                        color: context.textSecondaryColor, size: 20),
+                    const SizedBox(width: AppSpace.sm),
                     const Text('Şifre Değiştir',
                         style: AppTextStyles.titleSmall),
                     const Spacer(),
                     IconButton(
                       icon: Icon(
-                        _obscure
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
+                        _obscure ? TablerIcons.eye_off : TablerIcons.eye,
                         size: 20,
                         color: context.textSecondaryColor,
                       ),
@@ -2200,14 +2210,14 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 TextField(
                   controller: _currentCtrl,
                   obscureText: _obscure,
                   style: AppTextStyles.bodyMedium,
                   decoration: _dec('Mevcut şifre'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 TextField(
                   controller: _newCtrl,
                   obscureText: _obscure,
@@ -2219,7 +2229,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   const SizedBox(height: 10),
                   _PasswordRules(value: _newCtrl.text),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 TextField(
                   controller: _confirmCtrl,
                   obscureText: _obscure,
@@ -2233,18 +2243,18 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                        horizontal: AppSpace.md, vertical: 10),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                           color: AppColors.error.withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded,
+                        const Icon(TablerIcons.alert_circle,
                             color: AppColors.error, size: 18),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpace.sm),
                         Expanded(
                           child: Text(_error!,
                               style: AppTextStyles.bodySmall
@@ -2255,7 +2265,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   ),
                 ],
 
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpace.screen),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -2264,7 +2274,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
                     ),
                     child: _saving
                         ? const SizedBox(
@@ -2367,19 +2377,19 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
         children: [
           _SheetHandle(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.screen),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.delete_forever_rounded,
-                        color: AppColors.error, size: 20),
-                    SizedBox(width: 8),
+                    Icon(TablerIcons.trash, color: AppColors.error, size: 20),
+                    SizedBox(width: AppSpace.sm),
                     Text('Hesabı Sil', style: AppTextStyles.titleSmall),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 const Text(
                   'Hesabın kalıcı olarak silinecek. Bu işlem geri alınamaz.',
                   style: AppTextStyles.bodyMedium,
@@ -2396,11 +2406,11 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Icon(Icons.remove_circle_outline_rounded,
+                          padding: const EdgeInsets.only(top: AppSpace.xxs),
+                          child: Icon(TablerIcons.circle_minus,
                               size: 16, color: context.textSecondaryColor),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpace.sm),
                         Expanded(
                           child: Text(bullet, style: AppTextStyles.bodySmall),
                         ),
@@ -2418,13 +2428,11 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                   decoration: InputDecoration(
                     labelText: 'Onaylamak için şifren',
                     labelStyle: AppTextStyles.bodySmall,
-                    prefixIcon: Icon(Icons.lock_outline_rounded,
+                    prefixIcon: Icon(TablerIcons.lock,
                         size: 18, color: context.textSecondaryColor),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscure
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
+                        _obscure ? TablerIcons.eye_off : TablerIcons.eye,
                         size: 20,
                         color: context.textSecondaryColor,
                       ),
@@ -2433,15 +2441,15 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                     filled: true,
                     fillColor: context.surfaceElevatedColor,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide: BorderSide(color: context.dividerColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       borderSide:
                           const BorderSide(color: AppColors.error, width: 1.5),
                     ),
@@ -2452,18 +2460,18 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                        horizontal: AppSpace.md, vertical: 10),
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                           color: AppColors.error.withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded,
+                        const Icon(TablerIcons.alert_circle,
                             color: AppColors.error, size: 18),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpace.sm),
                         Expanded(
                           child: Text(_error!,
                               style: AppTextStyles.bodySmall
@@ -2473,7 +2481,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpace.screen),
                 FilledButton(
                   onPressed:
                       _deleting || _passwordCtrl.text.isEmpty ? null : _delete,
@@ -2483,7 +2491,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                         AppColors.error.withValues(alpha: 0.35),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                   ),
                   child: _deleting
                       ? const SizedBox(
@@ -2495,7 +2503,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                           style: AppTextStyles.labelLarge
                               .copyWith(color: Colors.white)),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpace.xs),
                 TextButton(
                   onPressed: _deleting ? null : () => Navigator.pop(context),
                   child: const Text('Vazgeç'),
@@ -2536,14 +2544,14 @@ class _SheetHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      padding: const EdgeInsets.only(top: AppSpace.md, bottom: AppSpace.sm),
       child: Center(
         child: Container(
           width: 36,
           height: 4,
           decoration: BoxDecoration(
             color: context.dividerColor,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
         ),
       ),
@@ -2551,7 +2559,7 @@ class _SheetHandle extends StatelessWidget {
   }
 }
 
-// Sheet içi tek satır öğe
+// Sheet içi tek satır öğe — profil menüsü satırıyla aynı görünüm.
 class _SheetItem extends StatelessWidget {
   const _SheetItem({
     required this.icon,
@@ -2567,44 +2575,11 @@ class _SheetItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 18),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: AppTextStyles.bodyMedium
-                            .copyWith(color: context.textPrimaryColor)),
-                    if (subtitle != null)
-                      Text(subtitle!,
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textDisabled)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textDisabled, size: 20),
-            ],
-          ),
-        ),
-      ),
+    return _ProfileItem(
+      icon: icon,
+      label: label,
+      subtitle: subtitle,
+      onTap: onTap,
     );
   }
 }
@@ -2620,26 +2595,27 @@ class _ProfileRatingSheet extends StatelessWidget {
       height: MediaQuery.of(context).size.height * 0.92,
       decoration: BoxDecoration(
         color: context.surfaceElevatedColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.md),
           SizedBox(
             width: 40,
             height: 4,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: context.dividerColor,
-                borderRadius: const BorderRadius.all(Radius.circular(2)),
+                borderRadius:
+                    const BorderRadius.all(Radius.circular(AppRadius.xs)),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpace.screen),
           const Expanded(child: AddRatingScreen()),
         ],
       ),
     );
   }
 }
-
