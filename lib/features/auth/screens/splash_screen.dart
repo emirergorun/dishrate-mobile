@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
 
 /// Açılış ekranındaki logonun genişliği. Sistem açılış ekranındaki logoyla
@@ -15,7 +17,11 @@ const double splashLogoWidth = 278;
 /// boyutta. Önceden yükleme göstergesiyle birlikte ortalanıyor, bu yüzden
 /// sistem ekranına göre biraz yukarıda ve daha küçük duruyordu.
 class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.onRetry});
+
+  /// Verilirse sunucuya ulaşılamamıştır: gösterge yerine mesaj ve
+  /// "Tekrar dene" çıkar. Logo yerinden oynamaz.
+  final VoidCallback? onRetry;
 
   /// Açılış ekranı bu oturumda gösterildi mi?
   ///
@@ -30,20 +36,47 @@ class SplashScreen extends StatelessWidget {
     wasShown = true;
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: const Stack(
+      body: Stack(
         alignment: Alignment.center,
         children: [
-          DishrateWordmark(width: splashLogoWidth),
+          const DishrateWordmark(width: splashLogoWidth),
           Align(
-            alignment: Alignment(0, 0.35),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 2.5,
-              ),
-            ),
+            alignment: const Alignment(0, 0.35),
+            child: onRetry == null
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpace.xxl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Sunucuya ulaşılamadı',
+                          style: AppTextStyles.titleMedium
+                              .copyWith(color: context.textPrimaryColor),
+                        ),
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          'Bağlantını kontrol edip tekrar dene.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyMedium
+                              .copyWith(color: context.textSecondaryColor),
+                        ),
+                        const SizedBox(height: AppSpace.sm),
+                        TextButton(
+                          onPressed: onRetry,
+                          child: const Text('Tekrar dene'),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),

@@ -26,6 +26,10 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
   bool _isSearching = false;
   String _lastQuery = '';
 
+  /// Son arama bağlantı hatasıyla bitti. Önceden hata "Restoran bulunamadı"
+  /// gibi görünüyor, kullanıcı restoranın uygulamada olmadığını sanıyordu.
+  bool _failed = false;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -36,14 +40,24 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
     if (query.trim().length < 2 || query == _lastQuery) return;
     _lastQuery = query;
 
-    setState(() => _isSearching = true);
+    setState(() {
+      _isSearching = true;
+      _failed = false;
+    });
 
     try {
       final results =
           await RestaurantRepository.instance.searchRestaurants(query.trim());
       if (mounted) setState(() => _results = results);
     } catch (_) {
-      if (mounted) setState(() => _results = []);
+      // Aynı sorgu "Tekrar dene" ile yeniden gönderilebilsin.
+      _lastQuery = '';
+      if (mounted) {
+        setState(() {
+          _results = [];
+          _failed = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -100,7 +114,7 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
                   : null,
             ),
             onChanged: (value) {
-              setState(() {});
+              setState(() => _failed = false);
               _search(value);
             },
           ),
@@ -134,6 +148,21 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
 
     if (_controller.text.isEmpty) {
       return _EmptySearchHint(onHintTap: _selectHint);
+    }
+
+    if (_failed) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpace.screen, AppSpace.lg, AppSpace.screen, 0),
+        children: [
+          StateMessage(
+            title: 'Arama yapılamadı',
+            message: 'Bağlantını kontrol edip tekrar dene.',
+            actionLabel: 'Tekrar dene',
+            onAction: () => _search(_controller.text),
+          ),
+        ],
+      );
     }
 
     if (_results.isEmpty && _controller.text.length >= 2) {

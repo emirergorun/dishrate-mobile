@@ -131,6 +131,10 @@ class _AuthGate extends ConsumerWidget {
       AuthStatus.loading => const SplashScreen(),
       AuthStatus.authenticated => const MainScaffold(),
       AuthStatus.unauthenticated => const LoginScreen(),
+      // Açılışta sunucuya ulaşılamadı: oturum korunur, tekrar denenir.
+      AuthStatus.unreachable => SplashScreen(
+          onRetry: () => ref.read(authProvider.notifier).retry(),
+        ),
     };
   }
 }

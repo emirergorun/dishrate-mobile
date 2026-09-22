@@ -7,10 +7,12 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_categories.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/widgets/map_tiles.dart';
+import '../../../shared/widgets/state_message.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
 import 'map_full_screen.dart';
 
@@ -126,8 +128,12 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  /// Son arama; hata ekranındaki "Tekrar dene" aynısını yeniden gönderir.
+  VoidCallback? _retry;
+
   Future<void> _run(
       String key, Future<List<SearchResult>> Function() loader) async {
+    _retry = () => _run(key, loader);
     final request = ++_request;
     setState(() {
       _searching = true;
@@ -217,7 +223,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (key == null) return const _EmptySearch();
 
     final settled = _resultsFor == key && !_searching;
-    if (settled && _failed) return const _SearchFailed();
+    if (settled && _failed) return _SearchFailed(onRetry: _retry);
     if (settled && _results.isEmpty) return const _NoResults();
     if (_results.isEmpty) {
       // İlk sonuç bekleniyor: boş durum yerine sessiz gösterge.
@@ -647,40 +653,42 @@ class _EmptySearch extends StatelessWidget {
   }
 }
 
+/// Boş ve hata durumları Keşfet'teki gibi sola hizalı `StateMessage`.
 class _NoResults extends StatelessWidget {
   const _NoResults();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.sentiment_dissatisfied_rounded,
-              color: AppColors.textDisabled, size: 44),
-          const SizedBox(height: 12),
-          Text('Sonuç bulunamadı',
-              style: AppTextStyles.titleMedium
-                  .copyWith(color: context.textSecondaryColor)),
-        ],
+    return const Padding(
+      padding:
+          EdgeInsets.fromLTRB(AppSpace.screen, AppSpace.xl, AppSpace.screen, 0),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: StateMessage(
+          title: 'Sonuç bulunamadı',
+          message: 'Farklı bir yemek ya da restoran adı dene.',
+        ),
       ),
     );
   }
 }
 
 class _SearchFailed extends StatelessWidget {
-  const _SearchFailed();
+  const _SearchFailed({this.onRetry});
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Text(
-          'Arama yapılamadı. Bağlantını kontrol edip tekrar dene.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: context.textSecondaryColor),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpace.screen, AppSpace.xl, AppSpace.screen, 0),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: StateMessage(
+          title: 'Arama yapılamadı',
+          message: 'Bağlantını kontrol edip tekrar dene.',
+          actionLabel: onRetry == null ? null : 'Tekrar dene',
+          onAction: onRetry,
         ),
       ),
     );

@@ -120,6 +120,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
       return;
     }
 
+    final previous = _selectedCategory;
     setState(() {
       _selectedCategory = label;
       _isFiltering = true;
@@ -136,7 +137,16 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isFiltering = false);
+      // Önceden çip seçili görünüp harita eski işaretlerle kalıyordu; filtre
+      // uygulanmış sanılıyordu. Seçim geri alınır ve söylenir.
+      if (!mounted) return;
+      setState(() {
+        _selectedCategory = previous;
+        _isFiltering = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filtre uygulanamadı, tekrar dene.')),
+      );
     }
   }
 

@@ -205,21 +205,29 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       setState(() {
         _inWishlist = !_inWishlist;
         _wishlistLoading = false;
-        // Eklenip hemen çıkarılırsa "eklendi" gider, "çıkarıldı" gelir.
-        _banner = _inWishlist
-            ? _InfoBannerKind.addedToWishlist
-            : _InfoBannerKind.removedFromWishlist;
       });
-      _bannerTimer?.cancel();
-      final shown = _banner;
-      _bannerTimer = Timer(_bannerDuration, () {
-        if (mounted && _banner == shown) {
-          setState(() => _banner = _InfoBannerKind.none);
-        }
-      });
+      // Eklenip hemen çıkarılırsa "eklendi" gider, "çıkarıldı" gelir.
+      _showTimedBanner(_inWishlist
+          ? _InfoBannerKind.addedToWishlist
+          : _InfoBannerKind.removedFromWishlist);
     } catch (_) {
-      if (mounted) setState(() => _wishlistLoading = false);
+      // Önceden düğme sessizce eski hâline dönüyordu; işlemin olmadığı
+      // anlaşılmıyordu.
+      if (!mounted) return;
+      setState(() => _wishlistLoading = false);
+      _showTimedBanner(_InfoBannerKind.wishlistFailed);
     }
+  }
+
+  /// Şeridi gösterir, süresi dolunca kapatır.
+  void _showTimedBanner(_InfoBannerKind kind) {
+    setState(() => _banner = kind);
+    _bannerTimer?.cancel();
+    _bannerTimer = Timer(_bannerDuration, () {
+      if (mounted && _banner == kind) {
+        setState(() => _banner = _InfoBannerKind.none);
+      }
+    });
   }
 
   Future<void> _loadReviews() async {
@@ -301,6 +309,11 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
           key: ValueKey(_InfoBannerKind.removedFromWishlist),
           icon: Icons.bookmark_remove_outlined,
           message: "İstek Listesi'nden çıkarıldı.",
+        ),
+      _InfoBannerKind.wishlistFailed => const InfoBanner(
+          key: ValueKey(_InfoBannerKind.wishlistFailed),
+          icon: Icons.error_outline_rounded,
+          message: 'İstek listesi güncellenemedi, tekrar dene.',
         ),
       _InfoBannerKind.alreadyTried => InfoBanner(
           key: const ValueKey(_InfoBannerKind.alreadyTried),
@@ -668,7 +681,8 @@ enum _InfoBannerKind {
   none,
   alreadyTried,
   addedToWishlist,
-  removedFromWishlist
+  removedFromWishlist,
+  wishlistFailed,
 }
 
 // ── İstek listesi butonu ──────────────────────────────────────────────────────

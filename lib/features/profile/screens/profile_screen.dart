@@ -46,6 +46,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   List<WishlistModel> _wishlist = [];
   bool _isLoading = true;
 
+  /// İlk yükleme başarısız oldu; ekranda boş profil yerine hata mesajı çıkar.
+  bool _failed = false;
+
   /// Başlıktaki avatardan başlatılan fotoğraf işlemi sürüyor mu?
   bool _photoBusy = false;
 
@@ -98,7 +101,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
-    if (!silent) setState(() => _isLoading = true);
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _failed = false;
+      });
+    }
     try {
       final results = await Future.wait([
         UserRepository.instance.getUser(userId),
@@ -110,10 +118,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _user = results[0] as UserModel;
           _ratings = results[1] as List<RatingModel>;
           _wishlist = results[2] as List<WishlistModel>;
+          _failed = false;
         });
       }
     } catch (_) {
-      // Sessizce devam et
+      // Eldeki profil varsa (sessiz tazeleme) o kalır. Yoksa önceden ad "—",
+      // sayılar 0 görünüyordu; kullanıcı verisinin silindiğini sanabilirdi.
+      if (mounted && _user == null) setState(() => _failed = true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -326,131 +337,145 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: context.bgColor,
       body: _isLoading
           ? const SafeArea(child: _ProfileSkeleton())
-          : CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // ── App Bar ────────────────────────────────────────────
-                SliverAppBar(
-                  pinned: true,
-                  backgroundColor: context.bgColor,
-                  title:
-                      const Text('Profil', style: AppTextStyles.headlineMedium),
-                  actions: [
-                    IconButton(
-                      icon: Icon(TablerIcons.settings,
-                          color: context.textSecondaryColor),
-                      onPressed: () => _openSettings(context),
-                      tooltip: 'Ayarlar',
+          : _failed
+              ? SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpace.screen, AppSpace.xxl, AppSpace.screen, 0),
+                    child: StateMessage(
+                      title: 'Profil yüklenemedi',
+                      message: 'Bağlantını kontrol edip tekrar dene.',
+                      actionLabel: 'Tekrar dene',
+                      onAction: _load,
                     ),
-                    const SizedBox(width: AppSpace.xs),
+                  ),
+                )
+              : CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    // ── App Bar ────────────────────────────────────────────
+                    SliverAppBar(
+                      pinned: true,
+                      backgroundColor: context.bgColor,
+                      title: const Text('Profil',
+                          style: AppTextStyles.headlineMedium),
+                      actions: [
+                        IconButton(
+                          icon: Icon(TablerIcons.settings,
+                              color: context.textSecondaryColor),
+                          onPressed: () => _openSettings(context),
+                          tooltip: 'Ayarlar',
+                        ),
+                        const SizedBox(width: AppSpace.xs),
+                      ],
+                      bottom: PreferredSize(
+                        preferredSize: const Size.fromHeight(0.5),
+                        child:
+                            Container(height: 0.5, color: context.dividerColor),
+                      ),
+                    ),
+
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Profil başlığı ──────────────────────────────
+                          _ProfileHeader(
+                            user: _user,
+                            ratingCount: _ratings.length,
+                            wishlistCount: _wishlist.length,
+                            // Sayaçlara dokununca ilgili yere git
+                            onRatingsTap: () => ref
+                                .read(selectedTabProvider.notifier)
+                                .state = 2, // Günlük sekmesi
+                            onWishlistTap: _showWishlist,
+                            // Avatara dokununca fotoğrafı doğrudan değiştir
+                            onPhotoTap:
+                                _user == null ? null : () => _editPhoto(_user!),
+                            photoBusy: _photoBusy,
+                          ),
+
+                          const SizedBox(height: AppSpace.sm),
+
+                          // ── KEŞFEDİN ───────────────────────────────────
+                          const _SectionLabel('KEŞFEDİN'),
+                          _ProfileItem(
+                            icon: TablerIcons.heart,
+                            label: 'Favori Yemekler',
+                            subtitle: _topFavorites.isEmpty
+                                ? 'Henüz puan verilmedi'
+                                : 'En yüksek puanlı ${_topFavorites.length} yemeğin',
+                            onTap: _showFavorites,
+                          ),
+                          _ProfileItem(
+                            icon: TablerIcons.bookmark,
+                            label: 'İstek Listesi',
+                            subtitle: _wishlist.isEmpty
+                                ? 'Boş'
+                                : '${_wishlist.length} ürün kaydedildi',
+                            onTap: _showWishlist,
+                          ),
+
+                          // ── HESAP ───────────────────────────────────────
+                          const _SectionLabel('HESAP'),
+                          _ProfileItem(
+                            icon: TablerIcons.pencil,
+                            label: 'Profili Düzenle',
+                            subtitle: 'Kullanıcı adı ve biyografi',
+                            onTap: _showEditProfile,
+                          ),
+                          _ProfileItem(
+                            icon: TablerIcons.lock,
+                            label: 'Gizlilik ve Güvenlik',
+                            subtitle: 'Şifre, hesap gizliliği',
+                            onTap: _showPrivacy,
+                          ),
+                          _ProfileItem(
+                            icon: TablerIcons.bell,
+                            label: 'Bildirimler',
+                            subtitle: 'Bildirim tercihlerini yönet',
+                            onTap: _showNotifications,
+                          ),
+
+                          // ── DESTEK ──────────────────────────────────────
+                          const _SectionLabel('DESTEK'),
+                          _ProfileItem(
+                            icon: TablerIcons.message_circle,
+                            label: 'Bize Ulaş',
+                            subtitle: 'Öneri ve şikayetlerin için',
+                            onTap: _showContactUs,
+                          ),
+                          _ProfileItem(
+                            icon: TablerIcons.file_text,
+                            label: 'Kullanım Şartları',
+                            onTap: _showTerms,
+                          ),
+
+                          const SizedBox(height: AppSpace.xl),
+
+                          // ── Oturum ve hesap ─────────────────────────────
+                          // "Tehlikeli bölge" başlığı yerine boşlukla ayrılıyor;
+                          // kırmızı yazı zaten uyarıyor.
+                          _ProfileItem(
+                            icon: TablerIcons.logout,
+                            label: 'Oturumu Kapat',
+                            onTap: _confirmSignOut,
+                            showChevron: false,
+                          ),
+                          _ProfileItem(
+                            icon: TablerIcons.trash,
+                            label: 'Hesabı Sil',
+                            destructive: true,
+                            onTap: _openDeleteAccount,
+                            showChevron: false,
+                          ),
+
+                          const SizedBox(height: AppSpace.section),
+                        ],
+                      ),
+                    ),
                   ],
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(0.5),
-                    child: Container(height: 0.5, color: context.dividerColor),
-                  ),
                 ),
-
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Profil başlığı ──────────────────────────────
-                      _ProfileHeader(
-                        user: _user,
-                        ratingCount: _ratings.length,
-                        wishlistCount: _wishlist.length,
-                        // Sayaçlara dokununca ilgili yere git
-                        onRatingsTap: () => ref
-                            .read(selectedTabProvider.notifier)
-                            .state = 2, // Günlük sekmesi
-                        onWishlistTap: _showWishlist,
-                        // Avatara dokununca fotoğrafı doğrudan değiştir
-                        onPhotoTap:
-                            _user == null ? null : () => _editPhoto(_user!),
-                        photoBusy: _photoBusy,
-                      ),
-
-                      const SizedBox(height: AppSpace.sm),
-
-                      // ── KEŞFEDİN ───────────────────────────────────
-                      const _SectionLabel('KEŞFEDİN'),
-                      _ProfileItem(
-                        icon: TablerIcons.heart,
-                        label: 'Favori Yemekler',
-                        subtitle: _topFavorites.isEmpty
-                            ? 'Henüz puan verilmedi'
-                            : 'En yüksek puanlı ${_topFavorites.length} yemeğin',
-                        onTap: _showFavorites,
-                      ),
-                      _ProfileItem(
-                        icon: TablerIcons.bookmark,
-                        label: 'İstek Listesi',
-                        subtitle: _wishlist.isEmpty
-                            ? 'Boş'
-                            : '${_wishlist.length} ürün kaydedildi',
-                        onTap: _showWishlist,
-                      ),
-
-                      // ── HESAP ───────────────────────────────────────
-                      const _SectionLabel('HESAP'),
-                      _ProfileItem(
-                        icon: TablerIcons.pencil,
-                        label: 'Profili Düzenle',
-                        subtitle: 'Kullanıcı adı ve biyografi',
-                        onTap: _showEditProfile,
-                      ),
-                      _ProfileItem(
-                        icon: TablerIcons.lock,
-                        label: 'Gizlilik ve Güvenlik',
-                        subtitle: 'Şifre, hesap gizliliği',
-                        onTap: _showPrivacy,
-                      ),
-                      _ProfileItem(
-                        icon: TablerIcons.bell,
-                        label: 'Bildirimler',
-                        subtitle: 'Bildirim tercihlerini yönet',
-                        onTap: _showNotifications,
-                      ),
-
-                      // ── DESTEK ──────────────────────────────────────
-                      const _SectionLabel('DESTEK'),
-                      _ProfileItem(
-                        icon: TablerIcons.message_circle,
-                        label: 'Bize Ulaş',
-                        subtitle: 'Öneri ve şikayetlerin için',
-                        onTap: _showContactUs,
-                      ),
-                      _ProfileItem(
-                        icon: TablerIcons.file_text,
-                        label: 'Kullanım Şartları',
-                        onTap: _showTerms,
-                      ),
-
-                      const SizedBox(height: AppSpace.xl),
-
-                      // ── Oturum ve hesap ─────────────────────────────
-                      // "Tehlikeli bölge" başlığı yerine boşlukla ayrılıyor;
-                      // kırmızı yazı zaten uyarıyor.
-                      _ProfileItem(
-                        icon: TablerIcons.logout,
-                        label: 'Oturumu Kapat',
-                        onTap: _confirmSignOut,
-                        showChevron: false,
-                      ),
-                      _ProfileItem(
-                        icon: TablerIcons.trash,
-                        label: 'Hesabı Sil',
-                        destructive: true,
-                        onTap: _openDeleteAccount,
-                        showChevron: false,
-                      ),
-
-                      const SizedBox(height: AppSpace.section),
-                    ],
-                  ),
-                ),
-              ],
-            ),
     );
   }
 }

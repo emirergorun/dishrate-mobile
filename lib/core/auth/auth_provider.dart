@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/models/user_model.dart';
 import 'auth_repository.dart';
@@ -5,7 +6,9 @@ import 'token_storage.dart';
 
 // ── Auth Durumu ───────────────────────────────────────────────────────────────
 
-enum AuthStatus { loading, authenticated, unauthenticated }
+/// [unreachable]: açılışta sunucuya ulaşılamadı. Kayıtlı oturum silinmez;
+/// açılış ekranı "Tekrar dene" gösterir.
+enum AuthStatus { loading, authenticated, unauthenticated, unreachable }
 
 class AuthState {
   final AuthStatus status;
@@ -25,6 +28,11 @@ class AuthState {
 
   const AuthState.authenticated(UserModel this.user)
       : status = AuthStatus.authenticated,
+        errorMessage = null;
+
+  const AuthState.unreachable()
+      : status = AuthStatus.unreachable,
+        user = null,
         errorMessage = null;
 
   const AuthState.unauthenticated([String? error])
@@ -69,11 +77,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userId: authResponse.user.userId,
       );
       state = AuthState.authenticated(authResponse.user);
+    } on DioException catch (e) {
+      // Oturum yalnızca sunucu token'ı gerçekten reddederse kapanır. Önceden
+      // her hata token'ları siliyordu: bağlantı yokken uygulamayı açan
+      // kullanıcı yeniden giriş yapmak zorunda kalıyordu.
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403 || status == 404) {
+        await _storage.clearAll();
+        state = const AuthState.unauthenticated();
+      } else {
+        state = const AuthState.unreachable();
+      }
     } catch (_) {
-      // Token geçersiz veya süresi dolmuş
       await _storage.clearAll();
       state = const AuthState.unauthenticated();
     }
+  }
+
+  /// Açılış ekranındaki "Tekrar dene".
+  Future<void> retry() async {
+    state = const AuthState.loading();
+    await _initialize();
   }
 
   /// Giriş yap
