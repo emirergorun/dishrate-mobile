@@ -154,7 +154,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final menuItem = MenuItemModel(
       menuItemId: wish.menuItemId,
       name: wish.menuItemName,
-      price: wish.price,
       averageRating: wish.averageRating,
       restaurantId: wish.restaurantId,
       restaurantName: wish.restaurantName,
@@ -1745,7 +1744,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                       child: StateMessage(
                         title: 'İstek listesi boş',
                         message:
-                            'Denemek istediğin yemekleri yemek panelindeki yer imiyle buraya ekleyebilirsin.',
+                            'Denemek istediğin yemekleri unutmamak için istek listene ekleyebilirsin.',
                       ),
                     ),
                   )

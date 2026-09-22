@@ -5,7 +5,6 @@ class WishlistModel {
   final int restaurantId;
   final String restaurantName;
   final double averageRating;
-  final double? price;
 
   /// Yemeğin fotoğrafı. Sunucu hep gönderiyordu ama okunmuyordu; istek
   /// listesindeki yemekler bu yüzden ikonla görünüyordu.
@@ -18,7 +17,6 @@ class WishlistModel {
     required this.restaurantId,
     required this.restaurantName,
     required this.averageRating,
-    this.price,
     this.photoUrl,
   });
 
@@ -31,7 +29,6 @@ class WishlistModel {
       restaurantId: item['restaurantId'] as int,
       restaurantName: item['restaurantName'] as String,
       averageRating: (item['averageRating'] as num?)?.toDouble() ?? 0.0,
-      price: (item['price'] as num?)?.toDouble(),
       photoUrl: item['photoUrl'] as String?,
     );
   }
