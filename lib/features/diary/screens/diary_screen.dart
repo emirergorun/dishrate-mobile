@@ -81,6 +81,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   static const _undoWindow = Duration(seconds: 5);
 
+  /// Sunucudan silme isteğinin beklendiği süre.
+  static const _deleteDeadline = Duration(seconds: 4);
+
   /// Yaklaşık kart yüksekliği — tembel listede ekran dışındaki kartın context'i
   /// olmadığı için önce buna göre yaklaşılır, sonra tam hizalanır.
   static const double _cardHeight = 132;
@@ -285,7 +288,11 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       _applyFilters();
     });
     try {
-      await RatingRepository.instance.deleteRating(rating.ratingId);
+      // Bağlantı zaman aşımı (10 sn) beklenmez; o kadar süre kayıt silinmiş
+      // görünürdü. Süre dolarsa kart geri gelir, kayıt sunucuda kalır.
+      await RatingRepository.instance
+          .deleteRating(rating.ratingId)
+          .timeout(_deleteDeadline);
       if (mounted) ref.read(userDataRefreshProvider.notifier).state++;
     } catch (_) {
       if (!mounted) return;

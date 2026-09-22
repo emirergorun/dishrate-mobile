@@ -132,13 +132,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ── Sheet açıcılar ──────────────────────────────────────────────────────────
 
-  Future<void> _showWishlist() async {
+  /// Panel eldeki listeyle hemen açılır. Önceden sunucudan tazeleme beklenirdi;
+  /// bağlantı yokken zaman aşımı dolana kadar (10 sn) düğme tepkisiz kalıyordu.
+  /// Tazeleme arka planda döner; sayaç ve bir sonraki açılış güncellenir.
+  ///
+  /// [waitForFresh] yemek panelindeki "Tümünü gör" içindir: liste, az önce
+  /// eklenen ürünü içermeli. Orada da tazeleme sınırsız beklenmez.
+  Future<void> _showWishlist({bool waitForFresh = false}) async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
-    // Profil tab'ına döndükten sonra güncel veriyi çek
-    final fresh = await WishlistRepository.instance.getWishlist(userId);
-    if (mounted) setState(() => _wishlist = fresh);
-    if (!mounted) return;
+    final refresh = _refreshWishlist(userId);
+    if (waitForFresh) {
+      await refresh.timeout(const Duration(seconds: 2), onTimeout: () {});
+      if (!mounted) return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -156,8 +163,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           }
         },
         onRate: _openRatingForWishlistItem,
+        onRemoveFailedAfterClose: _notifyRemoveFailed,
       ),
     );
+  }
+
+  /// Panel kapandıktan sonra düşen çıkarma isteği: ürün listede kaldı.
+  void _notifyRemoveFailed(WishlistModel item) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item.menuItemName} listeden çıkarılamadı, '
+            'tekrar dene.'),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// İstek listesini arka planda tazeler; ulaşılamazsa eldeki liste kalır.
+  Future<void> _refreshWishlist(int userId) async {
+    try {
+      final fresh = await WishlistRepository.instance.getWishlist(userId);
+      if (mounted) setState(() => _wishlist = fresh);
+    } catch (_) {
+      // Sessiz: açık panel eldeki listeyi göstermeye devam eder.
+    }
   }
 
   /// İstek listesindeki bir ürünü doğrudan puanlama ekranına gönderir.
@@ -329,7 +360,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     // sonra istek listesi açılsın diye bir sonraki kareye bırakılıyor.
     ref.listen<int>(wishlistOpenRequestProvider, (_, __) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showWishlist();
+        if (mounted) _showWishlist(waitForFresh: true);
       });
     });
 
@@ -1611,10 +1642,15 @@ class _WishlistSheet extends StatefulWidget {
     required this.wishlist,
     required this.onRemove,
     required this.onRate,
+    required this.onRemoveFailedAfterClose,
   });
   final List<WishlistModel> wishlist;
   final Future<void> Function(int wishId) onRemove;
   final void Function(WishlistModel) onRate;
+
+  /// Panel kapandıktan sonra çıkarma başarısız olursa: şerit gösterecek panel
+  /// kalmadığı için haber profil ekranına verilir.
+  final void Function(WishlistModel) onRemoveFailedAfterClose;
 
   @override
   State<_WishlistSheet> createState() => _WishlistSheetState();
@@ -1637,6 +1673,9 @@ class _WishlistSheetState extends State<_WishlistSheet> {
 
   static const _undoWindow = Duration(seconds: 5);
 
+  /// Sunucudan çıkarma isteğinin beklendiği süre.
+  static const _removeDeadline = Duration(seconds: 4);
+
   List<WishlistModel> get _visibleItems {
     final hidden = {for (final p in _pendingRemovals) p.item.wishId};
     return _items.where((w) => !hidden.contains(w.wishId)).toList();
@@ -1651,9 +1690,14 @@ class _WishlistSheetState extends State<_WishlistSheet> {
   @override
   void dispose() {
     // Panel kapanıyorsa bekleyen çıkarmalar artık geri alınamaz; hemen gönderilir.
+    // Başarısız olursa şerit gösterecek panel kalmadığı için profil haber verir.
     for (final pending in _pendingRemovals) {
       pending.timer.cancel();
-      widget.onRemove(pending.item.wishId).ignore();
+      final item = pending.item;
+      widget
+          .onRemove(item.wishId)
+          .timeout(_removeDeadline)
+          .catchError((Object _) => widget.onRemoveFailedAfterClose(item));
     }
     for (final notice in _notices) {
       notice.timer.cancel();
@@ -1694,7 +1738,9 @@ class _WishlistSheetState extends State<_WishlistSheet> {
       _items.removeWhere((w) => w.wishId == item.wishId);
     });
     try {
-      await widget.onRemove(item.wishId);
+      // Bağlantı zaman aşımı (10 sn) beklenmez; o kadar süre öğe silinmiş
+      // görünürdü. Süre dolarsa öğe listeye döner, kayıt sunucuda kalır.
+      await widget.onRemove(item.wishId).timeout(_removeDeadline);
     } catch (_) {
       if (!mounted) return;
       _markRestored(item.wishId);
