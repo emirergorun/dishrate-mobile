@@ -49,7 +49,11 @@ class DishPhoto extends StatelessWidget {
           )
         : _Placeholder(iconSize: iconSize);
 
-    child = SizedBox(width: width, height: height, child: child);
+    // Ekran okuyucu için sessiz: yemek adı her zaman fotoğrafın yanında yazı
+    // olarak duruyor, ayrıca "görsel" diye durup okumasın.
+    child = ExcludeSemantics(
+      child: SizedBox(width: width, height: height, child: child),
+    );
     if (radius > 0) {
       child = ClipRRect(
         borderRadius: BorderRadius.circular(radius),

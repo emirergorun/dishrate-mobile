@@ -18,6 +18,7 @@ import '../../../shared/models/rating_request_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/info_banner.dart';
+import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/rating_stars.dart';
 import '../../../shared/widgets/skeleton.dart';
@@ -436,6 +437,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                       children: [
                         IconButton(
                           onPressed: _openFilterSheet,
+                          tooltip: 'Filtrele ve sırala',
                           icon: Icon(
                             TablerIcons.adjustments_horizontal,
                             color: _hasActiveFilter
@@ -460,6 +462,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     ),
                     IconButton(
                       onPressed: _load,
+                      tooltip: 'Yenile',
                       icon: Icon(TablerIcons.refresh,
                           color: context.textSecondaryColor),
                     ),
@@ -770,8 +773,8 @@ class _SortOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Seçili seçenek metin renginde; turuncu ana eyleme ayrılmış
-    // (Keşfet'teki kategori çipleriyle aynı kural).
+    // Seçili seçeneğin halkası turuncu (24 Eylül). Yazı metin renginde kalır:
+    // açık zeminde küçük turuncu yazı ya soluk ya da fazla koyu duruyor.
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -788,7 +791,7 @@ class _SortOption extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isSelected
-                        ? context.textPrimaryColor
+                        ? AppColors.primary
                         : context.textTertiaryColor,
                     width: isSelected ? 6 : 1.5,
                   ),
@@ -824,27 +827,32 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Keşfet'teki kategori çipinin aynısı: seçili çip metin renginde dolu.
+    // Filtre panelindeki çip: seçiliyken turuncu + beyaz yazı, keşfet ve
+    // arama çipleriyle aynı (24 Eylül). Eskiden bilerek metin renginde
+    // doluydu; uygulamanın her yerinde seçili çip tek görünümde olsun diye
+    // değişti.
     return Padding(
       padding: const EdgeInsets.only(right: AppSpace.sm),
       child: Pressable(
         onTap: onTap,
         semanticLabel: label,
-        child: AnimatedContainer(
-          duration: AppMotion.base,
-          curve: AppMotion.curve,
-          height: 36,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-          decoration: BoxDecoration(
-            color: isSelected ? context.textPrimaryColor : context.fillColor,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Text(
-            label,
-            style: AppTextStyles.label.copyWith(
-              fontSize: 14,
-              color: isSelected ? context.bgColor : context.textPrimaryColor,
+        child: MinTapArea(
+          child: AnimatedContainer(
+            duration: AppMotion.base,
+            curve: AppMotion.curve,
+            height: 36,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primary : context.fillColor,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              label,
+              style: AppTextStyles.label.copyWith(
+                fontSize: 14,
+                color: isSelected ? Colors.white : context.textPrimaryColor,
+              ),
             ),
           ),
         ),
@@ -1341,13 +1349,11 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                       half: StarGlyph(
                           fill: 0.5,
                           size: 40,
-                          emptyColor:
-                              context.starColor.withValues(alpha: 0.55)),
+                          emptyColor: context.starOutlineColor),
                       empty: StarGlyph(
                           fill: 0,
                           size: 40,
-                          emptyColor:
-                              context.starColor.withValues(alpha: 0.55)),
+                          emptyColor: context.starOutlineColor),
                     ),
                     onRatingUpdate: (r) => setState(() => _score = r),
                   ),

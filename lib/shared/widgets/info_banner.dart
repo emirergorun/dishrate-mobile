@@ -28,45 +28,50 @@ class InfoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasAction = actionLabel != null && onAction != null;
-    return Container(
-      padding: EdgeInsets.fromLTRB(AppSpace.md, hasAction ? 4 : 12,
-          hasAction ? 4 : AppSpace.md, hasAction ? 4 : 12),
-      // Açık temada gri dolgu yerine beyaz zemin + kenarlık + hafif gölge;
-      // günlükte kartların üstünde yüzerken de ayrışır.
-      decoration: BoxDecoration(
-        color: context.isDark
-            ? context.surfaceElevatedColor
-            : context.surfaceColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: context.dividerColor),
-        boxShadow: context.isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: context.textSecondaryColor),
-          const SizedBox(width: AppSpace.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodyMedium
-                  .copyWith(color: context.textPrimaryColor),
+    // Şerit kendiliğinden beliriyor: ekran okuyucu içeriği duyursun, yoksa
+    // "… silindi" ve "Geri al" görmeyen kullanıcıdan tamamen kaçıyor.
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(AppSpace.md, hasAction ? 4 : 12,
+            hasAction ? 4 : AppSpace.md, hasAction ? 4 : 12),
+        // Açık temada gri dolgu yerine beyaz zemin + kenarlık + hafif gölge;
+        // günlükte kartların üstünde yüzerken de ayrışır.
+        decoration: BoxDecoration(
+          color: context.isDark
+              ? context.surfaceElevatedColor
+              : context.surfaceColor,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: context.dividerColor),
+          boxShadow: context.isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: context.textSecondaryColor),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTextStyles.bodyMedium
+                    .copyWith(color: context.textPrimaryColor),
+              ),
             ),
-          ),
-          if (hasAction)
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              child: Text(actionLabel!),
-            ),
-        ],
+            if (hasAction)
+              TextButton(
+                onPressed: onAction,
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                child: Text(actionLabel!),
+              ),
+          ],
+        ),
       ),
     );
   }

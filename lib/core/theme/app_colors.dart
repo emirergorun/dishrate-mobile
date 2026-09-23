@@ -24,7 +24,11 @@ abstract final class AppColors {
 
   /// Yıldız glifi (koyu tema). Puan RAKAMLARI bu renkte yazılmaz: sarı metin
   /// açık zeminde 1.5:1 kalıyor, okunmuyordu.
-  static const Color star = Color(0xFFFFC107);
+  ///
+  /// 23 Eylül'de marka sarısından (#FFC107) kehribara alındı (#E09900);
+  /// cihaz testinde koyu bulunup 24 Eylül'de bir ton açıldı. Açık temadaki
+  /// [lightStar] ile aynı renk ailesinde. Koyu kartta 8.5:1.
+  static const Color star = Color(0xFFEBA500);
 
   // ─── Durum ────────────────────────────────────────────────────────────────
   static const Color success = Color(0xFF30D158);
@@ -46,7 +50,8 @@ abstract final class AppColors {
   static const Color textDisabled = Color(0xFF6F6A64);
 
   static const Color navBackground = background;
-  static const Color navUnselected = Color(0xFF7A756F);
+  /// 1.4 turunda bir ton açıldı: 4.3:1 → 4.5:1.
+  static const Color navUnselected = Color(0xFF7E7973);
 
   // ─── Açık tema ────────────────────────────────────────────────────────────
   static const Color lightBackground = Color(0xFFF6F6F5);
@@ -57,11 +62,14 @@ abstract final class AppColors {
   static const Color lightTextSecondary = Color(0xFF5E5953);
   static const Color lightTextDisabled = Color(0xFF8A847E);
   static const Color lightNavBackground = lightBackground;
-  static const Color lightNavUnselected = Color(0xFF8A847E);
+  /// 1.4 erişilebilirlik turunda bir ton koyulaştı: 3.4:1 → 4.5:1.
+  static const Color lightNavUnselected = Color(0xFF75706B);
 
-  /// Açık temada seçili alt menü sekmesi. `primary` + butonuyla aynı olunca
-  /// buton ile seçili sekme birbirine karışıyordu; `lightAccentText` ise
-  /// soluk kalıyordu. İkisinin ortası (açık zeminde 3.4:1).
+  /// Açık temada seçili alt menü sekmesi. `primary` ile aynı olunca + butonu
+  /// ile sekme birbirine karışıyordu; ikisinin ortası bu ton seçildi (3.5:1).
+  /// 1.4 turunda 4.8:1 için `lightAccentText` denendi ama gözle fazla koyu
+  /// bulundu (cihaz testi, 23 Eylül). Seçili sekme renkten başka iki sinyalle
+  /// daha ayrılıyor — dolu ikon ve konum — bu yüzden 3.5:1 kabul edildi.
   static const Color lightNavSelected = Color(0xFFE05620);
 
   /// Açık zeminde küçük turuncu metin. Marka turuncusu burada 2.6:1 kalıyordu;
@@ -70,7 +78,14 @@ abstract final class AppColors {
 
   /// Açık zeminde yıldız glifi. Parlak sarı beyaza yakın zeminde şekil olarak
   /// eriyordu; bu kehribar tonu yıldızın biçimini koruyor.
-  static const Color lightStar = Color(0xFFBF8700);
+  ///
+  /// 1.4 turunda kontrast için #B98300'e (3.1:1) koyulaştırıldı, cihaz
+  /// testlerinde iki kez koyu bulundu: 23 Eylül'de #D99400'e, 24 Eylül'de
+  /// buraya açıldı (beyaz kartta 2.2:1). Grafik eşiği 3:1'in altında kalıyor;
+  /// kabul edilebilir çünkü puanı yalnızca yıldızın rengi taşımıyor — yanında
+  /// rakam yazıyor, dolu yıldız ile boş yıldız da renkle değil biçimle
+  /// (dolgu ve çerçeve) ayrılıyor.
+  static const Color lightStar = Color(0xFFE6A000);
 
   /// Açık zeminde hata metni. [error] burada 3.3:1 kalıyor, küçük yazı için az.
   static const Color lightErrorText = Color(0xFFD70015);
@@ -117,6 +132,12 @@ extension ThemeColors on BuildContext {
       isDark ? AppColors.primary : AppColors.lightAccentText;
 
   Color get starColor => isDark ? AppColors.star : AppColors.lightStar;
+
+  /// Puan GİRİŞİNDEKİ boş yıldızın çerçeve rengi (değerlendirme akışı, günlük
+  /// düzenleme). Yıldızın kendi renginin soluğu: dolu ile boş biçimle ayrılır,
+  /// çerçeve de aynı aileden kalsın. %55'te silik duruyordu (cihaz testi,
+  /// 23 Eylül), %75'e çıkarıldı.
+  Color get starOutlineColor => starColor.withValues(alpha: 0.75);
 
   Color get errorTextColor =>
       isDark ? AppColors.error : AppColors.lightErrorText;

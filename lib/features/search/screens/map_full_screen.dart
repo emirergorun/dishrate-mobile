@@ -16,6 +16,7 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/map_tiles.dart';
+import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/rating_stars.dart';
 import '../../discover/providers/location_provider.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
@@ -64,8 +65,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
       final target = loc.hasDistrict ? loc.district! : loc.province;
       final area = loc.hasDistrict ? r.district : r.city;
       return area != null &&
-          TurkeyAddresses.searchKey(area) ==
-              TurkeyAddresses.searchKey(target);
+          TurkeyAddresses.searchKey(area) == TurkeyAddresses.searchKey(target);
     }).toList();
     if (matches.isEmpty) return _istanbul;
     final lat = matches.map((r) => r.latitude!).reduce((a, b) => a + b) /
@@ -191,53 +191,57 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
         point: LatLng(r.latitude!, r.longitude!),
         width: 52,
         height: 52,
-        child: GestureDetector(
-          onTap: () => _openPreview(r),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                margin: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  // Puanladığın restoranlar turuncu halkalı.
-                  border: rated
-                      ? Border.all(color: AppColors.primary, width: 3)
-                      : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+        child: Semantics(
+          button: true,
+          label: r.name,
+          child: GestureDetector(
+            onTap: () => _openPreview(r),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  margin: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    // Puanladığın restoranlar turuncu halkalı.
+                    border: rated
+                        ? Border.all(color: AppColors.primary, width: 3)
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  // Restoranın türü (menüsündeki çoğunluk kategori) sade ikonla.
+                  child: Center(
+                    child: Icon(
+                      AppCategories.icon(r.categoryName),
+                      size: 22,
+                      color: const Color(0xFF1A1A1A),
                     ),
-                  ],
-                ),
-                // Restoranın türü (menüsündeki çoğunluk kategori) sade ikonla.
-                child: Center(
-                  child: Icon(
-                    AppCategories.icon(r.categoryName),
-                    size: 22,
-                    color: const Color(0xFF1A1A1A),
                   ),
                 ),
-              ),
-              if (rated)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                if (rated)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.star_rounded,
+                          size: 12, color: AppColors.onPrimary),
                     ),
-                    child: const Icon(Icons.star_rounded,
-                        size: 12, color: AppColors.onPrimary),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -317,7 +321,9 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                 IconButton(
                   icon: Icon(Icons.close_rounded,
                       size: 18, color: Colors.white.withValues(alpha: 0.7)),
-                  onPressed: () => setState(() => _locationBannerDismissed = true),
+                  tooltip: 'Konum şeridini kapat',
+                  onPressed: () =>
+                      setState(() => _locationBannerDismissed = true),
                 ),
               ],
             ),
@@ -383,7 +389,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
           // Engellemez, kapatılabilir. Konum izni olmayan kullanıcı
           // haritayı yine de kullanabilsin diye böyle: haritanın işi
           // "restoranlar nerede", "ben neredeyim" değil.
-          if (!_locationBannerDismissed && _hasPermission == false) _buildLocationBanner(),
+          if (!_locationBannerDismissed && _hasPermission == false)
+            _buildLocationBanner(),
 
           // ── Üst sıra: geri + "Puanladıklarım" ────────────────────────
           SafeArea(
@@ -401,8 +408,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                     _CategoryChip(
                       label: '★ Puanladıklarım',
                       isSelected: _onlyRated,
-                      onTap: () => setState(() =>
-                          _onlyRated = !_onlyRated),
+                      onTap: () => setState(() => _onlyRated = !_onlyRated),
                     ),
                 ],
               ),
@@ -428,7 +434,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: AppCategories.all.map((label) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        // Dokunma alanı çipin çevresini zaten dolduruyor.
+                        padding: EdgeInsets.zero,
                         child: _CategoryChip(
                           label: label,
                           isSelected: _selectedCategory == label,
@@ -578,8 +585,7 @@ class _PreviewCard extends StatelessWidget {
             ),
           ],
           Padding(
-            padding:
-                EdgeInsets.fromLTRB(20, 16, 20, media.padding.bottom + 12),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, media.padding.bottom + 12),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -604,16 +610,19 @@ class _MapButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      child: MinTapArea(
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          child: child,
         ),
-        child: child,
       ),
     );
   }
@@ -632,29 +641,36 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Çip ~36 pt: 44 pt'lik dokunma kutusunda alt alta dizilince aralarında
+    // 1.4 öncesindeki gibi ~8 pt kalıyor. 30 pt'lik eski boyda kutular çipleri
+    // 17 pt aralıkla seyrek diziyordu, çipler küçülmüş gibi görünüyordu.
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : Colors.black.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+      child: MinTapArea(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
             color: isSelected
                 ? AppColors.primary
-                : Colors.white.withValues(alpha: 0.20),
-            width: 1,
+                : Colors.black.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.primary
+                  : Colors.white.withValues(alpha: 0.20),
+              width: 1,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: isSelected ? AppColors.onPrimary : Colors.white,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              // Seçiliyken de beyaz: keşfet ve aramadaki çiplerle aynı.
+              color: Colors.white,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ),
       ),

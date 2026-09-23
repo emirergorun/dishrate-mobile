@@ -9,6 +9,7 @@ import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/dish_sheet.dart';
+import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/pressable.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
@@ -286,19 +287,22 @@ class _SortToggle extends StatelessWidget {
       return Pressable(
         onTap: () => onChanged(option),
         semanticLabel: label,
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primary : context.fillColor,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: AppTextStyles.label.copyWith(
-              color: selected ? AppColors.onPrimary : context.textPrimaryColor,
+        child: MinTapArea(
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : context.fillColor,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: AppTextStyles.label.copyWith(
+                color:
+                    selected ? AppColors.onPrimary : context.textPrimaryColor,
+              ),
             ),
           ),
         ),

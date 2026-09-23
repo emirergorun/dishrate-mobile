@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/network/local_network_warmup.dart';
+import 'core/storage/fresh_install.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
@@ -24,6 +26,9 @@ Future<void> main() async {
   ]);
 
   _registerFontLicenses();
+  // Silinip yeniden kurulduysa cihazda kalan oturumu ve tercihleri temizle.
+  // Tema okunmadan önce olmalı: sonra çağrılırsa silinecek tercih okunur.
+  await FreshInstall.clearIfNeeded();
   // Tema ilk kareden önce bilinmeli; yoksa uygulama bir an yanlış temada açılır.
   final (_, themeMode) =
       await (_precacheLogo(), ThemeStorage.instance.read()).wait;
@@ -33,6 +38,8 @@ Future<void> main() async {
     ],
     child: const DishrateApp(),
   ));
+  // Geliştirmede yerel ağ izni açılışta sorulsun; bkz. warmUpLocalNetwork.
+  unawaited(warmUpLocalNetwork());
 }
 
 /// Gömülü fontların OFL lisansları. Paket lisanslarını Flutter kendisi
@@ -119,6 +126,18 @@ class DishrateApp extends ConsumerWidget {
       locale: const Locale('tr', 'TR'),
       supportedLocales: const [Locale('tr', 'TR')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) {
+        // Sistem yazı boyutu en fazla %130 uygulanır (karar 23 Eylül).
+        // iOS erişilebilirlik boyutları %310'a kadar çıkıyor; o ölçekte
+        // düzen ayakta kalmıyor. %130'a kadar her ekran bozulmadan çalışır.
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler.clamp(maxScaleFactor: 1.3),
+          ),
+          child: child!,
+        );
+      },
       home: const _AuthGate(),
     );
   }

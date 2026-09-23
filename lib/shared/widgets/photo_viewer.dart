@@ -28,12 +28,16 @@ class _PhotoViewerPage extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: InteractiveViewer(
-              maxScale: 4,
-              child: Center(
-                child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+          Semantics(
+            button: true,
+            label: 'Fotoğrafı kapat',
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: InteractiveViewer(
+                maxScale: 4,
+                child: Center(
+                  child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+                ),
               ),
             ),
           ),

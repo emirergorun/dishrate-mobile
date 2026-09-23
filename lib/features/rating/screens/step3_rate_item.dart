@@ -181,7 +181,7 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
     if (item == null || restaurant == null) return const SizedBox.shrink();
 
     // Boş yıldız çerçevesinin rengi — bkz. aşağıdaki RatingBar yorumu.
-    final emptyStar = context.starColor.withValues(alpha: 0.55);
+    final emptyStar = context.starOutlineColor;
 
     return AnimatedOpacity(
       opacity: _closing ? 0 : 1,

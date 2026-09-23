@@ -589,53 +589,57 @@ class _ProfileHeader extends StatelessWidget {
             children: [
               // Avatara dokunmak fotoğrafı doğrudan değiştirir —
               // "Profili Düzenle"ye girmeye gerek yok.
-              GestureDetector(
-                onTap: user == null ? null : onPhotoTap,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: context.surfaceElevatedColor,
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(color: context.dividerColor, width: 2),
-                      ),
-                      child: user?.profilePhotoUrl != null
-                          ? ClipOval(
-                              child: Image.network(user!.profilePhotoUrl!,
-                                  fit: BoxFit.cover),
-                            )
-                          : Icon(TablerIcons.user,
-                              color: context.textTertiaryColor, size: 34),
-                    ),
-                    // Dokunulabilir olduğunu belli eden küçük rozet
-                    if (user != null)
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border:
-                                Border.all(color: context.bgColor, width: 2),
-                          ),
-                          child: photoBusy
-                              ? const SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(TablerIcons.camera,
-                                  size: 12, color: Colors.white),
+              Semantics(
+                button: true,
+                label: 'Profil fotoğrafını değiştir',
+                child: GestureDetector(
+                  onTap: user == null ? null : onPhotoTap,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: context.surfaceElevatedColor,
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: context.dividerColor, width: 2),
                         ),
+                        child: user?.profilePhotoUrl != null
+                            ? ClipOval(
+                                child: Image.network(user!.profilePhotoUrl!,
+                                    fit: BoxFit.cover),
+                              )
+                            : Icon(TablerIcons.user,
+                                color: context.textTertiaryColor, size: 34),
                       ),
-                  ],
+                      // Dokunulabilir olduğunu belli eden küçük rozet
+                      if (user != null)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border:
+                                  Border.all(color: context.bgColor, width: 2),
+                            ),
+                            child: photoBusy
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(TablerIcons.camera,
+                                    size: 12, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: AppSpace.lg),
@@ -1026,52 +1030,58 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: AppSpace.screen),
                 // Profil fotoğrafı — tıkla → galeriden seç → yükle
-                GestureDetector(
-                  onTap: _pickPhoto,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: context.surfaceElevatedColor,
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: context.dividerColor, width: 2),
-                        ),
-                        child: _uploadingPhoto
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.primary),
-                                ),
-                              )
-                            : _photoUrl != null
-                                ? ClipOval(
-                                    child: Image.network(_photoUrl!,
-                                        width: 80,
-                                        height: 80,
-                                        fit: BoxFit.cover))
-                                : Icon(TablerIcons.user,
-                                    color: context.textTertiaryColor, size: 38),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                Semantics(
+                  button: true,
+                  label: 'Profil fotoğrafı seç',
+                  child: GestureDetector(
+                    onTap: _pickPhoto,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: context.surfaceElevatedColor,
                             shape: BoxShape.circle,
+                            border: Border.all(
+                                color: context.dividerColor, width: 2),
                           ),
-                          child: const Icon(TablerIcons.camera,
-                              color: Colors.white, size: 14),
+                          child: _uploadingPhoto
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary),
+                                  ),
+                                )
+                              : _photoUrl != null
+                                  ? ClipOval(
+                                      child: Image.network(_photoUrl!,
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover))
+                                  : Icon(TablerIcons.user,
+                                      color: context.textTertiaryColor,
+                                      size: 38),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(TablerIcons.camera,
+                                color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpace.screen),
@@ -2271,6 +2281,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                         style: AppTextStyles.titleSmall),
                     const Spacer(),
                     IconButton(
+                      tooltip: _obscure ? 'Şifreyi göster' : 'Şifreyi gizle',
                       icon: Icon(
                         _obscure ? TablerIcons.eye_off : TablerIcons.eye,
                         size: 20,
@@ -2501,6 +2512,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                     prefixIcon: Icon(TablerIcons.lock,
                         size: 18, color: context.textSecondaryColor),
                     suffixIcon: IconButton(
+                      tooltip: _obscure ? 'Şifreyi göster' : 'Şifreyi gizle',
                       icon: Icon(
                         _obscure ? TablerIcons.eye_off : TablerIcons.eye,
                         size: 20,

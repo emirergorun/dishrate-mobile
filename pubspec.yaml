@@ -6,7 +6,7 @@ publish_to: 'none'
 # üzerine kurulumda silmiyor — numarayı artırmak tek başına yetmiyor,
 # eski kare gidene kadar uygulamayı telefondan silip kurmak gerekiyor
 # (22 Eylül'de yaşandı).
-version: 1.0.0+3
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -56,6 +56,7 @@ dependencies:
   geolocator: ^14.0.3
   geocoding: ^5.0.0
   flutter_tabler_icons: ^1.43.0
+  shared_preferences: ^2.5.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,8 +70,9 @@ dev_dependencies:
   flutter_native_splash: ^2.4.6
 
 # ── Uygulama ikonu ────────────────────────────────────────────────────────────
-# Kaynak: logo paketi "DISHRATE EN SON LOGO" → icon-3-orange-bg-white-d
-# (turuncu zemin, beyaz `d`). Karar 22 Eylül.
+# Kaynak: logo paketi "DISHRATE KESİN LOGO" → icon-3-orange-bg-white-d
+# (turuncu zemin, beyaz `d`). Karar 22 Eylül; 23 Eylül'de gövdesi 9° yatık
+# yeni işaretle yenilendi, renk birleşimi aynı kaldı.
 # Yeniden üretmek için:  dart run flutter_launcher_icons
 flutter_launcher_icons:
   image_path: assets/branding/app_icon.png

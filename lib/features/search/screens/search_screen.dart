@@ -12,6 +12,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/restaurant_model.dart';
 import '../../../shared/widgets/map_tiles.dart';
+import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/state_message.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
 import 'map_full_screen.dart';
@@ -300,8 +301,9 @@ class _SearchCategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const categories = AppCategories.all;
+    // Şerit dokunma alanı kadar yüksek; çip görünüşte aynı boyda kalıyor.
     return SizedBox(
-      height: 38,
+      height: AppSize.minTap,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -311,27 +313,30 @@ class _SearchCategoryChips extends StatelessWidget {
           final label = categories[i];
           final isSelected = selectedCategory == label;
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => onCategoryTap(label),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : context.surfaceElevatedColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color:
-                      isSelected ? AppColors.primary : context.dividerColor,
-                  width: 1,
+            child: MinTapArea(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary
+                      : context.surfaceElevatedColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color:
+                        isSelected ? AppColors.primary : context.dividerColor,
+                    width: 1,
+                  ),
                 ),
-              ),
-              child: Text(
-                label,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: isSelected ? Colors.white : context.textPrimaryColor,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                child: Text(
+                  label,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: isSelected ? Colors.white : context.textPrimaryColor,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
                 ),
               ),
             ),
@@ -359,77 +364,81 @@ class _MapPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: context.dividerColor),
-        ),
-        child: Stack(
-          children: [
-            if (isLoading)
-              Container(
-                color: context.surfaceColor,
-                child: const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              )
-            else
-              FlutterMap(
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: 12,
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.none,
+    return Semantics(
+      button: true,
+      label: 'Haritayı aç',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.dividerColor),
+          ),
+          child: Stack(
+            children: [
+              if (isLoading)
+                Container(
+                  color: context.surfaceColor,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
+                )
+              else
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: 12,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.none,
+                    ),
+                  ),
+                  children: [
+                    const AppTileLayer(),
+                    MarkerLayer(markers: markers),
+                  ],
                 ),
-                children: [
-                  const AppTileLayer(),
-                  MarkerLayer(markers: markers),
-                ],
-              ),
 
-            // "Haritada Keşfet" overlay
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.65),
-                      Colors.transparent,
+              // "Haritada Keşfet" overlay
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.65),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.map_rounded,
+                          color: Colors.white, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Haritada Keşfet',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.open_in_full_rounded,
+                          color: Colors.white54, size: 14),
                     ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.map_rounded,
-                        color: Colors.white, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Haritada Keşfet',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.open_in_full_rounded,
-                        color: Colors.white54, size: 14),
-                  ],
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -463,8 +472,8 @@ class _SearchBar extends StatelessWidget {
         style: AppTextStyles.bodyMedium,
         decoration: InputDecoration(
           hintText: 'Yemek veya restoran ara...',
-          hintStyle:
-              AppTextStyles.bodyMedium.copyWith(color: AppColors.textDisabled),
+          hintStyle: AppTextStyles.bodyMedium
+              .copyWith(color: context.textTertiaryColor),
           prefixIcon: Icon(Icons.search_rounded,
               color: context.textSecondaryColor, size: 22),
           suffixIcon: isLoading
@@ -494,8 +503,7 @@ class _SearchBar extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
         ),
       ),
@@ -553,69 +561,73 @@ class _RestaurantCard extends StatelessWidget {
 
     // Kart da ad da aynı yere gidiyor: restoran sayfası. Önceden burada
     // aramaya özel bir mini menü açılıyordu; menü tek yerde olsun.
-    return GestureDetector(
-      onTap: () => _openRestaurant(context),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: context.surfaceColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.dividerColor),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: context.surfaceElevatedColor,
-                borderRadius: BorderRadius.circular(10),
+    return Semantics(
+      button: true,
+      label: '${result.name}, $subtitle',
+      child: GestureDetector(
+        onTap: () => _openRestaurant(context),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.dividerColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: context.surfaceElevatedColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.storefront_rounded,
+                    color: context.textTertiaryColor, size: 20),
               ),
-              child: const Icon(Icons.storefront_rounded,
-                  color: AppColors.textDisabled, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Restoran adına dokunmak restoran sayfasını açar
-                  // (kartın kalanı eşleşen ürünleri gösterir)
-                  GestureDetector(
-                    onTap: () => _openRestaurant(context),
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(result.name,
-                              style: AppTextStyles.titleSmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.north_east_rounded,
-                            size: 13, color: AppColors.primary),
-                      ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Restoran adına dokunmak restoran sayfasını açar
+                    // (kartın kalanı eşleşen ürünleri gösterir)
+                    GestureDetector(
+                      onTap: () => _openRestaurant(context),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(result.name,
+                                style: AppTextStyles.titleSmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.north_east_rounded,
+                              size: 13, color: AppColors.primary),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (location.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(location, style: AppTextStyles.bodySmall),
+                    if (location.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(location, style: AppTextStyles.bodySmall),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textDisabled, size: 20),
-          ],
+              Icon(Icons.chevron_right_rounded,
+                  color: context.textTertiaryColor, size: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -633,8 +645,8 @@ class _EmptySearch extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.search_rounded,
-              color: AppColors.textDisabled, size: 48),
+          Icon(Icons.search_rounded,
+              color: context.textTertiaryColor, size: 48),
           const SizedBox(height: 12),
           Text(
             'Yemek veya restoran ara',

@@ -140,6 +140,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                       ? null
                       : IconButton(
                           icon: const Icon(Icons.close_rounded, size: 18),
+                          tooltip: 'Aramayı temizle',
                           onPressed: () {
                             _searchCtrl.clear();
                             _filter('');

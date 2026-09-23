@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
+import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
 import 'splash_screen.dart';
 import 'welcome_screen.dart';
@@ -219,6 +220,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             textInputAction: TextInputAction.done,
                             onFieldSubmitted: (_) => _login(),
                             suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Şifreyi göster'
+                                  : 'Şifreyi gizle',
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_off_rounded
@@ -293,19 +297,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               color: context.textSecondaryColor,
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const RegisterScreen(),
+                          Semantics(
+                            button: true,
+                            label: 'Kayıt ol',
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen(),
+                                  ),
+                                );
+                              },
+                              child: MinTapArea(
+                                child: Text(
+                                  'Kayıt Ol',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              );
-                            },
-                            child: Text(
-                              'Kayıt Ol',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -454,6 +464,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: context.textPrimaryColor),
+          tooltip: 'Geri',
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -547,6 +558,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onChanged: (_) =>
                           setState(() {}), // kural listesi güncellensin
                       suffixIcon: IconButton(
+                        tooltip: _obscurePassword
+                            ? 'Şifreyi göster'
+                            : 'Şifreyi gizle',
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_off_rounded
@@ -654,13 +668,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         color: context.textSecondaryColor,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Giriş Yap',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
+                    Semantics(
+                      button: true,
+                      label: 'Giriş yap',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.of(context).pop(),
+                        child: MinTapArea(
+                          child: Text(
+                            'Giriş Yap',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ),

@@ -11,6 +11,7 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/rating/providers/rating_flow_provider.dart';
 import '../providers/data_refresh.dart';
 import 'home_filled_icon.dart';
+import 'min_tap_area.dart';
 import 'pressable.dart';
 import 'rating_sheet.dart';
 
@@ -227,20 +228,22 @@ class _AddButton extends StatelessWidget {
           onTap: onTap,
           scale: 0.92,
           semanticLabel: 'Değerlendirme ekle',
-          child: Container(
-            width: 48,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            // Beyaz + (karar 21 Eylül): turuncu üstünde 2.8:1 ama 22 pt kalın
-            // işaret rahat seçiliyor; koyu işaret ağır duruyordu. Turuncu
-            // butonların YAZILARI koyu kalır (AppColors.onPrimary).
-            child: const Icon(
-              TablerIcons.plus,
-              color: Colors.white,
-              size: 22,
+          child: MinTapArea(
+            child: Container(
+              width: 48,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              // Beyaz + (karar 21 Eylül): turuncu üstünde 2.8:1 ama 22 pt kalın
+              // işaret rahat seçiliyor; koyu işaret ağır duruyordu. Turuncu
+              // butonların YAZILARI koyu kalır (AppColors.onPrimary).
+              child: const Icon(
+                TablerIcons.plus,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ),

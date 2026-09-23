@@ -3,9 +3,9 @@ import '../../core/theme/app_colors.dart';
 
 /// Dishrate marka görselleri.
 ///
-/// Kaynak: `DISHRATE EN SON LOGO` paketi (22 Eylül 2026) — geometrik küçük
-/// `d` işareti + Poppins Bold "dishrate" kelime markası. Kullanılan dosyalar
-/// paketin zeminsiz ("extra") sürümleri:
+/// Kaynak: `DISHRATE KESİN LOGO` paketi (23 Eylül 2026) — geometrik küçük
+/// `d` işareti (gövdesi dikeyden 9° sağa yatık) + Poppins Bold "dishrate"
+/// kelime markası. Kullanılan dosyalar paketin zeminsiz ("extra") sürümleri:
 ///   • [DishrateWordmark] → işaret + yazı; yazı rengi temaya göre değişir
 ///   • [DishrateMark]     → yalnız işaret (turuncu `d`)
 ///
