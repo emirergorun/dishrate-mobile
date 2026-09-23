@@ -1,7 +1,12 @@
 name: dishrate_mobile
 description: Dishrate — Yediğin her şeyi puanla.
 publish_to: 'none'
-version: 1.0.0+1
+# Açılış ekranı ya da ikon değişince yapı numarasını (+ sonrası) artır.
+# Not: iOS açılış karesinin görüntüsünü telefonda önbelleğe alıyor ve bunu
+# üzerine kurulumda silmiyor — numarayı artırmak tek başına yetmiyor,
+# eski kare gidene kadar uygulamayı telefondan silip kurmak gerekiyor
+# (22 Eylül'de yaşandı).
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -64,8 +69,8 @@ dev_dependencies:
   flutter_native_splash: ^2.4.6
 
 # ── Uygulama ikonu ────────────────────────────────────────────────────────────
-# Kaynak: "Dishrate logo/ikon/12-ikon-siyah-zemin"
-# (siyah zemin, turuncu tabak + sarı yıldız)
+# Kaynak: logo paketi "DISHRATE EN SON LOGO" → icon-3-orange-bg-white-d
+# (turuncu zemin, beyaz `d`). Karar 22 Eylül.
 # Yeniden üretmek için:  dart run flutter_launcher_icons
 flutter_launcher_icons:
   image_path: assets/branding/app_icon.png
@@ -73,36 +78,42 @@ flutter_launcher_icons:
   remove_alpha_ios: true          # App Store saydam ikon kabul etmiyor
   android: ic_launcher
   min_sdk_android: 21
-  # Android uyarlanabilir ikon: zemin düz siyah, önplan şeffaf işaret
-  adaptive_icon_background: "#0D0D0D"
+  # Android uyarlanabilir ikon: zemin turuncu, önplan saydam beyaz `d`
+  # (iOS ikonuyla aynı görünsün).
+  adaptive_icon_background: "#FF6B35"
   adaptive_icon_foreground: assets/branding/icon_foreground.png
   adaptive_icon_monochrome: assets/branding/icon_foreground.png
   web:
     generate: true
     image_path: assets/branding/app_icon.png
+    # Web uygulamasının açılış zemini — uygulamanın evi siyah, ikonun zemini değil.
     background_color: "#0D0D0D"
     theme_color: "#FF6B35"
 
 # ── Açılış ekranı ─────────────────────────────────────────────────────────────
-# Kaynak: "Dishrate logo/yatay-seffaf/07-seffaf-turuncu-sari-beyaz-yazi"
-# (turuncu tabak, sarı yıldız, beyaz "dishrate" yazısı)
-# Görsel şeffaftır; zemini aşağıdaki `color` (#0D0D0D) sağlar.
+# Kare **temadan bağımsız**: turuncu zemin, beyaz `d` ve beyaz yazı — uygulama
+# ikonunun büyümüş hali. Sebep: bu kareyi iOS, uygulamanın kodu çalışmadan
+# çiziyor; kullanıcının uygulama içi tema tercihini bilemez, yalnızca cihazın
+# temasını bilir. Temaya bağlasaydık, tercihi cihazdan farklı olan kullanıcı
+# her açılışta ters temada bir kare görürdü (karar 23 Eylül).
+# Uygulamanın kendi açılış ekranı (SplashScreen) aynı turuncu kareyle başlar,
+# sonra temanın rengine geçer; iki kare arasında fark görünmesin diye logo
+# ölçüsü ve yeri birebir aynı.
 # Yeniden üretmek için:  dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#0D0D0D"
-  image: assets/branding/splash_logo.png
-  # Sistem açık temadayken de aynı koyu açılış ekranı gösterilir
-  color_dark: "#0D0D0D"
-  image_dark: assets/branding/splash_logo.png
+  color: "#FF6B35"
+  image: assets/branding/splash_logo_brand.png
+  color_dark: "#FF6B35"
+  image_dark: assets/branding/splash_logo_brand.png
   android_12:
     # Android 12+ açılışı yuvarlak maskeli tek ikon ister — yazı sığmaz,
     # bu yüzden yalnızca işaret kullanılır.
     image: assets/branding/splash_android12.png
-    icon_background_color: "#0D0D0D"
-    color: "#0D0D0D"
+    icon_background_color: "#FF6B35"
+    color: "#FF6B35"
     image_dark: assets/branding/splash_android12.png
-    icon_background_color_dark: "#0D0D0D"
-    color_dark: "#0D0D0D"
+    icon_background_color_dark: "#FF6B35"
+    color_dark: "#FF6B35"
   web: false
 
 flutter:

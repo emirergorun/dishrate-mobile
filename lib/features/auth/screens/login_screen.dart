@@ -14,9 +14,6 @@ import 'welcome_screen.dart';
 /// Giriş ekranındaki logonun genişliği.
 const double _logoWidth = 200;
 
-/// Logo görselinin en-boy oranı (bkz. [DishrateWordmark]).
-const double _wordmarkAspect = 2400 / 764;
-
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -86,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   /// beliriyordu (cihazda tam olarak bu oluyordu).
   Offset _logoTarget(BuildContext context) {
     final mq = MediaQuery.of(context);
-    const h = _logoWidth / _wordmarkAspect;
+    const h = _logoWidth / DishrateWordmark.aspectRatio;
     return Offset(mq.size.width / 2, mq.padding.top + 60 + h / 2);
   }
 
@@ -108,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         final start = MediaQuery.sizeOf(context).center(Offset.zero);
         final c = Offset.lerp(start, _logoTarget(context), t)!;
         final w = lerpDouble(splashLogoWidth, _logoWidth, t)!;
-        final h = w / _wordmarkAspect;
+        final h = w / DishrateWordmark.aspectRatio;
         return Positioned(
           left: c.dx - w / 2,
           top: c.dy - h / 2,
@@ -159,166 +156,167 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           FadeTransition(
             opacity: _contentFade,
             child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 60),
-
-              // ── Logo & Başlık ──────────────────────────────────────────────
-              Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Geçiş sürerken gerçek logo gizli; yerine üstte kayan
-                    // kopyası görünüyor.
-                    Opacity(
-                      opacity: _introDone ? 1 : 0,
-                      child: const DishrateWordmark(width: _logoWidth),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Yemek günlüğü ve keşfi',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: context.textSecondaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                    const SizedBox(height: 60),
 
-              const SizedBox(height: 52),
-
-              // ── Form ──────────────────────────────────────────────────────
-              const Text('Giriş Yap', style: AppTextStyles.titleLarge),
-              const SizedBox(height: 24),
-
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // E-posta veya kullanıcı adı
-                    _AuthTextField(
-                      controller: _emailController,
-                      label: null,
-                      hint: 'Kullanıcı adı veya e-posta',
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'E-posta veya kullanıcı adı gerekli';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Şifre
-                    _AuthTextField(
-                      controller: _passwordController,
-                      label: null,
-                      hint: 'Şifre',
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _login(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          color: context.textSecondaryColor,
-                          size: 20,
-                        ),
-                        onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword),
-                      ),
-                      // Girişte karmaşıklık kuralı uygulanmaz — eski şifresi
-                      // olan kullanıcılar kilitlenmesin. Doğrulama sunucuda.
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Şifre gerekli' : null,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 16),
-                      _ErrorBox(message: _error!),
-                    ],
-
-                    const SizedBox(height: 28),
-
-                    // Giriş Butonu
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor:
-                              AppColors.primary.withValues(alpha: 0.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                    // ── Logo & Başlık ──────────────────────────────────────────────
+                    Center(
+                      child: Column(
+                        children: [
+                          // Geçiş sürerken gerçek logo gizli; yerine üstte kayan
+                          // kopyası görünüyor.
+                          Opacity(
+                            opacity: _introDone ? 1 : 0,
+                            child: const DishrateWordmark(width: _logoWidth),
                           ),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Text(
-                                'Giriş Yap',
-                                style: AppTextStyles.titleSmall.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Yemek günlüğü ve keşfi',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 52),
+
+                    // ── Form ──────────────────────────────────────────────────────
+                    const Text('Giriş Yap', style: AppTextStyles.titleLarge),
+                    const SizedBox(height: 24),
+
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          // E-posta veya kullanıcı adı
+                          _AuthTextField(
+                            controller: _emailController,
+                            label: null,
+                            hint: 'Kullanıcı adı veya e-posta',
+                            keyboardType: TextInputType.text,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'E-posta veya kullanıcı adı gerekli';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Şifre
+                          _AuthTextField(
+                            controller: _passwordController,
+                            label: null,
+                            hint: 'Şifre',
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _login(),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                                color: context.textSecondaryColor,
+                                size: 20,
                               ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ── Kayıt Ol ──────────────────────────────────────────────────
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Hesabın yok mu? ',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: context.textSecondaryColor,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
+                              onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
+                            ),
+                            // Girişte karmaşıklık kuralı uygulanmaz — eski şifresi
+                            // olan kullanıcılar kilitlenmesin. Doğrulama sunucuda.
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Şifre gerekli'
+                                : null,
                           ),
-                        );
-                      },
-                      child: Text(
-                        'Kayıt Ol',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 16),
+                            _ErrorBox(message: _error!),
+                          ],
+
+                          const SizedBox(height: 28),
+
+                          // Giriş Butonu
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _login,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    AppColors.primary.withValues(alpha: 0.5),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Giriş Yap',
+                                      style: AppTextStyles.titleSmall.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+
+                    const SizedBox(height: 24),
+
+                    // ── Kayıt Ol ──────────────────────────────────────────────────
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Hesabın yok mu? ',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: context.textSecondaryColor,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              'Kayıt Ol',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
+            ),
           ),
           if (!_introDone) _flyingLogo(),
         ],

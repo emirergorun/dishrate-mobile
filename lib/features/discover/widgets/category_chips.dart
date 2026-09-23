@@ -75,9 +75,10 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Seçili çip turuncu değil, metin renginde dolu. Turuncu ana eyleme
-    // (Değerlendir, +) ayrılmış; filtre çipi de turuncu olunca ekranın en
-    // güçlü vurgusu bir filtre oluyordu.
+    // Seçili çip turuncu, yazısı beyaz (karar 23 Eylül). Önce metin
+    // rengindeydi; açık temada siyah dolu çip ekranda sırıtıyordu. Arama
+    // ekranındaki çip de aynı. Beyaz yazı turuncu üstünde 2,8:1 kontrast
+    // veriyor; bilinçli tercih, 1.4 erişilebilirlik turunda yeniden bakılacak.
     return Pressable(
       onTap: onTap,
       semanticLabel: label,
@@ -89,14 +90,14 @@ class _Chip extends StatelessWidget {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           decoration: BoxDecoration(
-            color: isSelected ? context.textPrimaryColor : context.fillColor,
+            color: isSelected ? AppColors.primary : context.fillColor,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Text(
             label,
             style: AppTextStyles.label.copyWith(
               fontSize: 14,
-              color: isSelected ? context.bgColor : context.textPrimaryColor,
+              color: isSelected ? Colors.white : context.textPrimaryColor,
             ),
           ),
         ),

@@ -9,6 +9,7 @@ import 'core/auth/auth_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
+import 'features/settings/providers/theme_storage.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'shared/widgets/dishrate_logo.dart';
@@ -23,8 +24,15 @@ Future<void> main() async {
   ]);
 
   _registerFontLicenses();
-  await _precacheLogo();
-  runApp(const ProviderScope(child: DishrateApp()));
+  // Tema ilk kareden önce bilinmeli; yoksa uygulama bir an yanlış temada açılır.
+  final (_, themeMode) =
+      await (_precacheLogo(), ThemeStorage.instance.read()).wait;
+  runApp(ProviderScope(
+    overrides: [
+      themeProvider.overrideWith((ref) => ThemeNotifier(themeMode)),
+    ],
+    child: const DishrateApp(),
+  ));
 }
 
 /// Gömülü fontların OFL lisansları. Paket lisanslarını Flutter kendisi
@@ -47,11 +55,10 @@ void _registerFontLicenses() {
 /// ekranı kaybolup Flutter'ın boş ilk karesi görünüyor, logo bir an sönüp
 /// yeniden yanıyordu. Bu süre boyunca sistem açılış ekranı ekranda kalıyor.
 Future<void> _precacheLogo() async {
-  Future<void> resolveLogo(bool dark) {
+  Future<void> resolve(ImageProvider provider) {
     final done = Completer<void>();
     // Ekranda kullanılan sağlayıcının aynısı: önbellek anahtarı tutsun.
-    final stream =
-        DishrateWordmark.provider(dark).resolve(ImageConfiguration.empty);
+    final stream = provider.resolve(ImageConfiguration.empty);
     late final ImageStreamListener listener;
     listener = ImageStreamListener(
       (_, __) {
@@ -67,10 +74,13 @@ Future<void> _precacheLogo() async {
     return done.future;
   }
 
-  // Tema henüz bilinmiyor; iki sürüm de çözülüyor. Bir sorun olursa açılışı
-  // bekletmemek için süre sınırı var.
-  await Future.wait([resolveLogo(true), resolveLogo(false)])
-      .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
+  // Açılış turuncu kareyle başlıyor, sonra temaya geçiyor: üç sürüm de
+  // hazır olmalı. Bir sorun olursa açılışı bekletmemek için süre sınırı var.
+  await Future.wait([
+    resolve(DishrateWordmark.brandProvider),
+    resolve(DishrateWordmark.provider(true)),
+    resolve(DishrateWordmark.provider(false)),
+  ]).timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
 }
 
 class DishrateApp extends ConsumerWidget {
@@ -82,15 +92,13 @@ class DishrateApp extends ConsumerWidget {
 
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
-            WidgetsBinding
-                    .instance.platformDispatcher.platformBrightness ==
+            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
                 Brightness.dark);
 
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         // Android sistem çubuğu alt menüyle aynı tonda; ayrı sabit renk
         // yazılınca palet değiştiğinde çubuk ile menü arasında şerit kalıyordu.
         systemNavigationBarColor:
@@ -120,12 +128,30 @@ class DishrateApp extends ConsumerWidget {
 /// - loading       → SplashScreen
 /// - authenticated → MainScaffold
 /// - unauthenticated → LoginScreen
-class _AuthGate extends ConsumerWidget {
+class _AuthGate extends ConsumerStatefulWidget {
   const _AuthGate();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<_AuthGate> {
+  /// Açılış ekranı turuncu kareden temaya geçerken bekleniyor. Sunucu daha
+  /// hızlı cevap verirse ekran geçişin ortasında değişip zıplıyordu.
+  bool _intro = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(SplashScreen.introDuration, () {
+      if (mounted) setState(() => _intro = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    if (_intro) return const SplashScreen();
 
     return switch (authState.status) {
       AuthStatus.loading => const SplashScreen(),
