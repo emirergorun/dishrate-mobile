@@ -57,6 +57,11 @@ dependencies:
   geocoding: ^5.0.0
   flutter_tabler_icons: ^1.43.0
   shared_preferences: ^2.5.5
+  # "Bize ulaş" posta uygulamasını, gizlilik politikası web sayfasını açar.
+  url_launcher: ^6.3.2
+  # Ayarlar'daki sürüm uygulamanın gerçek sürümünden okunur (elle yazılmaz).
+  package_info_plus: ^10.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

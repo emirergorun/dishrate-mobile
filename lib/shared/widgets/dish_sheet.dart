@@ -94,12 +94,26 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
   bool _inWishlist = false;
   bool _wishlistLoading = true;
 
-  List<MenuItemReviewModel>? _reviews;
+  List<MenuItemReviewModel>? _loadedReviews;
   bool _reviewsFailed = false;
 
   /// Kullanıcının bu yemeğe verdiği puanın kimliği — yoksa `null`.
   /// Yorum listesinden çıkıyor: kendi değerlendirmesi `mine` ile işaretli.
-  int? _ownRatingId;
+  int? _loadedOwnRatingId;
+
+  /// Günlükte silinip "Geri al" süresi dolmamış puan sunucuda hâlâ duruyor;
+  /// panel onu yok sayar (bkz. [pendingRatingDeletesProvider]).
+  bool get _ownDeletePending => ref
+      .read(pendingRatingDeletesProvider)
+      .containsKey(widget.item.menuItemId);
+
+  int? get _ownRatingId => _ownDeletePending ? null : _loadedOwnRatingId;
+
+  List<MenuItemReviewModel>? get _reviews {
+    final reviews = _loadedReviews;
+    if (reviews == null || !_ownDeletePending) return reviews;
+    return reviews.where((r) => !r.mine).toList();
+  }
 
   /// Eylem satırının üstündeki bilgi şeridi.
   _InfoBannerKind _banner = _InfoBannerKind.none;
@@ -147,6 +161,14 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     super.initState();
     _checkWishlist();
     _loadReviews();
+    // Bekleyen silme bitince (gönderildi ya da geri alındı) sunucudaki
+    // gerçek durum yeniden okunur.
+    ref.listenManual(pendingRatingDeletesProvider, (prev, next) {
+      final id = widget.item.menuItemId;
+      if ((prev?.containsKey(id) ?? false) && !next.containsKey(id)) {
+        _loadReviews();
+      }
+    });
   }
 
   @override
@@ -165,8 +187,7 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       final list = await WishlistRepository.instance.getWishlist(userId);
       if (!mounted) return;
       setState(() {
-        _inWishlist =
-            list.any((w) => w.menuItemId == widget.item.menuItemId);
+        _inWishlist = list.any((w) => w.menuItemId == widget.item.menuItemId);
         _wishlistLoading = false;
       });
     } catch (_) {
@@ -197,6 +218,21 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
         }
         return;
       } else {
+        // Günlükte az önce silinen puan sunucuya henüz gitmemiş olabilir;
+        // beklemeden gönderilir. Silinemezse yemek hâlâ denenmiş sayılır.
+        final deleted = await ref
+            .read(pendingRatingDeletesProvider.notifier)
+            .commitNow(widget.item.menuItemId);
+        if (!deleted) {
+          _bannerTimer?.cancel();
+          if (mounted) {
+            setState(() {
+              _banner = _InfoBannerKind.alreadyTried;
+              _wishlistLoading = false;
+            });
+          }
+          return;
+        }
         await WishlistRepository.instance
             .addToWishlist(userId, widget.item.menuItemId);
       }
@@ -239,12 +275,11 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
       reviews.sort((a, b) => b.ratingId.compareTo(a.ratingId));
       if (mounted) {
         setState(() {
-          _reviews = reviews;
+          _loadedReviews = reviews;
           final own = reviews.where((r) => r.mine);
-          _ownRatingId = own.isEmpty ? null : own.first.ratingId;
+          _loadedOwnRatingId = own.isEmpty ? null : own.first.ratingId;
           // Kullanıcı bu arada puanını silmiş olabilir.
-          if (_ownRatingId == null &&
-              _banner == _InfoBannerKind.alreadyTried) {
+          if (_ownRatingId == null && _banner == _InfoBannerKind.alreadyTried) {
             _banner = _InfoBannerKind.none;
           }
         });
@@ -308,24 +343,24 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
         const InfoBanner(
           key: ValueKey(_InfoBannerKind.removedFromWishlist),
           icon: Icons.bookmark_remove_outlined,
-          message: "İstek Listesi'nden çıkarıldı.",
+          message: 'İstek Listesi’nden çıkarıldı.',
         ),
       _InfoBannerKind.wishlistFailed => const InfoBanner(
           key: ValueKey(_InfoBannerKind.wishlistFailed),
           icon: Icons.error_outline_rounded,
-          message: 'İstek listesi güncellenemedi, tekrar dene.',
+          message: 'İstek Listesi güncellenemedi, tekrar dene.',
         ),
       _InfoBannerKind.alreadyTried => InfoBanner(
           key: const ValueKey(_InfoBannerKind.alreadyTried),
           icon: Icons.info_outline_rounded,
-          message: 'Bu ürünü daha önce denedin.',
+          message: 'Bu yemeği daha önce denedin.',
           actionLabel: 'Günlüğe git',
           onAction: _openInDiary,
         ),
       _InfoBannerKind.addedToWishlist => InfoBanner(
           key: const ValueKey(_InfoBannerKind.addedToWishlist),
           icon: Icons.check_circle_outline_rounded,
-          message: "İstek Listesi'ne eklendi.",
+          message: 'İstek Listesi’ne eklendi.',
           actionLabel: 'Tümünü gör',
           onAction: _openWishlist,
         ),
@@ -346,6 +381,8 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
 
   @override
   Widget build(BuildContext context) {
+    // Günlükte silme beklerken ya da geri alınınca kendi puanı değişir.
+    ref.watch(pendingRatingDeletesProvider);
     final item = widget.item;
     final media = MediaQuery.of(context);
     final hasPhoto = item.photoUrl != null && item.photoUrl!.isNotEmpty;
@@ -373,88 +410,88 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
                 child: NotificationListener<ScrollNotification>(
                   onNotification: _onScroll,
                   child: SingleChildScrollView(
-                  // Her platformda esneyen kaydırma: aşağı çekince içerik
-                  // parmakla birlikte gelsin, kapanacağı hissedilsin.
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Fotoğraf — panelin kenarına kadar ─────────────────
-                      // Önceden fotoğraf panelin içinde, kenar boşluklu ayrı
-                      // bir kutudaydı; yemek küçülüyor, panel kutu içinde
-                      // kutu gibi görünüyordu.
-                      Stack(
-                        children: [
-                          hasPhoto
-                              ? AspectRatio(
-                                  aspectRatio: 4 / 3,
-                                  child: DishPhoto(
-                                      url: item.photoUrl, iconSize: 40),
-                                )
-                              : const SizedBox(height: 28),
-                          Positioned(
-                            top: 8,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                width: 36,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: hasPhoto
-                                      ? Colors.white.withValues(alpha: 0.7)
-                                      : context.dividerColor,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.xs),
+                    // Her platformda esneyen kaydırma: aşağı çekince içerik
+                    // parmakla birlikte gelsin, kapanacağı hissedilsin.
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Fotoğraf — panelin kenarına kadar ─────────────────
+                        // Önceden fotoğraf panelin içinde, kenar boşluklu ayrı
+                        // bir kutudaydı; yemek küçülüyor, panel kutu içinde
+                        // kutu gibi görünüyordu.
+                        Stack(
+                          children: [
+                            hasPhoto
+                                ? AspectRatio(
+                                    aspectRatio: 4 / 3,
+                                    child: DishPhoto(
+                                        url: item.photoUrl, iconSize: 40),
+                                  )
+                                : const SizedBox(height: 28),
+                            Positioned(
+                              top: 8,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Container(
+                                  width: 36,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: hasPhoto
+                                        ? Colors.white.withValues(alpha: 0.7)
+                                        : context.dividerColor,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.xs),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                            AppSpace.screen, AppSpace.screen, AppSpace.screen, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.name,
-                              style: AppTextStyles.headlineLarge
-                                  .copyWith(color: context.textPrimaryColor),
-                            ),
-                            const SizedBox(height: AppSpace.sm),
-                            _RestaurantLine(
-                              name: item.restaurantName,
-                              onTap: widget.showRestaurantLink
-                                  ? _openRestaurant
-                                  : null,
-                            ),
-                            if (meta.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                meta,
-                                style: AppTextStyles.caption.copyWith(
-                                    color: context.textSecondaryColor),
-                              ),
-                            ],
-                            const SizedBox(height: AppSpace.xl),
-                            _RatingSummary(
-                              rating: item.averageRating,
-                              count: _reviews?.length,
-                            ),
-                            const SizedBox(height: AppSpace.xl),
-                            _buildReviews(),
-                            const SizedBox(height: AppSpace.lg),
                           ],
                         ),
-                      ),
-                    ],
+
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(AppSpace.screen,
+                              AppSpace.screen, AppSpace.screen, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                style: AppTextStyles.headlineLarge
+                                    .copyWith(color: context.textPrimaryColor),
+                              ),
+                              const SizedBox(height: AppSpace.sm),
+                              _RestaurantLine(
+                                name: item.restaurantName,
+                                onTap: widget.showRestaurantLink
+                                    ? _openRestaurant
+                                    : null,
+                              ),
+                              if (meta.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  meta,
+                                  style: AppTextStyles.caption.copyWith(
+                                      color: context.textSecondaryColor),
+                                ),
+                              ],
+                              const SizedBox(height: AppSpace.xl),
+                              _RatingSummary(
+                                rating: item.averageRating,
+                                count: _reviews?.length,
+                              ),
+                              const SizedBox(height: AppSpace.xl),
+                              _buildReviews(),
+                              const SizedBox(height: AppSpace.lg),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 ),
               ),
 
@@ -563,7 +600,7 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Son yorumlar', style: titleStyle),
+        Text('Son Yorumlar', style: titleStyle),
         const SizedBox(height: AppSpace.lg),
         for (final r in written.take(_previewCount)) ...[
           ReviewTile(review: r, maxLines: 4),
@@ -641,8 +678,8 @@ class _RatingSummary extends StatelessWidget {
     if (rating <= 0) {
       return Text(
         'Henüz puanlanmamış',
-        style:
-            AppTextStyles.titleSmall.copyWith(color: context.textSecondaryColor),
+        style: AppTextStyles.titleSmall
+            .copyWith(color: context.textSecondaryColor),
       );
     }
     return Row(
@@ -650,8 +687,8 @@ class _RatingSummary extends StatelessWidget {
       children: [
         Text(
           rating.toStringAsFixed(1),
-          style:
-              AppTextStyles.ratingLarge.copyWith(color: context.textPrimaryColor),
+          style: AppTextStyles.ratingLarge
+              .copyWith(color: context.textPrimaryColor),
         ),
         const SizedBox(width: AppSpace.md),
         Column(
@@ -700,8 +737,7 @@ class _WishlistButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        active ? 'İstek listesinden çıkar' : 'İstek listesine ekle';
+    final label = active ? 'İstek Listesi’nden çıkar' : 'İstek Listesi’ne ekle';
 
     return Tooltip(
       message: label,
@@ -727,14 +763,11 @@ class _WishlistButton extends StatelessWidget {
                   transitionBuilder: (child, a) =>
                       ScaleTransition(scale: a, child: child),
                   child: Icon(
-                    active
-                        ? TablerIcons.bookmark_filled
-                        : TablerIcons.bookmark,
+                    active ? TablerIcons.bookmark_filled : TablerIcons.bookmark,
                     key: ValueKey(active),
                     size: 22,
-                    color: active
-                        ? AppColors.primary
-                        : context.textPrimaryColor,
+                    color:
+                        active ? AppColors.primary : context.textPrimaryColor,
                   ),
                 ),
         ),

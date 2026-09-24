@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/utils/turkish_text.dart';
 import '../../../core/constants/app_categories.dart';
 import '../../../core/network/restaurant_repository.dart';
 import '../../../core/theme/app_colors.dart';
@@ -95,19 +96,42 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
+    final q = value.trim();
+    // Yazılan kelime bir kategorinin adıysa ("sushi", "tatli") çipe basılmış
+    // gibi davranılır: önceden çip o türdeki yemekleri, yazı ise adında
+    // "sushi" geçen restoranları getiriyordu; aynı kelime iki ayrı sonuç
+    // veriyordu (24 Eylül).
+    final category = _categoryNamed(q);
     setState(() {
       _query = value;
-      _selectedCategory = null; // metin araması kategoriden bağımsız
+      _selectedCategory = category;
     });
 
-    final q = value.trim();
     if (q.length < _minQuery) {
       _clearResults();
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 350), () {
-      _run('metin:$q', () => RestaurantRepository.instance.search(q));
+      if (category != null) {
+        _run('kategori:$category', () => _searchCategory(category));
+      } else {
+        _run('metin:$q', () => RestaurantRepository.instance.search(q));
+      }
     });
+  }
+
+  static String? _categoryNamed(String query) {
+    final key = TurkishText.searchKey(query);
+    for (final c in AppCategories.all) {
+      if (TurkishText.searchKey(c) == key) return c;
+    }
+    return null;
+  }
+
+  Future<List<SearchResult>> _searchCategory(String label) async {
+    final items =
+        await RestaurantRepository.instance.getMenuItemsByCategory(label);
+    return _groupByRestaurant(items);
   }
 
   void _onCategoryTap(String label) {
@@ -122,11 +146,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _clearResults();
       return;
     }
-    _run('kategori:$label', () async {
-      final items =
-          await RestaurantRepository.instance.getMenuItemsByCategory(label);
-      return _groupByRestaurant(items);
-    });
+    _run('kategori:$label', () => _searchCategory(label));
   }
 
   /// Son arama; hata ekranındaki "Tekrar dene" aynısını yeniden gönderir.
@@ -424,7 +444,7 @@ class _MapPreview extends StatelessWidget {
                           color: Colors.white, size: 16),
                       const SizedBox(width: 6),
                       Text(
-                        'Haritada Keşfet',
+                        'Haritada keşfet',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -471,7 +491,7 @@ class _SearchBar extends StatelessWidget {
         textInputAction: TextInputAction.search,
         style: AppTextStyles.bodyMedium,
         decoration: InputDecoration(
-          hintText: 'Yemek veya restoran ara...',
+          hintText: 'Yemek veya restoran ara…',
           hintStyle: AppTextStyles.bodyMedium
               .copyWith(color: context.textTertiaryColor),
           prefixIcon: Icon(Icons.search_rounded,
@@ -557,7 +577,7 @@ class _RestaurantCard extends StatelessWidget {
         ? 'Menü henüz eklenmemiş'
         : result.nameMatched
             ? 'Menüye bak'
-            : '$count eşleşen ürün';
+            : '$count eşleşen yemek';
 
     // Kart da ad da aynı yere gidiyor: restoran sayfası. Önceden burada
     // aramaya özel bir mini menü açılıyordu; menü tek yerde olsun.

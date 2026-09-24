@@ -346,7 +346,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     }
     final message = switch (r.outcome) {
       LocationOutcome.serviceDisabled =>
-        'Cihazının konum servisi kapalı. Ayarlardan açabilirsin.',
+        'Cihazının konum servisi kapalı. Ayarlar’dan açabilirsin.',
       LocationOutcome.deniedForever =>
         'Konum izni kapalı. Ayarlar’dan açabilirsin.',
       _ => 'Konum alınamadı. Şehri kendin seçebilirsin.',

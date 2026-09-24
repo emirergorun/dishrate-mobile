@@ -134,7 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!mounted) return;
     final authState = ref.read(authProvider);
     final errorText = authState.status == AuthStatus.unauthenticated
-        ? (authState.errorMessage ?? 'Giriş yapılamadı, tekrar dene')
+        ? (authState.errorMessage ?? 'Giriş yapılamadı, tekrar dene.')
         : null;
 
     setState(() {
@@ -272,7 +272,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                     )
                                   : Text(
-                                      'Giriş Yap',
+                                      'Giriş yap',
                                       style: AppTextStyles.titleSmall.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w600,
@@ -310,7 +310,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               },
                               child: MinTapArea(
                                 child: Text(
-                                  'Kayıt Ol',
+                                  'Kayıt ol',
                                   style: AppTextStyles.bodyMedium.copyWith(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w600,
@@ -451,7 +451,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // silinmeden.
     if (authState.status == AuthStatus.unauthenticated) {
       setState(() => _error =
-          authState.errorMessage ?? 'Kayıt tamamlanamadı, tekrar dene');
+          authState.errorMessage ?? 'Kayıt tamamlanamadı, tekrar dene.');
     }
   }
 
@@ -490,12 +490,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           child: _AuthTextField(
                             controller: _firstNameController,
                             label: null,
-                            hint: 'İsim',
+                            hint: 'Ad',
                             keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'İsim gerekli';
+                                return 'Ad gerekli';
                               }
                               return null;
                             },
@@ -506,12 +506,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           child: _AuthTextField(
                             controller: _lastNameController,
                             label: null,
-                            hint: 'Soyisim',
+                            hint: 'Soyad',
                             keyboardType: TextInputType.name,
                             textInputAction: TextInputAction.next,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'Soyisim gerekli';
+                                return 'Soyad gerekli';
                               }
                               return null;
                             },
@@ -523,7 +523,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     _AuthTextField(
                       controller: _usernameController,
                       label: null,
-                      hint: 'Kullanıcı Adı',
+                      hint: 'Kullanıcı adı',
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         final t = (v ?? '').trim();
@@ -533,7 +533,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           return 'Kullanıcı adı boşluk içeremez';
                         }
                         if (!RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(t)) {
-                          return 'Sadece harf, rakam, nokta, _ ve - kullanılabilir';
+                          return 'Türkçe karakter olamaz; yalnızca a-z, rakam, nokta, _ ve -';
                         }
                         return null;
                       },
@@ -646,7 +646,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                               )
                             : Text(
-                                'Kayıt Ol',
+                                'Kayıt ol',
                                 style: AppTextStyles.titleSmall.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
@@ -676,7 +676,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onTap: () => Navigator.of(context).pop(),
                         child: MinTapArea(
                           child: Text(
-                            'Giriş Yap',
+                            'Giriş yap',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,

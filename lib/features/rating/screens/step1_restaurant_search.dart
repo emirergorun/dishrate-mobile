@@ -173,7 +173,7 @@ class _Step1RestaurantSearchState extends ConsumerState<Step1RestaurantSearch> {
           StateMessage(
             title: 'Restoran bulunamadı',
             message:
-                '"${_controller.text}" ile eşleşen bir restoran yok. Adın bir kısmını yazmayı dene.',
+                '“${_controller.text}” ile eşleşen bir restoran yok. Adın bir kısmını yazmayı dene.',
           ),
         ],
       );
@@ -219,7 +219,21 @@ class _EmptySearchHint extends StatelessWidget {
           Wrap(
             spacing: AppSpace.sm,
             runSpacing: AppSpace.sm,
-            children: ['Burger', 'Sushi', 'Pizza', 'Ocakbaşı', 'Noodle']
+            // Arama restoran adında yapılıyor; her örnek gerçek veride en az
+            // bir restoran getirmeli (24 Eylül'de denendi). Lahmacun, mantı,
+            // köfte gibi adlar restoran adında geçmediği için boş dönüyordu.
+            children: [
+              'Burger',
+              'Sushi',
+              'Pizza',
+              'Döner',
+              'Kebap',
+              'Ocakbaşı',
+              'Kahvaltı',
+              'Ramen',
+              'Noodle',
+              'Balık',
+            ]
                 .map((hint) => _HintChip(
                       label: hint,
                       onTap: () => onHintTap(hint),

@@ -20,6 +20,7 @@ import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/info_banner.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/pressable.dart';
+import '../../../core/utils/relative_date.dart';
 import '../../../shared/widgets/rating_stars.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
@@ -28,10 +29,10 @@ import '../../../shared/widgets/swipe_to_delete.dart';
 // ── Sıralama seçenekleri ──────────────────────────────────────────────────────
 
 enum _SortBy {
-  newest('En Yeni'),
-  oldest('En Eski'),
-  highest('En Yüksek Puan'),
-  lowest('En Düşük Puan');
+  newest('En yeni'),
+  oldest('En eski'),
+  highest('En yüksek puan'),
+  lowest('En düşük puan');
 
   const _SortBy(this.label);
   final String label;
@@ -102,9 +103,14 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   bool get _hasActiveFilter =>
       _categoryFilter != null || _sortBy != _SortBy.newest;
 
+  /// Bekleyen silmelerin uygulama geneli kaydı. `dispose`'da `ref`
+  /// kullanılamadığı için baştan tutulur.
+  late final PendingRatingDeletes _pendingRegistry;
+
   @override
   void initState() {
     super.initState();
+    _pendingRegistry = ref.read(pendingRatingDeletesProvider.notifier);
     _load();
     // Ekran ilk kez burada oluşuyorsa ref.listen henüz bir değişiklik görmez;
     // bekleyen odak isteği varsa onu da karşıla.
@@ -121,6 +127,10 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       pending.timer.cancel();
       RatingRepository.instance.deleteRating(pending.rating.ratingId).ignore();
     }
+    // Ağaç kapanırken sağlayıcı değiştirilemez; bir sonraki turda temizlenir.
+    final ids = [for (final p in _pendingDeletes) p.rating.ratingId];
+    final registry = _pendingRegistry;
+    Future.microtask(() => ids.forEach(registry.remove));
     for (final notice in _notices) {
       notice.timer.cancel();
     }
@@ -197,7 +207,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = 'Oturum bulunamadı.';
+          _error = 'Oturum bulunamadı';
         });
       }
       return;
@@ -217,7 +227,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Puanlar yüklenemedi.');
+      if (mounted) setState(() => _error = 'Değerlendirmeler yüklenemedi');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -260,10 +270,16 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       _pendingDeletes.add(pending);
       _applyFilters();
     });
+    _pendingRegistry.add(PendingRatingDelete(
+      ratingId: rating.ratingId,
+      menuItemId: rating.menuItemId,
+      commitNow: () => _commitDelete(pending),
+    ));
   }
 
   void _undoDelete(_PendingDelete pending) {
     pending.timer.cancel();
+    _pendingRegistry.remove(pending.rating.ratingId);
     _markRestored(pending.rating.ratingId);
     setState(() {
       _pendingDeletes.remove(pending);
@@ -279,9 +295,11 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         .addPostFrameCallback((_) => _restoredIds.remove(ratingId));
   }
 
-  Future<void> _commitDelete(_PendingDelete pending) async {
+  /// Süre dolunca ya da yemek paneli beklemeden istediğinde (İstek
+  /// Listesi'ne ekleme) çalışır. Sunucu sildiyse `true`.
+  Future<bool> _commitDelete(_PendingDelete pending) async {
     pending.timer.cancel();
-    if (!mounted || !_pendingDeletes.contains(pending)) return;
+    if (!mounted || !_pendingDeletes.contains(pending)) return true;
     final rating = pending.rating;
     setState(() {
       _pendingDeletes.remove(pending);
@@ -294,9 +312,12 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       await RatingRepository.instance
           .deleteRating(rating.ratingId)
           .timeout(_deleteDeadline);
+      _pendingRegistry.remove(rating.ratingId);
       if (mounted) ref.read(userDataRefreshProvider.notifier).state++;
+      return true;
     } catch (_) {
-      if (!mounted) return;
+      _pendingRegistry.remove(rating.ratingId);
+      if (!mounted) return false;
       // Sunucu silmediyse kart geri gelir.
       _markRestored(rating.ratingId);
       setState(() {
@@ -304,6 +325,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         _applyFilters();
       });
       _showNotice('Silinemedi, tekrar dene.');
+      return false;
     }
   }
 
@@ -325,8 +347,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
           InfoBanner(
             key: ValueKey('deleted_${pending.rating.ratingId}'),
             icon: Icons.delete_outline_rounded,
-            message:
-                '${pending.rating.restaurantName} - ${pending.rating.menuItemName} silindi.',
+            message: '${pending.rating.menuItemName} silindi.',
             actionLabel: 'Geri al',
             onAction: () => _undoDelete(pending),
           ),
@@ -343,6 +364,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      // Aşağı kaydırmayı panel kendisi yönetiyor: Flutter'ın kaydırarak
+      // kapatması PopScope'a sormadan kapatıyor, değişiklik kayboluyordu.
+      enableDrag: false,
       builder: (_) => _EditRatingSheet(rating: rating),
     );
     if (result == null || !mounted) return;
@@ -883,25 +907,6 @@ class _RatingCard extends StatelessWidget {
   /// aynı yarıçapı kullanıyor.
   static const double cardRadius = 16;
 
-  static const _months = [
-    'Oca',
-    'Şub',
-    'Mar',
-    'Nis',
-    'May',
-    'Haz',
-    'Tem',
-    'Ağu',
-    'Eyl',
-    'Eki',
-    'Kas',
-    'Ara',
-  ];
-
-  String _formatDate(DateTime dt) {
-    return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     // Vurgu: turuncudan normale sönen zemin ve kenarlık.
@@ -958,7 +963,7 @@ class _RatingCard extends StatelessWidget {
                         // Tarih
                         if (rating.ratedAt != null)
                           Text(
-                            _formatDate(rating.ratedAt!),
+                            RelativeDate.date(rating.ratedAt!),
                             style: AppTextStyles.caption.copyWith(
                               color: context.textTertiaryColor,
                             ),
@@ -1039,7 +1044,7 @@ class _RatingCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Text(
-                '"${rating.comment}"',
+                '“${rating.comment}”',
                 style: AppTextStyles.bodySmall.copyWith(
                   fontStyle: FontStyle.italic,
                   color: context.textSecondaryColor,
@@ -1146,12 +1151,74 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
   bool get _hasPhoto =>
       _newPhotoBytes != null || (!_photoRemoved && _currentPhoto != null);
 
+  /// Kayıtlı hâlden farkı var mı? Yoksa "Güncelle" pasif kalır, kapatırken
+  /// onay sorulmaz. Fotoğraf eklemek, değiştirmek ya da kaldırmak da sayılır.
+  bool get _isDirty =>
+      _score != widget.rating.score ||
+      _commentCtrl.text.trim() != (widget.rating.comment ?? '').trim() ||
+      _newPhoto != null ||
+      (_photoRemoved && _currentPhoto != null);
+
   @override
   void initState() {
     super.initState();
     _score = widget.rating.score;
     _commentCtrl = TextEditingController(text: widget.rating.comment ?? '');
     _currentPhoto = widget.rating.reviewPhotoUrl;
+    // Her harfte "Güncelle"nin durumu yeniden hesaplansın.
+    _commentCtrl.addListener(() => setState(() {}));
+  }
+
+  /// Aşağı kaydırılan mesafe; panel parmağı izler.
+  double _dragOffset = 0;
+  bool _dragging = false;
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    setState(() {
+      _dragging = true;
+      _dragOffset = (_dragOffset + d.delta.dy).clamp(0.0, double.infinity);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final close = _dragOffset > 100 || d.velocity.pixelsPerSecond.dy > 700;
+    setState(() {
+      _dragging = false;
+      _dragOffset = 0;
+    });
+    if (close) _requestClose();
+  }
+
+  /// "İptal et", panelin dışına basma ve aşağı kaydırma buraya gelir.
+  /// Değişiklik varsa önce sorulur; "Geri dön" paneli olduğu gibi bırakır.
+  Future<void> _requestClose() async {
+    if (_isLoading) return;
+    if (!_isDirty) {
+      Navigator.pop(context);
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.surfaceColor,
+        content: const Text(
+          'Güncellemeyi iptal etmek istiyor musun?',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Geri dön'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: ctx.errorTextColor),
+            child: const Text('İptal et'),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) Navigator.pop(context);
   }
 
   Future<void> _pickPhoto() async {
@@ -1191,7 +1258,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     } catch (_) {
       if (mounted) {
         setState(() =>
-            _error = 'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.');
+            _error = 'Fotoğrafa erişilemedi. İzni Ayarlar’dan açabilirsin.');
       }
     }
   }
@@ -1265,19 +1332,31 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     }
   }
 
-  static String _scoreLabel(double score) {
-    if (score == 0) return 'Puan seç';
-    if (score <= 1.0) return 'Berbat';
-    if (score <= 2.0) return 'İdare eder';
-    if (score <= 3.0) return 'Fena değil';
-    if (score <= 3.5) return 'İyi';
-    if (score <= 4.0) return 'Güzel';
-    if (score <= 4.5) return 'Harika';
-    return 'Mükemmel!';
-  }
+  static String _scoreLabel(double score) =>
+      score == 0 ? 'Puan seç' : ratingLabel(score);
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_isDirty && !_isLoading,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _requestClose();
+      },
+      child: GestureDetector(
+        onVerticalDragUpdate: _onDragUpdate,
+        onVerticalDragEnd: _onDragEnd,
+        child: AnimatedContainer(
+          duration:
+              _dragging ? Duration.zero : const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, _dragOffset, 0),
+          child: _buildSheet(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context) {
     return Padding(
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -1308,17 +1387,44 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
               // Tam genişlik: yoksa sütun metin kadar daralıp ortada kalıyordu.
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Değerlendirmeyi Düzenle',
-                      style: AppTextStyles.titleSmall),
-                  const SizedBox(height: AppSpace.xxs),
-                  Text(
-                    '${widget.rating.restaurantName} · ${widget.rating.menuItemName}',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: context.textSecondaryColor),
-                    overflow: TextOverflow.ellipsis,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Değerlendirmeyi Düzenle',
+                            style: AppTextStyles.titleSmall),
+                        const SizedBox(height: AppSpace.xxs),
+                        Text(
+                          '${widget.rating.restaurantName} · ${widget.rating.menuItemName}',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: context.textSecondaryColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  // Kırmızı: "Hesabı sil" ile aynı renk (Emir'in isteği).
+                  Semantics(
+                    button: true,
+                    label: 'Düzenlemeyi iptal et',
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _requestClose,
+                      child: MinTapArea(
+                        child: Text(
+                          'İptal et',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: context.errorTextColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1379,7 +1485,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                 maxLength: 500,
                 style: AppTextStyles.bodyMedium,
                 decoration: InputDecoration(
-                  hintText: 'Yorumunu güncelle...',
+                  hintText: 'Bu yemek hakkında ne düşünüyorsun?',
                   alignLabelWithHint: true,
                   counterStyle: AppTextStyles.caption
                       .copyWith(color: context.textTertiaryColor),
@@ -1436,7 +1542,7 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _save,
+                  onPressed: (_isLoading || !_isDirty) ? null : _save,
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,

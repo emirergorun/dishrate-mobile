@@ -116,7 +116,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
                     child: Text(
-                      'Keşfetmeye Başla',
+                      'Keşfetmeye başla',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,

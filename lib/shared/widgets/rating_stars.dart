@@ -4,6 +4,24 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
+/// Puanın sözlü karşılığı; puan girilen her yerde aynı ölçek (1.5 turu).
+///
+/// Her yarım yıldızın kendi etiketi var: yarım yıldız seçen kullanıcı
+/// değişikliği yazıda da görsün. Önceden değerlendirme ekranı ile günlükteki
+/// düzenleme paneli ayrı listeler kullanıyordu ve aynı puana farklı yazı
+/// çıkıyordu (2 yıldız: "Kötü" / "İdare eder").
+String ratingLabel(double score) {
+  if (score <= 1.0) return 'Berbat';
+  if (score <= 1.5) return 'Çok kötü';
+  if (score <= 2.0) return 'Kötü';
+  if (score <= 2.5) return 'İdare eder';
+  if (score <= 3.0) return 'Fena değil';
+  if (score <= 3.5) return 'İyi';
+  if (score <= 4.0) return 'Çok iyi';
+  if (score <= 4.5) return 'Harika';
+  return 'Mükemmel';
+}
+
 /// Tek yıldız: dolu, yarım ya da boş.
 ///
 /// Boş yıldız soluk dolgu değil ÇERÇEVE. Koyu temada soluk dolgu zeminle
@@ -65,7 +83,7 @@ class StarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '5 üzerinden ${rating.toStringAsFixed(1)} yıldız',
+      label: '5 üzerinden ${rating.toStringAsFixed(1).replaceAll('.', ',')} yıldız',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,

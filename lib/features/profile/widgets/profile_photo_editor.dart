@@ -34,18 +34,22 @@ class ProfilePhotoResult {
 abstract final class ProfilePhotoEditor {
   /// Seçenek listesini açar ve seçime göre yükleme yapar.
   /// Kullanıcı vazgeçerse null döner.
+  ///
+  /// [onError] verilirse hata SnackBar yerine ona gider. Bir panelin içinden
+  /// çağıranlar kullanır: SnackBar panelin arkasında kalıp görünmüyordu.
   static Future<ProfilePhotoResult?> edit(
     BuildContext context, {
     required UserModel user,
+    ValueChanged<String>? onError,
   }) async {
     final choice = await _askChoice(context, user: user);
     if (choice == null || !context.mounted) return null;
 
     switch (choice) {
       case _PhotoAction.pickNew:
-        return _pickFromGallery(context);
+        return _pickFromGallery(context, onError);
       case _PhotoAction.recrop:
-        return _recropExisting(context, user: user);
+        return _recropExisting(context, user: user, onError: onError);
       case _PhotoAction.remove:
         return const ProfilePhotoResult(photoUrl: '', originalUrl: '', crop: '');
     }
@@ -135,7 +139,7 @@ abstract final class ProfilePhotoEditor {
   // ── Galeriden yeni fotoğraf ────────────────────────────────────────────────
 
   static Future<ProfilePhotoResult?> _pickFromGallery(
-      BuildContext context) async {
+      BuildContext context, ValueChanged<String>? onError) async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       maxWidth: 1600,
@@ -145,7 +149,7 @@ abstract final class ProfilePhotoEditor {
     final bytes = await picked.readAsBytes();
     if (!context.mounted) return null;
 
-    return _cropAndUpload(context, original: bytes);
+    return _cropAndUpload(context, original: bytes, onError: onError);
   }
 
   // ── Kayıtlı özgün görseli yeniden çerçevele ────────────────────────────────
@@ -153,6 +157,7 @@ abstract final class ProfilePhotoEditor {
   static Future<ProfilePhotoResult?> _recropExisting(
     BuildContext context, {
     required UserModel user,
+    ValueChanged<String>? onError,
   }) async {
     final Uint8List bytes;
     try {
@@ -160,7 +165,7 @@ abstract final class ProfilePhotoEditor {
           .downloadBytes(user.profilePhotoOriginalUrl!);
     } catch (_) {
       if (context.mounted) {
-        _snack(context, 'Özgün fotoğraf indirilemedi, tekrar dene.');
+        _report(context, onError, 'Özgün fotoğraf indirilemedi, tekrar dene.');
       }
       return null;
     }
@@ -173,6 +178,7 @@ abstract final class ProfilePhotoEditor {
       initialArea: CropOutcome.parseArea(user.profilePhotoCrop),
       // Özgün görsel zaten sunucuda; tekrar yüklemeye gerek yok.
       existingOriginalUrl: user.profilePhotoOriginalUrl,
+      onError: onError,
     );
   }
 
@@ -183,6 +189,7 @@ abstract final class ProfilePhotoEditor {
     required Uint8List original,
     Rect? initialArea,
     String? existingOriginalUrl,
+    ValueChanged<String>? onError,
   }) async {
     final outcome = await ImageCropDialog.show(
       context,
@@ -210,13 +217,18 @@ abstract final class ProfilePhotoEditor {
       );
     } catch (_) {
       if (context.mounted) {
-        _snack(context, 'Fotoğraf yüklenemedi, tekrar dene.');
+        _report(context, onError, 'Fotoğraf yüklenemedi, tekrar dene.');
       }
       return null;
     }
   }
 
-  static void _snack(BuildContext context, String message) {
+  static void _report(
+      BuildContext context, ValueChanged<String>? onError, String message) {
+    if (onError != null) {
+      onError(message);
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

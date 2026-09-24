@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/app_info.dart';
+import '../../../core/constants/app_links.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../providers/theme_provider.dart';
@@ -12,6 +16,9 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
+    // Yüklenirken ya da okunamazsa çizgi; elle yazılmış sürüm göstermek yerine.
+    final version = ref.watch(appVersionProvider).valueOrNull ?? '—';
+    const privacyPolicy = AppLinks.privacyPolicy;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -58,7 +65,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => ref.read(themeProvider.notifier).set(ThemeMode.light),
           ),
           _ThemeOption(
-            title: 'Cihaz Ayarları',
+            title: 'Cihaz ayarları',
             icon: Icons.brightness_auto_rounded,
             iconColor: AppColors.primary,
             selected: themeMode == ThemeMode.system,
@@ -77,25 +84,29 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
 
-          const _InfoItem(
+          _InfoItem(
             icon: Icons.info_outline_rounded,
             label: 'Sürüm',
-            value: '1.0.0',
+            value: version,
           ),
-          _InfoItem(
-            icon: Icons.privacy_tip_outlined,
-            label: 'Gizlilik Politikası',
-            value: '',
-            onTap: () {},
-          ),
+          // Adres web sitesiyle gelecek (yol haritası 2.10); o zamana kadar
+          // satır yok — basınca bir şey yapmayan öğe bırakılmıyor.
+          if (privacyPolicy != null)
+            _InfoItem(
+              icon: Icons.privacy_tip_outlined,
+              label: 'Gizlilik politikası',
+              value: '',
+              onTap: () => launchUrl(Uri.parse(privacyPolicy),
+                  mode: LaunchMode.inAppBrowserView),
+            ),
           _InfoItem(
             icon: Icons.description_outlined,
-            label: 'Açık Kaynak Lisansları',
+            label: 'Açık kaynak lisansları',
             value: '',
             onTap: () => showLicensePage(
               context: context,
               applicationName: 'Dishrate',
-              applicationVersion: '1.0.0',
+              applicationVersion: version,
             ),
           ),
 

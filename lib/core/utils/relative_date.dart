@@ -4,8 +4,18 @@
 /// biçim için yerel veri başlatmak yerine ay adları burada tutuluyor.
 abstract final class RelativeDate {
   static const _months = [
-    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
-    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+    'Oca',
+    'Şub',
+    'Mar',
+    'Nis',
+    'May',
+    'Haz',
+    'Tem',
+    'Ağu',
+    'Eyl',
+    'Eki',
+    'Kas',
+    'Ara',
   ];
 
   /// "bugün", "3 gün önce", "2 hafta önce"; bir aydan eskiyse "12 Eyl 2026".
@@ -22,6 +32,10 @@ abstract final class RelativeDate {
     if (days == 1) return 'dün';
     if (days < 7) return '$days gün önce';
     if (days < 30) return '${days ~/ 7} hafta önce';
-    return '${t.day} ${_months[t.month - 1]} ${t.year}';
+    return RelativeDate.date(t);
   }
+
+  /// "12 Eyl 2026". Günlük kartları ve eski yorumlar aynı biçimi kullanır.
+  static String date(DateTime d) =>
+      '${d.day} ${_months[d.month - 1]} ${d.year}';
 }

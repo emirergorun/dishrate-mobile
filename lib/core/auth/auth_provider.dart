@@ -176,16 +176,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (e is Exception) {
       final msg = e.toString();
       if (msg.contains('401') || msg.contains('Unauthorized')) {
-        return 'E-posta veya şifre hatalı';
+        return 'Giriş bilgileri hatalı.';
       }
       if (msg.contains('409') || msg.contains('already')) {
-        return 'Bu e-posta veya kullanıcı adı zaten kullanımda';
+        return 'Bu e-posta ya da kullanıcı adı zaten kullanımda.';
       }
       if (msg.contains('SocketException') || msg.contains('connection')) {
-        return 'Sunucuya bağlanılamadı';
+        return 'Sunucuya bağlanılamadı.';
       }
     }
-    return 'Bir hata oluştu, tekrar dene';
+    return 'Bir hata oluştu, tekrar dene.';
   }
 }
 

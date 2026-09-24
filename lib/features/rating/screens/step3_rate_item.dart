@@ -99,7 +99,7 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
       });
     } catch (_) {
       ref.read(ratingFlowProvider.notifier).showError(
-            'Fotoğrafa erişilemedi. İzni Ayarlar\'dan açabilirsin.',
+            'Fotoğrafa erişilemedi. İzni Ayarlar’dan açabilirsin.',
           );
     }
   }
@@ -166,7 +166,7 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
       if (mounted) widget.onSuccess();
     } catch (e) {
       ref.read(ratingFlowProvider.notifier).showError(
-            'Puan kaydedilemedi. Lütfen tekrar dene.',
+            'Puan kaydedilemedi, tekrar dene.',
           );
     }
   }
@@ -420,7 +420,7 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
         ),
         const SizedBox(width: 10),
         Text(
-          _scoreLabel(score),
+          ratingLabel(score),
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.w400,
             color: context.textSecondaryColor,
@@ -430,19 +430,6 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
     );
   }
 
-  /// Her yarım yıldızın kendi etiketi var. Önceden 1.5 ile 2 aynı etiketi
-  /// alıyordu; yarım yıldız seçen kullanıcı değişikliği yazıda görmüyordu.
-  String _scoreLabel(double score) {
-    if (score <= 1.0) return 'Berbat';
-    if (score <= 1.5) return 'Çok kötü';
-    if (score <= 2.0) return 'Kötü';
-    if (score <= 2.5) return 'İdare eder';
-    if (score <= 3.0) return 'Fena değil';
-    if (score <= 3.5) return 'İyi';
-    if (score <= 4.0) return 'Çok iyi';
-    if (score <= 4.5) return 'Harika';
-    return 'Mükemmel';
-  }
 }
 
 // ── Sabit alt çubuk ───────────────────────────────────────────────────────────

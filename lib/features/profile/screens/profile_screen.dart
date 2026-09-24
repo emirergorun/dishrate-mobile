@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/app_info.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/auth/token_storage.dart';
+import '../../../core/constants/app_links.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/user_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
@@ -251,7 +255,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _showPrivacy() {
+  void _showChangePassword() {
     showModalBottomSheet(
       context: context,
       backgroundColor: context.surfaceColor,
@@ -259,32 +263,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (_) => const _PrivacySheet(),
+      builder: (_) => const _ChangePasswordSheet(),
     );
   }
 
-  void _showNotifications() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.surfaceColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (_) => const _NotificationsSheet(),
+  /// "Bize ulaş": posta uygulamasını destek adresiyle açar. Önceden bir
+  /// panel açılıyor, satırlara basınca yalnızca adres şerit olarak
+  /// görünüyordu (1.6). Posta uygulaması yoksa adres panoya kopyalanır.
+  Future<void> _contactUs() async {
+    // Sürüm destek için işe yarıyor; okunamazsa posta onsuz açılır.
+    String? version;
+    try {
+      version = await ref.read(appVersionProvider.future);
+    } catch (_) {}
+    final uri = Uri(
+      scheme: 'mailto',
+      path: AppLinks.supportEmail,
+      // `queryParameters` boşlukları "+" yapıyor, posta uygulaması da "+"
+      // olarak gösteriyor; elle kodlanır.
+      query: [
+        'subject=${Uri.encodeComponent('Dishrate Geri Bildirimi')}',
+        if (version != null)
+          'body=${Uri.encodeComponent('\n\n—\nSürüm: $version')}',
+      ].join('&'),
     );
-  }
-
-  void _showContactUs() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.surfaceColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (_) => const _ContactSheet(),
-    );
+    var opened = false;
+    try {
+      opened = await launchUrl(uri);
+    } catch (_) {}
+    if (opened || !mounted) return;
+    await Clipboard.setData(const ClipboardData(text: AppLinks.supportEmail));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('E-posta adresi kopyalandı: ${AppLinks.supportEmail}'),
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   void _showTerms() {
@@ -304,9 +317,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.surfaceColor,
-        title: const Text('Oturumu Kapat', style: AppTextStyles.titleSmall),
+        title: const Text('Çıkış Yap', style: AppTextStyles.titleSmall),
         content: Text(
-          'Oturumunu kapatmak istediğine emin misin?',
+          'Çıkış yapmak istediğine emin misin?',
           style: AppTextStyles.bodySmall,
         ),
         actions: [
@@ -322,7 +335,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             },
             style:
                 TextButton.styleFrom(foregroundColor: context.errorTextColor),
-            child: const Text('Çıkış Yap'),
+            child: const Text('Çıkış yap'),
           ),
         ],
       ),
@@ -428,11 +441,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                           const SizedBox(height: AppSpace.sm),
 
-                          // ── KEŞFEDİN ───────────────────────────────────
-                          const _SectionLabel('KEŞFEDİN'),
+                          // ── YEMEKLERİN ───────────────────────────────────
+                          const _SectionLabel('YEMEKLERİN'),
                           _ProfileItem(
                             icon: TablerIcons.heart,
-                            label: 'Favori Yemekler',
+                            label: 'Favori yemekler',
                             subtitle: _topFavorites.isEmpty
                                 ? 'Henüz puan verilmedi'
                                 : 'En yüksek puanlı ${_topFavorites.length} yemeğin',
@@ -443,7 +456,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             label: 'İstek Listesi',
                             subtitle: _wishlist.isEmpty
                                 ? 'Boş'
-                                : '${_wishlist.length} ürün kaydedildi',
+                                : '${_wishlist.length} yemek kaydedildi',
                             onTap: _showWishlist,
                           ),
 
@@ -451,34 +464,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           const _SectionLabel('HESAP'),
                           _ProfileItem(
                             icon: TablerIcons.pencil,
-                            label: 'Profili Düzenle',
+                            label: 'Profili düzenle',
                             subtitle: 'Kullanıcı adı ve biyografi',
                             onTap: _showEditProfile,
                           ),
+                          // Önceki "Gizlilik ve güvenlik" panelinde kaydedilmeyen
+                          // bir "Profili gizle" anahtarı ve bu satır vardı;
+                          // "Bildirimler" paneli de hiçbir şey kaydetmiyordu.
+                          // İkisi 1.6'da kalktı (bildirimler 6.4 ile döner).
                           _ProfileItem(
-                            icon: TablerIcons.lock,
-                            label: 'Gizlilik ve Güvenlik',
-                            subtitle: 'Şifre, hesap gizliliği',
-                            onTap: _showPrivacy,
-                          ),
-                          _ProfileItem(
-                            icon: TablerIcons.bell,
-                            label: 'Bildirimler',
-                            subtitle: 'Bildirim tercihlerini yönet',
-                            onTap: _showNotifications,
+                            icon: TablerIcons.key,
+                            label: 'Şifre değiştir',
+                            subtitle: 'Hesap güvenliğini artır',
+                            onTap: _showChangePassword,
                           ),
 
                           // ── DESTEK ──────────────────────────────────────
                           const _SectionLabel('DESTEK'),
                           _ProfileItem(
                             icon: TablerIcons.message_circle,
-                            label: 'Bize Ulaş',
-                            subtitle: 'Öneri ve şikayetlerin için',
-                            onTap: _showContactUs,
+                            label: 'Bize ulaş',
+                            subtitle: AppLinks.supportEmail,
+                            onTap: _contactUs,
                           ),
                           _ProfileItem(
                             icon: TablerIcons.file_text,
-                            label: 'Kullanım Şartları',
+                            label: 'Kullanım şartları',
                             onTap: _showTerms,
                           ),
 
@@ -489,13 +500,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           // kırmızı yazı zaten uyarıyor.
                           _ProfileItem(
                             icon: TablerIcons.logout,
-                            label: 'Oturumu Kapat',
+                            label: 'Çıkış yap',
                             onTap: _confirmSignOut,
                             showChevron: false,
                           ),
                           _ProfileItem(
                             icon: TablerIcons.trash,
-                            label: 'Hesabı Sil',
+                            label: 'Hesabı sil',
                             destructive: true,
                             onTap: _openDeleteAccount,
                             showChevron: false,
@@ -845,6 +856,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _bioCtrl;
   bool _saving = false;
 
+  /// Hata panelin içinde gösterilir (bkz. [_SheetError]). SnackBar panelin
+  /// arkasında kalıyordu; "kullanıcı adı alınmış" uyarısı panel kapanınca
+  /// görünüyordu (24 Eylül).
+  String? _errorText;
+
   // Profil fotoğrafı (seçilip yüklenir, Kaydet ile kalıcı olur)
   String? _photoUrl;
   String? _photoOriginalUrl;
@@ -863,16 +879,28 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _photoUrl = widget.user.profilePhotoUrl;
     _photoOriginalUrl = widget.user.profilePhotoOriginalUrl;
     _photoCrop = widget.user.profilePhotoCrop;
+    // Kullanıcı hatayı düzeltmeye başlayınca uyarı kalkar.
+    for (final c in [_firstNameCtrl, _lastNameCtrl, _usernameCtrl]) {
+      c.addListener(_clearError);
+    }
+  }
+
+  void _clearError() {
+    if (_errorText != null) setState(() => _errorText = null);
   }
 
   Future<void> _pickPhoto() async {
     if (_uploadingPhoto) return;
-    setState(() => _uploadingPhoto = true);
+    setState(() {
+      _uploadingPhoto = true;
+      _errorText = null;
+    });
     final result = await ProfilePhotoEditor.edit(
       context,
       // Panel açıldıktan sonra seçilen fotoğraf da yeniden çerçevelenebilsin
       // diye kullanıcıyı yerel durumla güncel tutuyoruz.
       user: _draftUser,
+      onError: _error,
     );
     if (!mounted) return;
     setState(() {
@@ -939,13 +967,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     );
   }
 
-  void _error(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: AppColors.error,
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
+  void _error(String msg) => setState(() => _errorText = msg);
 
   Future<void> _save() async {
     final username = _usernameCtrl.text.trim();
@@ -957,11 +979,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       return;
     }
     if (_canChangeName && (firstName.isEmpty || lastName.isEmpty)) {
-      _error('İsim ve soyisim boş olamaz.');
+      _error('Ad ve soyad boş olamaz.');
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _errorText = null;
+    });
     try {
       final updated = await UserRepository.instance.updateUser(
         widget.user.userId,
@@ -994,6 +1019,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   String _parseError(Object e) {
     if (e is DioException) {
       final data = e.response?.data;
+      // Doğrulama hatasında genel mesaj ("alanları kontrol et") neyin yanlış
+      // olduğunu söylemiyor; alana özel olanı ("username: …") gösterilir.
+      final details = data is Map ? data['validationErrors'] : null;
+      if (details is List && details.isNotEmpty && details.first is String) {
+        final first = details.first as String;
+        final i = first.indexOf(': ');
+        return i == -1 ? first : first.substring(i + 2);
+      }
       if (data is Map && data['message'] is String) {
         return data['message'] as String;
       }
@@ -1096,7 +1129,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         style: AppTextStyles.bodyMedium,
                         textCapitalization: TextCapitalization.words,
                         decoration:
-                            _nameDecoration(context, 'İsim', TablerIcons.id),
+                            _nameDecoration(context, 'Ad', TablerIcons.id),
                       ),
                     ),
                     const SizedBox(width: AppSpace.md),
@@ -1107,7 +1140,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         style: AppTextStyles.bodyMedium,
                         textCapitalization: TextCapitalization.words,
                         decoration:
-                            _nameDecoration(context, 'Soyisim', TablerIcons.id),
+                            _nameDecoration(context, 'Soyad', TablerIcons.id),
                       ),
                     ),
                   ],
@@ -1121,7 +1154,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'İsim ve soyisim 15 günde bir değiştirilebilir. ',
+                          'Ad ve soyad 15 günde bir değiştirilebilir. ',
                           style: AppTextStyles.bodySmall
                               .copyWith(color: context.textSecondaryColor),
                         ),
@@ -1166,7 +1199,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   decoration: InputDecoration(
                     labelText: 'Biyografi',
                     labelStyle: AppTextStyles.bodySmall,
-                    hintText: 'Kendinizi tanıtın...',
+                    hintText: 'Kendinden biraz bahset…',
                     hintStyle: AppTextStyles.bodySmall
                         .copyWith(color: context.textTertiaryColor),
                     prefixIcon: Padding(
@@ -1193,6 +1226,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                   ),
                 ),
+                if (_errorText != null) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  _SheetError(_errorText!),
+                ],
                 const SizedBox(height: AppSpace.lg),
                 // Kaydet butonu
                 SizedBox(
@@ -1218,321 +1255,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Gizlilik ve güvenlik sheet ────────────────────────────────────────────────
-
-class _PrivacySheet extends StatefulWidget {
-  const _PrivacySheet();
-
-  @override
-  State<_PrivacySheet> createState() => _PrivacySheetState();
-}
-
-class _PrivacySheetState extends State<_PrivacySheet> {
-  bool _privateProfile = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.35,
-      maxChildSize: 0.75,
-      builder: (_, __) => Column(
-        children: [
-          _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
-            child: Row(
-              children: [
-                Icon(TablerIcons.lock,
-                    color: context.textSecondaryColor, size: 20),
-                const SizedBox(width: AppSpace.sm),
-                const Text('Gizlilik ve Güvenlik',
-                    style: AppTextStyles.titleSmall),
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: context.dividerColor),
-          // Şifre değiştir
-          _SheetItem(
-            icon: TablerIcons.key,
-            label: 'Şifre Değiştir',
-            subtitle: 'Hesap güvenliğini artır',
-            onTap: () {
-              Navigator.pop(context);
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: context.surfaceColor,
-                isScrollControlled: true,
-                shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(AppRadius.lg))),
-                builder: (_) => const _ChangePasswordSheet(),
-              );
-            },
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
-              height: 0.5,
-              color: context.dividerColor),
-          // Profil gizliliği toggle
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpace.screen, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(TablerIcons.eye_off,
-                      color: AppColors.primary, size: 18),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Profili Gizle',
-                          style: AppTextStyles.bodyMedium
-                              .copyWith(color: context.textPrimaryColor)),
-                      Text('Değerlendirmelerin sadece sana görünür',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: context.textTertiaryColor)),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _privateProfile,
-                  onChanged: (v) => setState(() => _privateProfile = v),
-                  activeThumbColor: AppColors.primary,
-                  activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Bildirimler sheet ─────────────────────────────────────────────────────────
-
-class _NotificationsSheet extends StatefulWidget {
-  const _NotificationsSheet();
-
-  @override
-  State<_NotificationsSheet> createState() => _NotificationsSheetState();
-}
-
-class _NotificationsSheetState extends State<_NotificationsSheet> {
-  bool _newFeatures = true;
-  bool _recommendations = false;
-  bool _comments = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.35,
-      maxChildSize: 0.7,
-      builder: (_, __) => Column(
-        children: [
-          _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
-            child: Row(
-              children: [
-                Icon(TablerIcons.bell,
-                    color: context.textSecondaryColor, size: 20),
-                const SizedBox(width: AppSpace.sm),
-                const Text('Bildirimler', style: AppTextStyles.titleSmall),
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: context.dividerColor),
-          _NotifToggle(
-            icon: TablerIcons.sparkles,
-            label: 'Yeni Özellikler',
-            subtitle: 'Güncellemeler ve yenilikler hakkında bilgi al',
-            value: _newFeatures,
-            onChanged: (v) => setState(() => _newFeatures = v),
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
-              height: 0.5,
-              color: context.dividerColor),
-          _NotifToggle(
-            icon: TablerIcons.tools_kitchen_2,
-            label: 'Dishrate Önerileri',
-            subtitle: 'Konumuna yakın lezzetleri keşfet',
-            value: _recommendations,
-            onChanged: (v) => setState(() => _recommendations = v),
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
-              height: 0.5,
-              color: context.dividerColor),
-          _NotifToggle(
-            icon: TablerIcons.message,
-            label: 'Yorum Bildirimleri',
-            subtitle: 'Yakında geliyor',
-            value: _comments,
-            onChanged: (v) => setState(() => _comments = v),
-            enabled: false,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NotifToggle extends StatelessWidget {
-  const _NotifToggle({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.45,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.screen, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 18),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: context.textPrimaryColor)),
-                  Text(subtitle,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: context.textTertiaryColor)),
-                ],
-              ),
-            ),
-            Switch(
-              value: value,
-              onChanged: enabled ? onChanged : null,
-              activeThumbColor: AppColors.primary,
-              activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Bize ulaş sheet ───────────────────────────────────────────────────────────
-
-class _ContactSheet extends StatelessWidget {
-  const _ContactSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.45,
-      minChildSize: 0.3,
-      maxChildSize: 0.65,
-      builder: (_, __) => Column(
-        children: [
-          _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.lg),
-            child: Row(
-              children: [
-                Icon(TablerIcons.message_circle,
-                    color: context.textSecondaryColor, size: 20),
-                const SizedBox(width: AppSpace.sm),
-                const Text('Bize Ulaş', style: AppTextStyles.titleSmall),
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: context.dividerColor),
-          const SizedBox(height: AppSpace.sm),
-          _SheetItem(
-            icon: TablerIcons.mail,
-            label: 'E-posta',
-            subtitle: 'destek@dishrate.app',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('destek@dishrate.app'),
-                behavior: SnackBarBehavior.floating,
-              ));
-            },
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
-              height: 0.5,
-              color: context.dividerColor),
-          _SheetItem(
-            icon: TablerIcons.camera,
-            label: 'Instagram',
-            subtitle: '@dishrate_app',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('@dishrate_app'),
-                behavior: SnackBarBehavior.floating,
-              ));
-            },
-          ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.screen),
-              height: 0.5,
-              color: context.dividerColor),
-          _SheetItem(
-            icon: TablerIcons.messages,
-            label: 'Geri Bildirim Gönder',
-            subtitle: 'Öneri ve şikayetlerin için',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Geri bildirim formu yakında geliyor.'),
-                behavior: SnackBarBehavior.floating,
-              ));
-            },
           ),
         ],
       ),
@@ -1776,7 +1498,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
             key: ValueKey('removed_${pending.item.wishId}'),
             icon: TablerIcons.bookmark_off,
             message:
-                '${pending.item.restaurantName} - ${pending.item.menuItemName} listeden çıkarıldı.',
+                '${pending.item.menuItemName} listeden çıkarıldı.',
             actionLabel: 'Geri al',
             onAction: () => _undoRemove(pending),
           ),
@@ -1810,7 +1532,7 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                 const SizedBox(width: AppSpace.sm),
                 const Text('İstek Listesi', style: AppTextStyles.titleSmall),
                 const Spacer(),
-                Text('${items.length} ürün', style: AppTextStyles.bodySmall),
+                Text('${items.length} yemek', style: AppTextStyles.bodySmall),
               ],
             ),
           ),
@@ -1823,9 +1545,9 @@ class _WishlistSheetState extends State<_WishlistSheet> {
                     child: Align(
                       alignment: Alignment.topLeft,
                       child: StateMessage(
-                        title: 'İstek listesi boş',
+                        title: 'İstek Listesi boş',
                         message:
-                            'Denemek istediğin yemekleri unutmamak için istek listene ekleyebilirsin.',
+                            'Denemek istediğin yemekleri unutmamak için İstek Listesi’ne ekleyebilirsin.',
                       ),
                     ),
                   )
@@ -2321,29 +2043,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 // Hata — sheet'in İÇİNDE, arkada kalmıyor
                 if (_error != null) ...[
                   const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpace.md, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(TablerIcons.alert_circle,
-                            color: AppColors.error, size: 18),
-                        const SizedBox(width: AppSpace.sm),
-                        Expanded(
-                          child: Text(_error!,
-                              style: AppTextStyles.bodySmall
-                                  .copyWith(color: AppColors.error)),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _SheetError(_error!),
                 ],
 
                 const SizedBox(height: AppSpace.screen),
@@ -2539,29 +2239,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpace.md, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(TablerIcons.alert_circle,
-                            color: AppColors.error, size: 18),
-                        const SizedBox(width: AppSpace.sm),
-                        Expanded(
-                          child: Text(_error!,
-                              style: AppTextStyles.bodySmall
-                                  .copyWith(color: AppColors.error)),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _SheetError(_error!),
                 ],
                 const SizedBox(height: AppSpace.screen),
                 FilledButton(
@@ -2641,31 +2319,6 @@ class _SheetHandle extends StatelessWidget {
   }
 }
 
-// Sheet içi tek satır öğe — profil menüsü satırıyla aynı görünüm.
-class _SheetItem extends StatelessWidget {
-  const _SheetItem({
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _ProfileItem(
-      icon: icon,
-      label: label,
-      subtitle: subtitle,
-      onTap: onTap,
-    );
-  }
-}
-
 // ── Değerlendirme modal wrapper (profil akışı) ────────────────────────────────
 
 class _ProfileRatingSheet extends StatelessWidget {
@@ -2697,6 +2350,43 @@ class _ProfileRatingSheet extends StatelessWidget {
           const SizedBox(height: AppSpace.screen),
           const Expanded(child: AddRatingScreen()),
         ],
+      ),
+    );
+  }
+}
+
+/// Panelin içindeki hata kutusu. Panellerde SnackBar kullanılmaz:
+/// ScaffoldMessenger panelin altındaki Scaffold'a bağlı, mesaj panelin
+/// arkasında kalıyor.
+class _SheetError extends StatelessWidget {
+  const _SheetError(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(TablerIcons.alert_circle,
+                color: AppColors.error, size: 18),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text(message,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.error)),
+            ),
+          ],
+        ),
       ),
     );
   }

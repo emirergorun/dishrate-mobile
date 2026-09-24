@@ -65,7 +65,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     super.initState();
     // Akış konuma bağlı: il ya da ilçe değişince yeniden istenir.
     ref.listenManual(selectedLocationProvider, (prev, next) {
-      if (prev?.province != next.province || prev?.district != next.district) _load();
+      if (prev?.province != next.province || prev?.district != next.district)
+        _load();
     });
     _load();
   }
@@ -147,8 +148,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   List<_Section> get _sections {
     final loc = ref.watch(selectedLocationProvider);
     final place = loc.hasDistrict ? loc.district! : loc.province;
-    final Map<String, ({String title, String? subtitle, _Layout layout})>
-        meta = {
+    final Map<String, ({String title, String? subtitle, _Layout layout})> meta =
+        {
       'top-rated': (
         title: '${_locativeSuffix(place)} En İyiler',
         subtitle: 'Konumuna yakın, yüksek puanlı lezzetler',
@@ -156,7 +157,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       ),
       'weekly': (
         title: 'Haftanın Yıldızları',
-        subtitle: 'Bu hafta en çok beğenilen menü öğeleri',
+        subtitle: 'Bu hafta en çok beğenilen yemekler',
         layout: _Layout.posters,
       ),
       'most-wanted': (
@@ -165,7 +166,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         layout: _Layout.wide,
       ),
       'cheat-meal': (
-        title: 'Cheat Meal Önerileri',
+        title: 'Diyeti Bozmaya Değer',
         subtitle: null,
         layout: _Layout.grid,
       ),
@@ -217,7 +218,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     }
     final lastChar = place.isEmpty ? '' : place[place.length - 1];
     final hardEnding = 'çfhkpsştÇFHKPSŞT'.contains(lastChar);
-    return "$place'${hardEnding ? 't' : 'd'}$vowel";
+    return '$place’${hardEnding ? 't' : 'd'}$vowel';
   }
 
   Widget _sectionBody(_Section s) {
@@ -308,7 +309,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         : 'Bu kategoride içerik yok',
                     message: _allSelected
                         ? 'Konumu değiştirerek başka bir şehre göz atabilirsin.'
-                        : 'Başka bir kategori seç ya da Tümü\'ne dön.',
+                        : 'Başka bir kategori seç ya da Tümü’ne dön.',
                   ),
                 ),
               )
@@ -444,7 +445,7 @@ class _DiscoverAppBar extends ConsumerWidget {
           _snack(
               context,
               'Konum izni kapalı gözüküyor. '
-              'Ayarlardan açarak tekrar deneyebilirsin.');
+              'Ayarlar’dan açarak tekrar deneyebilirsin.');
         }
       }
     }
@@ -524,12 +525,16 @@ class _DiscoverAppBar extends ConsumerWidget {
       options: province.districts.map((i) => i.name).toList(),
       // İl geneline dönme seçeneği alfabetik sıraya karışmasın diye sabit.
       pinned: [PinnedOption(allLabel, icon: Icons.select_all_rounded)],
-      selected: selectedProvince == current.province ? (current.district ?? allLabel) : null,
+      selected: selectedProvince == current.province
+          ? (current.district ?? allLabel)
+          : null,
       searchHint: 'İlçe ara…',
     );
     if (selectedDistrict == null) {
       // İlçe adımı iptal edilse bile il seçimi geçerli olsun.
-      await ref.read(selectedLocationProvider.notifier).setManual(selectedProvince);
+      await ref
+          .read(selectedLocationProvider.notifier)
+          .setManual(selectedProvince);
       return;
     }
     await ref.read(selectedLocationProvider.notifier).setManual(
