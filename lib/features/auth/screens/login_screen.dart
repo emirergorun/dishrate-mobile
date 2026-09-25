@@ -9,6 +9,7 @@ import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
+import '../../../shared/widgets/terms_sheet.dart';
 import 'splash_screen.dart';
 import 'welcome_screen.dart';
 
@@ -200,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             controller: _emailController,
                             label: null,
                             hint: 'Kullanıcı adı veya e-posta',
-                            keyboardType: TextInputType.text,
+                            identifier: true,
                             textInputAction: TextInputAction.next,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
@@ -524,6 +525,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       controller: _usernameController,
                       label: null,
                       hint: 'Kullanıcı adı',
+                      identifier: true,
+                      // Yorumlarda ad yerine kullanıcı adı görünüyor (karar
+                      // 25 Eylül); seçerken bilsin.
+                      helper: 'Yorumlarında bu adla görünürsün.',
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         final t = (v ?? '').trim();
@@ -543,7 +548,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       controller: _emailController,
                       label: null,
                       hint: 'E-posta',
-                      keyboardType: TextInputType.emailAddress,
+                      identifier: true,
                       textInputAction: TextInputAction.next,
                       validator: EmailValidator.validate,
                     ),
@@ -657,7 +662,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
+              // Apple Guideline 1.2: kullanıcı içeriği olan uygulamada şartlar
+              // (uygunsuz içeriğe tolerans yok) kayıtta kabul edilmeli (1.7).
+              _TermsNotice(textStyle: AppTextStyles.bodySmall.copyWith(
+                color: context.textSecondaryColor,
+              )),
+              const SizedBox(height: 12),
               Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -697,6 +708,48 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
+// ── Kayıt: şartların kabulü ──────────────────────────────────────────────────
+
+/// "Kayıt olarak Kullanım Şartları’nı kabul etmiş olursun." — bağlantı
+/// şartlar panelini açar. Parçalar `Wrap` içinde: büyük yazıda satır
+/// bağlantının önünden kırılabiliyor.
+class _TermsNotice extends StatelessWidget {
+  const _TermsNotice({required this.textStyle});
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('Kayıt olarak ', style: textStyle),
+          Semantics(
+            button: true,
+            label: 'Kullanım şartlarını aç',
+            excludeSemantics: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => TermsSheet.show(context),
+              child: MinTapArea(
+                child: Text(
+                  'Kullanım Şartları',
+                  style: textStyle.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Text('’nı kabul etmiş olursun.', style: textStyle),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Hesap Türü Toggle ─────────────────────────────────────────────────────────
 
 class _AuthTextField extends StatelessWidget {
@@ -711,6 +764,8 @@ class _AuthTextField extends StatelessWidget {
     this.onChanged,
     this.suffixIcon,
     this.validator,
+    this.identifier = false,
+    this.helper,
   });
 
   final TextEditingController controller;
@@ -723,6 +778,14 @@ class _AuthTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+
+  /// Kullanıcı adı / e-posta alanı: otomatik düzeltme ve öneri kapalı, ASCII
+  /// klavye. Önceden iOS "modsim"i "modern"e çeviriyor, Türkçe klavye
+  /// "haritatest" yerine "harıtatest" yazdırıyordu; ikisi de girişi bozuyordu.
+  final bool identifier;
+
+  /// Alanın altındaki açıklama (ör. kullanıcı adının herkese görüneceği).
+  final String? helper;
 
   @override
   Widget build(BuildContext context) {
@@ -741,7 +804,10 @@ class _AuthTextField extends StatelessWidget {
         TextFormField(
           controller: controller,
           obscureText: obscureText,
-          keyboardType: keyboardType,
+          keyboardType: identifier ? TextInputType.emailAddress : keyboardType,
+          autocorrect: !identifier,
+          enableSuggestions: !identifier,
+          textCapitalization: TextCapitalization.none,
           textInputAction: textInputAction,
           onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
@@ -751,6 +817,8 @@ class _AuthTextField extends StatelessWidget {
           ),
           decoration: InputDecoration(
             hintText: hint,
+            helperText: helper,
+            helperMaxLines: 2,
             hintStyle: AppTextStyles.bodyMedium.copyWith(
               color: context.textSecondaryColor.withValues(alpha: 0.6),
             ),

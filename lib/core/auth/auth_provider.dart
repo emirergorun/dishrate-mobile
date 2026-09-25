@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/models/user_model.dart';
+import '../network/api_errors.dart';
 import 'auth_repository.dart';
 import 'token_storage.dart';
 
@@ -173,6 +174,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Hata mesajını okunabilir hale getir
   String _parseError(Object e) {
+    // 400: kullanıcının düzeltebileceği sunucu mesajı (ör. "Bu kullanıcı adı
+    // kullanılamaz…"). Genel mesaj neyin yanlış olduğunu söylemiyordu.
+    if (e is DioException && e.response?.statusCode == 400) {
+      return userMessageFor(e, fallback: 'Bir hata oluştu, tekrar dene.');
+    }
     if (e is Exception) {
       final msg = e.toString();
       if (msg.contains('401') || msg.contains('Unauthorized')) {

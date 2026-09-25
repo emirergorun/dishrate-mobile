@@ -7,6 +7,7 @@ import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/menu_item_review_model.dart';
 import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/review_actions.dart';
 import '../../../shared/widgets/review_tile.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
@@ -40,9 +41,11 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  /// [silent]: bildirme/engelleme sonrası liste yerinde tazelenir, iskelet
+  /// yanıp sönmez.
+  Future<void> _load({bool silent = false}) async {
     setState(() {
-      _loading = true;
+      if (!silent) _loading = true;
       _error = null;
     });
     try {
@@ -64,6 +67,27 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _openActions(MenuItemReviewModel review) async {
+    final result = await ReviewActions.show(context, review);
+    if (result == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result.message),
+      behavior: SnackBarBehavior.floating,
+      // Yanlış dokunuş için (karar 25 Eylül).
+      action: SnackBarAction(
+        label: 'Geri al',
+        onPressed: () async {
+          try {
+            await result.undo();
+          } catch (_) {}
+          if (mounted) _load(silent: true);
+        },
+      ),
+    ));
+    // Bildirilen ya da engellenenin yorumları sunucudan artık gelmez.
+    _load(silent: true);
   }
 
   double get _average => _reviews.isEmpty
@@ -196,7 +220,10 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
               padding: EdgeInsets.symmetric(vertical: AppSpace.screen),
               child: Divider(height: 1),
             ),
-          ReviewTile(review: _reviews[i]),
+          ReviewTile(
+            review: _reviews[i],
+            onMore: () => _openActions(_reviews[i]),
+          ),
         ],
       ],
     );

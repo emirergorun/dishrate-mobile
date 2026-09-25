@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/api_errors.dart';
 import '../../../core/network/file_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
@@ -165,8 +166,9 @@ class _Step3RateItemState extends ConsumerState<Step3RateItem> {
       await Future<void>.delayed(_savedFade);
       if (mounted) widget.onSuccess();
     } catch (e) {
+      // 400: ör. küfür süzgeci — sunucunun mesajı neyin düzeltileceğini söyler.
       ref.read(ratingFlowProvider.notifier).showError(
-            'Puan kaydedilemedi, tekrar dene.',
+            userMessageFor(e, fallback: 'Puan kaydedilemedi, tekrar dene.'),
           );
     }
   }

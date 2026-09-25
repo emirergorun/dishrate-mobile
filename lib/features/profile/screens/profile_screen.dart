@@ -11,6 +11,7 @@ import '../../../core/app_info.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/auth/token_storage.dart';
 import '../../../core/constants/app_links.dart';
+import '../../../core/network/moderation_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/network/user_repository.dart';
 import '../../../core/network/wishlist_repository.dart';
@@ -24,15 +25,19 @@ import '../../../shared/models/user_model.dart';
 import '../../../shared/models/wishlist_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/edit_sheet_guard.dart';
 import '../../../shared/widgets/info_banner.dart';
 import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/sheet_error.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
 import '../../../shared/widgets/swipe_to_delete.dart';
+import '../../../shared/widgets/terms_sheet.dart';
 import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
 
 import '../../../core/utils/password_validator.dart';
+import '../../../core/utils/relative_date.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -238,11 +243,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (_user == null) return;
     showModalBottomSheet(
       context: context,
-      backgroundColor: context.surfaceColor,
+      // Yüzey panelin kendisinde; kaydırmayı EditSheetGuard yönetiyor.
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      enableDrag: false,
       builder: (_) => _EditProfileSheet(
         user: _user!,
         onSave: (updated) {
@@ -264,6 +268,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => const _ChangePasswordSheet(),
+    );
+  }
+
+  void _showBlockedUsers() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.surfaceColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => const _BlockedUsersSheet(),
     );
   }
 
@@ -298,18 +314,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       content: Text('E-posta adresi kopyalandı: ${AppLinks.supportEmail}'),
       behavior: SnackBarBehavior.floating,
     ));
-  }
-
-  void _showTerms() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.surfaceColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (_) => const _TermsSheet(),
-    );
   }
 
   void _confirmSignOut() {
@@ -478,6 +482,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             subtitle: 'Hesap güvenliğini artır',
                             onTap: _showChangePassword,
                           ),
+                          _ProfileItem(
+                            icon: TablerIcons.user_off,
+                            label: 'Engellenenler',
+                            subtitle: 'Engellediğin kullanıcılar',
+                            onTap: _showBlockedUsers,
+                          ),
 
                           // ── DESTEK ──────────────────────────────────────
                           const _SectionLabel('DESTEK'),
@@ -490,7 +500,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           _ProfileItem(
                             icon: TablerIcons.file_text,
                             label: 'Kullanım şartları',
-                            onTap: _showTerms,
+                            onTap: () => TermsSheet.show(context),
                           ),
 
                           const SizedBox(height: AppSpace.xl),
@@ -856,7 +866,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _bioCtrl;
   bool _saving = false;
 
-  /// Hata panelin içinde gösterilir (bkz. [_SheetError]). SnackBar panelin
+  /// Hata panelin içinde gösterilir (bkz. [SheetError]). SnackBar panelin
   /// arkasında kalıyordu; "kullanıcı adı alınmış" uyarısı panel kapanınca
   /// görünüyordu (24 Eylül).
   String? _errorText;
@@ -883,6 +893,26 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     for (final c in [_firstNameCtrl, _lastNameCtrl, _usernameCtrl]) {
       c.addListener(_clearError);
     }
+    // Her harfte "Kaydet"in durumu yeniden hesaplansın.
+    for (final c in [_firstNameCtrl, _lastNameCtrl, _usernameCtrl, _bioCtrl]) {
+      c.addListener(_onFieldChanged);
+    }
+  }
+
+  void _onFieldChanged() => setState(() {});
+
+  /// Kayıtlı hâlden farkı var mı? Yoksa "Kaydet" pasif, kapatırken onay
+  /// sorulmaz (günlük düzenlemeyle aynı, bkz. [EditSheetGuard]).
+  bool get _isDirty {
+    final u = widget.user;
+    return _usernameCtrl.text.trim() != u.username ||
+        _bioCtrl.text.trim() != (u.bio ?? '').trim() ||
+        (_canChangeName &&
+            (_firstNameCtrl.text.trim() != (u.firstName ?? '').trim() ||
+                _lastNameCtrl.text.trim() != (u.lastName ?? '').trim())) ||
+        _photoUrl != u.profilePhotoUrl ||
+        _photoOriginalUrl != u.profilePhotoOriginalUrl ||
+        _photoCrop != u.profilePhotoCrop;
   }
 
   void _clearError() {
@@ -1039,7 +1069,23 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return EditSheetGuard(
+      isDirty: _isDirty,
+      busy: _saving || _uploadingPhoto,
+      discardMessage: 'Değişiklikleri iptal etmek istiyor musun?',
+      child: _buildSheet(context),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context) {
+    // Panel yüzeyi burada: [EditSheetGuard] kaydırırken paneli bütünüyle
+    // taşıyor, zemin rengi olmadan arkası görünürdü.
+    return Container(
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
@@ -1057,8 +1103,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     Icon(TablerIcons.pencil,
                         color: context.textSecondaryColor, size: 20),
                     const SizedBox(width: AppSpace.sm),
-                    const Text('Profili Düzenle',
-                        style: AppTextStyles.titleSmall),
+                    const Expanded(
+                      child: Text('Profili Düzenle',
+                          style: AppTextStyles.titleSmall),
+                    ),
+                    const SheetCancelButton(
+                        semanticLabel: 'Profil düzenlemeyi iptal et'),
                   ],
                 ),
                 const SizedBox(height: AppSpace.screen),
@@ -1166,9 +1216,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 // Kullanıcı adı
                 TextField(
                   controller: _usernameCtrl,
+                  // ASCII klavye, düzeltme kapalı: kullanıcı adında Türkçe
+                  // karakter olamıyor, iOS da adı "düzeltmesin".
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   style: AppTextStyles.bodyMedium,
                   decoration: InputDecoration(
                     labelText: 'Kullanıcı adı',
+                    helperText: 'Yorumlarında bu adla görünürsün.',
                     labelStyle: AppTextStyles.bodySmall,
                     prefixIcon: Icon(TablerIcons.at,
                         size: 18, color: context.textSecondaryColor),
@@ -1228,16 +1284,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 if (_errorText != null) ...[
                   const SizedBox(height: AppSpace.xs),
-                  _SheetError(_errorText!),
+                  SheetError(_errorText!),
                 ],
                 const SizedBox(height: AppSpace.lg),
                 // Kaydet butonu
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _saving ? null : _save,
+                    onPressed: (_saving || !_isDirty) ? null : _save,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      // Değişiklik yokken soluk; günlükteki "Güncelle" ile aynı.
+                      disabledBackgroundColor:
+                          AppColors.primary.withValues(alpha: 0.35),
+                      disabledForegroundColor:
+                          AppColors.onPrimary.withValues(alpha: 0.6),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadius.md)),
@@ -1256,111 +1317,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Kullanım şartları sheet ───────────────────────────────────────────────────
-
-class _TermsSheet extends StatelessWidget {
-  const _TermsSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
-      builder: (_, controller) => Column(
-        children: [
-          _SheetHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.md),
-            child: Row(
-              children: [
-                Icon(TablerIcons.file_text,
-                    color: context.textSecondaryColor, size: 20),
-                const SizedBox(width: AppSpace.sm),
-                const Text('Kullanım Şartları',
-                    style: AppTextStyles.titleSmall),
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: context.dividerColor),
-          Expanded(
-            child: ListView(
-              controller: controller,
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpace.screen, AppSpace.lg, AppSpace.screen, 40),
-              children: [
-                const _TermsSection(
-                  title: '1. Kabul',
-                  body:
-                      'Dishrate\'i kullanarak bu kullanım şartlarını kabul etmiş olursunuz. Şartları kabul etmiyorsanız uygulamayı kullanmayı bırakınız.',
-                ),
-                const _TermsSection(
-                  title: '2. Kullanıcı İçeriği',
-                  body:
-                      'Paylaştığınız değerlendirmeler ve yorumlar size aittir. Ancak Dishrate, bu içerikleri platform içinde görüntüleme ve analiz etme hakkına sahiptir. Yanıltıcı, hakaret içerikli veya yasadışı içerik paylaşmak yasaktır.',
-                ),
-                const _TermsSection(
-                  title: '3. Gizlilik',
-                  body:
-                      'Kişisel verileriniz 6698 sayılı KVKK kapsamında korunmaktadır. Verileriniz üçüncü şahıslarla paylaşılmaz. Ayrıntılı bilgi için Gizlilik Politikamızı inceleyiniz.',
-                ),
-                const _TermsSection(
-                  title: '4. Hesap Güvenliği',
-                  body:
-                      'Hesabınızın güvenliğinden siz sorumlusunuz. Şifrenizi güçlü tutun ve başkalarıyla paylaşmayın. Yetkisiz erişim şüphesinde derhal bizimle iletişime geçin.',
-                ),
-                const _TermsSection(
-                  title: '5. Hizmet Değişiklikleri',
-                  body:
-                      'Dishrate, herhangi bir bildirim yapmaksızın hizmeti geçici veya kalıcı olarak değiştirme ya da sonlandırma hakkını saklı tutar.',
-                ),
-                const _TermsSection(
-                  title: '6. İletişim',
-                  body:
-                      'Sorularınız için destek@dishrate.app adresine e-posta gönderebilirsiniz.',
-                ),
-                const SizedBox(height: AppSpace.sm),
-                Text(
-                  'Son güncelleme: Mayıs 2026',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: context.textTertiaryColor,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TermsSection extends StatelessWidget {
-  const _TermsSection({required this.title, required this.body});
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpace.screen),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: AppTextStyles.titleSmall
-                  .copyWith(color: context.textPrimaryColor)),
-          const SizedBox(height: 6),
-          Text(body, style: AppTextStyles.bodySmall),
         ],
       ),
     );
@@ -1819,6 +1775,186 @@ class _FavoriteItemRow extends StatelessWidget {
   }
 }
 
+// ── Engellenenler sheet ───────────────────────────────────────────────────────
+
+/// Engellenen kullanıcılar (1.7), yorumlardaki gibi "@kullanıcıadı" ile.
+/// Engel kaldırmak zararsız, onay sorulmaz.
+class _BlockedUsersSheet extends StatefulWidget {
+  const _BlockedUsersSheet();
+
+  @override
+  State<_BlockedUsersSheet> createState() => _BlockedUsersSheetState();
+}
+
+class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
+  List<BlockedUser>? _blocks;
+  bool _failed = false;
+  final Set<int> _removing = {};
+
+  /// Son kaldırılanın adı; panelin içindeki şeritte kısa süre görünür.
+  String? _notice;
+  Timer? _noticeTimer;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _noticeTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _failed = false);
+    try {
+      final blocks = await ModerationRepository.instance.blocks();
+      if (mounted) setState(() => _blocks = blocks);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  Future<void> _unblock(BlockedUser b) async {
+    setState(() {
+      _removing.add(b.blockId);
+      _error = null;
+    });
+    try {
+      await ModerationRepository.instance.unblock(b.blockId);
+      if (!mounted) return;
+      setState(() {
+        _blocks = [...?_blocks]..removeWhere((x) => x.blockId == b.blockId);
+        _removing.remove(b.blockId);
+        _notice = '${b.name} engeli kaldırıldı.';
+      });
+      _noticeTimer?.cancel();
+      _noticeTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _notice = null);
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _removing.remove(b.blockId);
+          _error = 'Engel kaldırılamadı, tekrar dene.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = _blocks;
+    final Widget body;
+    if (_failed) {
+      body = Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.screen, vertical: AppSpace.md),
+        child: StateMessage(
+          title: 'Liste yüklenemedi',
+          message: 'Bağlantını kontrol edip tekrar dene.',
+          actionLabel: 'Tekrar dene',
+          onAction: _load,
+        ),
+      );
+    } else if (blocks == null) {
+      body = const Padding(
+        padding: EdgeInsets.all(AppSpace.xl),
+        child: Center(
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: AppColors.primary),
+        ),
+      );
+    } else if (blocks.isEmpty) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: AppSpace.screen, vertical: AppSpace.md),
+        // Açıklama bilerek yok: "şuradan engelleyebilirsin" engellemeye
+        // teşvik ediyor gibi duruyordu (25 Eylül).
+        child: StateMessage(title: 'Engellediğin kimse yok'),
+      );
+    } else {
+      body = Column(
+        children: [
+          for (final b in blocks)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.screen, vertical: AppSpace.xs),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(b.name, style: AppTextStyles.bodyMedium),
+                        if (b.blockedAt != null)
+                          Text(
+                            RelativeDate.date(b.blockedAt!),
+                            style: AppTextStyles.caption
+                                .copyWith(color: context.textTertiaryColor),
+                          ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _removing.contains(b.blockId)
+                        ? null
+                        : () => _unblock(b),
+                    child: const Text('Engeli kaldır'),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SheetHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.screen, AppSpace.xs, AppSpace.screen, AppSpace.md),
+            child: Row(
+              children: [
+                Icon(TablerIcons.user_off,
+                    color: context.textSecondaryColor, size: 20),
+                const SizedBox(width: AppSpace.sm),
+                const Text('Engellenenler', style: AppTextStyles.titleSmall),
+              ],
+            ),
+          ),
+          Container(height: 0.5, color: context.dividerColor),
+          const SizedBox(height: AppSpace.sm),
+          Flexible(child: SingleChildScrollView(child: body)),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.sm, AppSpace.screen, 0),
+              child: SheetError(_error!),
+            ),
+          if (_notice != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.screen, AppSpace.sm, AppSpace.screen, 0),
+              child: InfoBanner(
+                icon: Icons.check_circle_outline_rounded,
+                message: _notice!,
+              ),
+            ),
+          const SizedBox(height: AppSpace.lg),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Şifre kuralları göstergesi ────────────────────────────────────────────────
 
 /// Şifre yazılırken hangi kuralların sağlandığını canlı gösterir.
@@ -2043,7 +2179,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 // Hata — sheet'in İÇİNDE, arkada kalmıyor
                 if (_error != null) ...[
                   const SizedBox(height: 14),
-                  _SheetError(_error!),
+                  SheetError(_error!),
                 ],
 
                 const SizedBox(height: AppSpace.screen),
@@ -2239,7 +2375,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
-                  _SheetError(_error!),
+                  SheetError(_error!),
                 ],
                 const SizedBox(height: AppSpace.screen),
                 FilledButton(
@@ -2350,43 +2486,6 @@ class _ProfileRatingSheet extends StatelessWidget {
           const SizedBox(height: AppSpace.screen),
           const Expanded(child: AddRatingScreen()),
         ],
-      ),
-    );
-  }
-}
-
-/// Panelin içindeki hata kutusu. Panellerde SnackBar kullanılmaz:
-/// ScaffoldMessenger panelin altındaki Scaffold'a bağlı, mesaj panelin
-/// arkasında kalıyor.
-class _SheetError extends StatelessWidget {
-  const _SheetError(this.message);
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          children: [
-            const Icon(TablerIcons.alert_circle,
-                color: AppColors.error, size: 18),
-            const SizedBox(width: AppSpace.sm),
-            Expanded(
-              child: Text(message,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.error)),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/relative_date.dart';
+import '../../core/utils/turkish_text.dart';
 import '../models/menu_item_review_model.dart';
 import 'dish_photo.dart';
 import 'photo_viewer.dart';
@@ -17,9 +18,14 @@ import 'rating_stars.dart';
 /// içindeydi, isim kalın, yıldızlar sarıydı. Bu uygulamada ürün yorumun
 /// kendisi; en okunur şey o olmalı.
 class ReviewTile extends StatelessWidget {
-  const ReviewTile({super.key, required this.review, this.maxLines});
+  const ReviewTile(
+      {super.key, required this.review, this.maxLines, this.onMore});
 
   final MenuItemReviewModel review;
+
+  /// Başkasının yorumunda "⋯" menüsü (bildir / engelle, bkz. `ReviewActions`).
+  /// Kendi yorumunda gösterilmez.
+  final VoidCallback? onMore;
 
   /// Önizlemede uzun yorum kısaltılır; tüm yorumlar ekranında sınırsız.
   final int? maxLines;
@@ -72,6 +78,25 @@ class ReviewTile extends StatelessWidget {
                       style: AppTextStyles.caption
                           .copyWith(color: context.textTertiaryColor),
                     ),
+                  if (onMore != null && !review.mine)
+                    // Görünen simge küçük; dokunma alanı 44 pt. Satırın
+                    // yüksekliğini büyütmesin diye dikeyde taşmasına izin var.
+                    SizedBox(
+                      width: 32,
+                      height: 20,
+                      child: OverflowBox(
+                        maxHeight: AppSize.minTap,
+                        maxWidth: AppSize.minTap,
+                        child: IconButton(
+                          onPressed: onMore,
+                          tooltip: 'Diğer seçenekler',
+                          padding: EdgeInsets.zero,
+                          iconSize: 18,
+                          icon: Icon(Icons.more_horiz_rounded,
+                              color: context.textTertiaryColor),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -120,7 +145,9 @@ class _Initials extends StatelessWidget {
         .where((p) => p.isNotEmpty)
         .toList();
     if (parts.isEmpty) return '?';
-    return parts.take(2).map((p) => p.characters.first).join();
+    // "@emirergorun" tek parça: baş harf büyük yazılır ("E").
+    return TurkishText.upper(
+        parts.take(2).map((p) => p.characters.first).join());
   }
 
   @override

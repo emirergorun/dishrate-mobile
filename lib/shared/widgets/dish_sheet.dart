@@ -24,6 +24,7 @@ import 'pressable.dart';
 import 'rating_sheet.dart';
 import 'main_scaffold.dart';
 import 'rating_stars.dart';
+import 'review_actions.dart';
 import 'review_tile.dart';
 import 'skeleton.dart';
 
@@ -357,6 +358,13 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
           actionLabel: 'Günlüğe git',
           onAction: _openInDiary,
         ),
+      _InfoBannerKind.reported || _InfoBannerKind.blocked => InfoBanner(
+          key: ValueKey(kind),
+          icon: Icons.check_circle_outline_rounded,
+          message: _lastReviewAction?.message ?? '',
+          actionLabel: 'Geri al',
+          onAction: _undoReviewAction,
+        ),
       _InfoBannerKind.addedToWishlist => InfoBanner(
           key: const ValueKey(_InfoBannerKind.addedToWishlist),
           icon: Icons.check_circle_outline_rounded,
@@ -376,7 +384,40 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
           menuItemName: widget.item.name,
         ),
       ),
-    );
+      // Orada bildirilen ya da engellenen yorum burada da kalkmalı.
+    ).then((_) {
+      if (mounted) _loadReviews();
+    });
+  }
+
+  /// Yorumdaki "⋯": bildir ya da yazarı engelle. Sonrasında liste sunucudan
+  /// yeniden gelir; bildirilen ve engellenenin yorumları artık yok.
+  Future<void> _openReviewActions(MenuItemReviewModel review) async {
+    final result = await ReviewActions.show(context, review);
+    if (result == null || !mounted) return;
+    _lastReviewAction = result;
+    _showTimedBanner(result.result == ReviewActionResult.reported
+        ? _InfoBannerKind.reported
+        : _InfoBannerKind.blocked);
+    _loadReviews();
+  }
+
+  /// Son bildirme/engelleme; şeritteki "Geri al" bunu geri çevirir
+  /// (yanlış dokunuş için, karar 25 Eylül).
+  ReviewActionOutcome? _lastReviewAction;
+
+  Future<void> _undoReviewAction() async {
+    final last = _lastReviewAction;
+    if (last == null) return;
+    _bannerTimer?.cancel();
+    setState(() => _banner = _InfoBannerKind.none);
+    try {
+      await last.undo();
+    } catch (_) {
+      // Geri alma düşerse işlem yerinde kalır; engel Engellenenler'den
+      // kaldırılabilir. Liste yine de tazelenir.
+    }
+    if (mounted) _loadReviews();
   }
 
   @override
@@ -481,7 +522,11 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
                               const SizedBox(height: AppSpace.xl),
                               _RatingSummary(
                                 rating: item.averageRating,
-                                count: _reviews?.length,
+                                // Ortalama sunucudan geliyor; sayı da oradan
+                                // gelmeli. Yorum listesinden sayılınca
+                                // bildirilen ya da engellenenin yorumu
+                                // düşüyor, "2.0 · 0 değerlendirme" çıkıyordu.
+                                count: item.ratingCount,
                               ),
                               const SizedBox(height: AppSpace.xl),
                               _buildReviews(),
@@ -603,7 +648,11 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
         Text('Son Yorumlar', style: titleStyle),
         const SizedBox(height: AppSpace.lg),
         for (final r in written.take(_previewCount)) ...[
-          ReviewTile(review: r, maxLines: 4),
+          ReviewTile(
+            review: r,
+            maxLines: 4,
+            onMore: () => _openReviewActions(r),
+          ),
           const SizedBox(height: AppSpace.xl),
         ],
         TextButton(
@@ -720,6 +769,8 @@ enum _InfoBannerKind {
   addedToWishlist,
   removedFromWishlist,
   wishlistFailed,
+  reported,
+  blocked,
 }
 
 // ── İstek listesi butonu ──────────────────────────────────────────────────────

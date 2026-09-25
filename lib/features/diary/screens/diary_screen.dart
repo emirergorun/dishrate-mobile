@@ -8,6 +8,7 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/api_errors.dart';
 import '../../../core/network/file_repository.dart';
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,6 +18,7 @@ import '../../../shared/models/rating_model.dart';
 import '../../../shared/models/rating_request_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
+import '../../../shared/widgets/edit_sheet_guard.dart';
 import '../../../shared/widgets/info_banner.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -1152,7 +1154,8 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
       _newPhotoBytes != null || (!_photoRemoved && _currentPhoto != null);
 
   /// Kayıtlı hâlden farkı var mı? Yoksa "Güncelle" pasif kalır, kapatırken
-  /// onay sorulmaz. Fotoğraf eklemek, değiştirmek ya da kaldırmak da sayılır.
+  /// onay sorulmaz (bkz. [EditSheetGuard]). Fotoğraf eklemek, değiştirmek
+  /// ya da kaldırmak da sayılır.
   bool get _isDirty =>
       _score != widget.rating.score ||
       _commentCtrl.text.trim() != (widget.rating.comment ?? '').trim() ||
@@ -1167,58 +1170,6 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
     _currentPhoto = widget.rating.reviewPhotoUrl;
     // Her harfte "Güncelle"nin durumu yeniden hesaplansın.
     _commentCtrl.addListener(() => setState(() {}));
-  }
-
-  /// Aşağı kaydırılan mesafe; panel parmağı izler.
-  double _dragOffset = 0;
-  bool _dragging = false;
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    setState(() {
-      _dragging = true;
-      _dragOffset = (_dragOffset + d.delta.dy).clamp(0.0, double.infinity);
-    });
-  }
-
-  void _onDragEnd(DragEndDetails d) {
-    final close = _dragOffset > 100 || d.velocity.pixelsPerSecond.dy > 700;
-    setState(() {
-      _dragging = false;
-      _dragOffset = 0;
-    });
-    if (close) _requestClose();
-  }
-
-  /// "İptal et", panelin dışına basma ve aşağı kaydırma buraya gelir.
-  /// Değişiklik varsa önce sorulur; "Geri dön" paneli olduğu gibi bırakır.
-  Future<void> _requestClose() async {
-    if (_isLoading) return;
-    if (!_isDirty) {
-      Navigator.pop(context);
-      return;
-    }
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.surfaceColor,
-        content: const Text(
-          'Güncellemeyi iptal etmek istiyor musun?',
-          style: AppTextStyles.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Geri dön'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: ctx.errorTextColor),
-            child: const Text('İptal et'),
-          ),
-        ],
-      ),
-    );
-    if (discard == true && mounted) Navigator.pop(context);
   }
 
   Future<void> _pickPhoto() async {
@@ -1322,11 +1273,11 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
           'comment': _commentCtrl.text.trim(),
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = 'Güncellenemedi, tekrar dene.';
+          _error = userMessageFor(e, fallback: 'Güncellenemedi, tekrar dene.');
         });
       }
     }
@@ -1337,22 +1288,11 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_isDirty && !_isLoading,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _requestClose();
-      },
-      child: GestureDetector(
-        onVerticalDragUpdate: _onDragUpdate,
-        onVerticalDragEnd: _onDragEnd,
-        child: AnimatedContainer(
-          duration:
-              _dragging ? Duration.zero : const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          transform: Matrix4.translationValues(0, _dragOffset, 0),
-          child: _buildSheet(context),
-        ),
-      ),
+    return EditSheetGuard(
+      isDirty: _isDirty,
+      busy: _isLoading,
+      discardMessage: 'Güncellemeyi iptal etmek istiyor musun?',
+      child: _buildSheet(context),
     );
   }
 
@@ -1407,25 +1347,8 @@ class _EditRatingSheetState extends State<_EditRatingSheet> {
                     ),
                   ),
                   const SizedBox(width: AppSpace.sm),
-                  // Kırmızı: "Hesabı sil" ile aynı renk (Emir'in isteği).
-                  Semantics(
-                    button: true,
-                    label: 'Düzenlemeyi iptal et',
-                    excludeSemantics: true,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _requestClose,
-                      child: MinTapArea(
-                        child: Text(
-                          'İptal et',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: context.errorTextColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SheetCancelButton(
+                      semanticLabel: 'Düzenlemeyi iptal et'),
                 ],
               ),
             ),
