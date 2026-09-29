@@ -6,7 +6,7 @@ publish_to: 'none'
 # üzerine kurulumda silmiyor — numarayı artırmak tek başına yetmiyor,
 # eski kare gidene kadar uygulamayı telefondan silip kurmak gerekiyor
 # (22 Eylül'de yaşandı).
-version: 1.0.0+5
+version: 1.0.0+6
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -83,6 +83,14 @@ flutter_launcher_icons:
   image_path: assets/branding/app_icon.png
   ios: true
   remove_alpha_ios: true          # App Store saydam ikon kabul etmiyor
+  # iOS 18+ koyu ve renkli ikon görünümleri (karar 29 Eylül). Ana ikon
+  # turuncu kalır; bunları sistem yalnız o görünümler seçiliyken (ör. koyu
+  # moddaki Spotlight) kullanır. Verilmeyince iOS kendisi üretiyordu.
+  # Koyu: paketteki 2 numaranın (siyah zemin, turuncu d) zemini saydam —
+  # Apple zemini kendisi çiziyor. Renkli: 4 numara (siyah zemin, beyaz d),
+  # sistem parlaklığa göre boyar.
+  image_path_ios_dark_transparent: assets/branding/icon_dark.png
+  image_path_ios_tinted_grayscale: assets/branding/icon_tinted.png
   android: ic_launcher
   min_sdk_android: 21
   # Android uyarlanabilir ikon: zemin turuncu, önplan saydam beyaz `d`
