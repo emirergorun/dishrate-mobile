@@ -147,7 +147,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   /// satır ediyordu; ekran fotoğraflardan önce metin olarak okunuyordu.
   List<_Section> get _sections {
     final loc = ref.watch(selectedLocationProvider);
-    final place = loc.hasDistrict ? loc.district! : loc.province;
+    final place =
+        loc.hasDistrict && !_widenedToProvince ? loc.district! : loc.province;
     final Map<String, ({String title, String? subtitle, _Layout layout})> meta =
         {
       'top-rated': (
@@ -195,6 +196,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           ),
     ];
   }
+
+  /// İlçe seçili ama ilçede yeterli yemek yok: sunucu il genelini döndürdü.
+  /// Başlık il adıyla yazılır, bölümlerin üstünde bunu söyleyen not çıkar;
+  /// yoksa başka ilçelerin yemekleri seçilen ilçeninmiş gibi görünüyordu.
+  bool get _widenedToProvince =>
+      ref.read(selectedLocationProvider).hasDistrict &&
+      _feed.isNotEmpty &&
+      !_feed.first.districtApplied;
+
+  /// "Esenler’de henüz yeterli yemek yok, İstanbul geneli gösteriliyor."
+  static String _widenedNote(SelectedLocation loc) =>
+      '${_locativeSuffix(loc.district!)} henüz yeterli yemek yok, '
+      '${loc.province} geneli gösteriliyor.';
 
   /// Sıralı listeler ekranda yalnızca [_listRows] satır gösteriyor; sunucuda
   /// devamı olmasa da gizli kalan satırlar için "Tümünü gör" gerekir.
@@ -315,7 +329,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               )
 
             // ── Bölümler ─────────────────────────────────────────────────
-            else
+            else ...[
+              if (_widenedToProvince)
+                SliverToBoxAdapter(
+                  child: _WidenedNote(
+                      text: _widenedNote(ref.watch(selectedLocationProvider))),
+                ),
               SliverList.builder(
                 itemCount: sections.length,
                 itemBuilder: (context, index) {
@@ -343,11 +362,45 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                   );
                 },
               ),
+            ],
 
             // ── Alt boşluk (bottom nav ile çakışmasın) ──────────────────
             const SliverToBoxAdapter(child: SizedBox(height: AppSpace.xxl)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── İl geneline düşüldü notu ─────────────────────────────────────────────────
+
+/// İlçede yeterli yemek olmadığı için il geneli gösterildiğini söyler.
+class _WidenedNote extends StatelessWidget {
+  const _WidenedNote({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.textSecondaryColor;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpace.screen,
+          AppSpace.lg - CategoryChips.tapInset, AppSpace.screen, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(TablerIcons.info_circle, size: 16, color: color),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.bodySmall.copyWith(color: color),
+            ),
+          ),
+        ],
       ),
     );
   }

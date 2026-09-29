@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 
 import '../../../core/network/rating_repository.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/auth/auth_provider.dart';
+import '../../../shared/auth/require_login.dart';
 import '../../../shared/models/menu_item_review_model.dart';
 import '../../../shared/widgets/rating_stars.dart';
 import '../../../shared/widgets/review_actions.dart';
@@ -14,7 +17,7 @@ import '../../../shared/widgets/state_message.dart';
 
 /// Bir menü öğesine yapılan tüm değerlendirmeler. İsimler gizlilik için
 /// maskeli gelir (E*** E***); kullanıcı kendi yorumunu gerçek adıyla görür.
-class MenuItemReviewsScreen extends StatefulWidget {
+class MenuItemReviewsScreen extends ConsumerStatefulWidget {
   const MenuItemReviewsScreen({
     super.key,
     required this.menuItemId,
@@ -24,10 +27,11 @@ class MenuItemReviewsScreen extends StatefulWidget {
   final String menuItemName;
 
   @override
-  State<MenuItemReviewsScreen> createState() => _MenuItemReviewsScreenState();
+  ConsumerState<MenuItemReviewsScreen> createState() => _MenuItemReviewsScreenState();
 }
 
-class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
+class _MenuItemReviewsScreenState
+    extends ConsumerState<MenuItemReviewsScreen> {
   List<MenuItemReviewModel> _reviews = [];
   bool _loading = true;
   String? _error;
@@ -70,6 +74,18 @@ class _MenuItemReviewsScreenState extends State<MenuItemReviewsScreen> {
   }
 
   Future<void> _openActions(MenuItemReviewModel review) async {
+    // Misafir önce giriş yapar (1.8); sonra liste yenilenir, yorum kişinin
+    // kendisininse menü açılmaz.
+    if (!ref.read(authProvider).isAuthenticated) {
+      if (!await requireLogin(context, ref,
+          reason: 'Bildirmek ya da engellemek için giriş yap')) {
+        return;
+      }
+      await _load(silent: true);
+      final fresh = _reviews.where((r) => r.ratingId == review.ratingId);
+      if (!mounted || fresh.isEmpty || fresh.first.mine) return;
+      review = fresh.first;
+    }
     final result = await ReviewActions.show(context, review);
     if (result == null || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

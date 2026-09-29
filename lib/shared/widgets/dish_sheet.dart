@@ -24,6 +24,8 @@ import 'pressable.dart';
 import 'rating_sheet.dart';
 import 'main_scaffold.dart';
 import 'rating_stars.dart';
+import '../auth/require_login.dart';
+import '../../core/auth/auth_provider.dart';
 import 'review_actions.dart';
 import 'review_tile.dart';
 import 'skeleton.dart';
@@ -196,7 +198,23 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
     }
   }
 
+  /// Misafirse giriş ister; girişten sonra sunucudaki durumu (listede mi,
+  /// daha önce puanlamış mı) yeniden okur. Girişli değilse `false`.
+  Future<bool> _ensureLoggedIn(String reason) async {
+    if (ref.read(authProvider).isAuthenticated) return true;
+    if (!await requireLogin(context, ref, reason: reason)) return false;
+    if (!mounted) return false;
+    await Future.wait([_checkWishlist(), _loadReviews()]);
+    return mounted;
+  }
+
   Future<void> _toggleWishlist() async {
+    final wasGuest = !ref.read(authProvider).isAuthenticated;
+    if (!await _ensureLoggedIn('İstek Listesi’ne eklemek için giriş yap')) {
+      return;
+    }
+    // Misafirken "ekle"ye basmıştı; zaten listedeyse çıkarılmasın.
+    if (wasGuest && _inWishlist) return;
     setState(() => _wishlistLoading = true);
     try {
       final userId = await TokenStorage.instance.getUserId();
@@ -393,7 +411,13 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
   /// Yorumdaki "⋯": bildir ya da yazarı engelle. Sonrasında liste sunucudan
   /// yeniden gelir; bildirilen ve engellenenin yorumları artık yok.
   Future<void> _openReviewActions(MenuItemReviewModel review) async {
-    final result = await ReviewActions.show(context, review);
+    if (!await _ensureLoggedIn('Bildirmek ya da engellemek için giriş yap')) {
+      return;
+    }
+    // Girişten sonra liste yenilendi; yorum kişinin kendisininse menü yok.
+    final fresh = _reviews?.where((r) => r.ratingId == review.ratingId);
+    if (!mounted || fresh == null || fresh.isEmpty || fresh.first.mine) return;
+    final result = await ReviewActions.show(context, fresh.first);
     if (result == null || !mounted) return;
     _lastReviewAction = result;
     _showTimedBanner(result.result == ReviewActionResult.reported
@@ -571,7 +595,14 @@ class _DishSheetBodyState extends ConsumerState<_DishSheetBody> {
                     const SizedBox(width: AppSpace.md),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
+                        onPressed: () async {
+                          // Misafir önce giriş yapar, sonra puanlama açılır.
+                          if (!await _ensureLoggedIn(
+                              'Puan vermek için giriş yap')) {
+                            return;
+                          }
+                          if (context.mounted) Navigator.pop(context, true);
+                        },
                         child: const Text('Değerlendir'),
                       ),
                     ),

@@ -32,6 +32,9 @@ abstract final class AppFonts {
   /// Logo yazısı — [active] ne olursa olsun değişmez.
   static const String wordmark = poppins;
 
+  /// Adisyonun fiş yazısı (1.9), sabit genişlikli. Yalnız adisyonda.
+  static const String receipt = 'IBMPlexMono';
+
   // ── Ağırlık skalası ────────────────────────────────────────────────────────
   // Ekranlarda `FontWeight.w600` yerine bu adlar yazılır ki skala tek yerden
   // kaysın. Poppins aynı sayıda Urbanist'ten belirgin kalın çizdiği için skala

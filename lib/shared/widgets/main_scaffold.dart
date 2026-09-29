@@ -9,6 +9,7 @@ import '../../features/search/screens/search_screen.dart';
 import '../../features/diary/screens/diary_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/rating/providers/rating_flow_provider.dart';
+import '../auth/require_login.dart';
 import '../providers/data_refresh.dart';
 import 'home_filled_icon.dart';
 import 'min_tap_area.dart';
@@ -61,6 +62,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   Future<void> _openAddRatingModal() async {
+    // Misafir önce giriş yapar, sonra akış kendiliğinden açılır (1.8).
+    if (!await requireLogin(context, ref, reason: 'Puan vermek için giriş yap')) {
+      return;
+    }
+    if (!mounted) return;
     await RatingSheet.show(context);
     // Panel sürükleyerek kapatılırsa akış yarım kalıyor; bir sonraki "+"
     // eski yemeğin puanlama adımında açılmasın.

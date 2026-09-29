@@ -1,16 +1,14 @@
-import 'dart:ui' show lerpDouble;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/dishrate_logo.dart';
 import '../../../shared/widgets/terms_sheet.dart';
-import 'splash_screen.dart';
 import 'welcome_screen.dart';
 
 /// Giriş ekranındaki logonun genişliği.
@@ -23,8 +21,7 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -34,89 +31,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   /// Giriş denemesi başarısızsa formun içinde gösterilen mesaj.
   String? _error;
 
-  // ── Açılıştan geçiş ─────────────────────────────────────────────────────
-  // Açılış ekranında logo ortada ve büyük; giriş ekranı açılınca bir anda
-  // yukarı sıçrayıp küçülüyordu. Artık logo açılıştaki yerinden kendi yerine
-  // kayarak küçülüyor, form arkasından beliriyor.
-
-  late final AnimationController _intro;
-  late final Animation<double> _contentFade;
-  bool _introDone = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _intro = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _contentFade = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.45, 1, curve: Curves.easeOut),
-    );
-    // Yalnızca açılış ekranından gelindiyse oynat; çıkış yapıp girişe dönünce
-    // logonun ortadan gelmesi için sebep yok.
-    if (!SplashScreen.wasShown) {
-      _intro.value = 1;
-      _introDone = true;
-      return;
-    }
-    SplashScreen.wasShown = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (MediaQuery.disableAnimationsOf(context)) {
-        setState(() {
-          _intro.value = 1;
-          _introDone = true;
-        });
-        return;
-      }
-      _intro.forward().whenComplete(() {
-        if (mounted) setState(() => _introDone = true);
-      });
-    });
-  }
-
-  /// Logonun formdaki yeri. Ölçmek yerine düzenden hesaplanıyor: güvenli
-  /// alanın üstü + 60 boşluk + logonun yarısı, yatayda orta.
-  ///
-  /// Önceden konum GlobalKey ile ölçülüyordu; ölçüm bir sebeple boş dönünce
-  /// animasyon sessizce atlanıyor ve logo ortadan kaybolup yukarıda yeniden
-  /// beliriyordu (cihazda tam olarak bu oluyordu).
-  Offset _logoTarget(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    const h = _logoWidth / DishrateWordmark.aspectRatio;
-    return Offset(mq.size.width / 2, mq.padding.top + 60 + h / 2);
-  }
-
   @override
   void dispose() {
-    _intro.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  /// Açılıştaki yerinden (ekranın ortası) formdaki yerine kayan logo.
-  Widget _flyingLogo() {
-    return AnimatedBuilder(
-      animation: _intro,
-      builder: (context, _) {
-        final t = Curves.easeInOutCubic
-            .transform((_intro.value / 0.6).clamp(0.0, 1.0));
-        final start = MediaQuery.sizeOf(context).center(Offset.zero);
-        final c = Offset.lerp(start, _logoTarget(context), t)!;
-        final w = lerpDouble(splashLogoWidth, _logoWidth, t)!;
-        final h = w / DishrateWordmark.aspectRatio;
-        return Positioned(
-          left: c.dx - w / 2,
-          top: c.dy - h / 2,
-          width: w,
-          height: h,
-          child: DishrateWordmark(width: w),
-        );
-      },
-    );
   }
 
   Future<void> _login() async {
@@ -143,6 +62,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _error = errorText;
     });
 
+    // Giriş ekranı içeriğin üstünde açıldı (1.8); başarıda kapanır ve
+    // kullanıcı kaldığı yere döner.
+    if (authState.isAuthenticated) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
     // Hata mesajı formun içinde kalıyor (alttan çıkan bildirim yerine) ve
     // ekran yeniden kurulmuyor: kullanıcı adı yazdığı gibi duruyor, yalnızca
     // şifre temizleniyor — yanlış olan büyük ihtimalle o.
@@ -155,181 +81,187 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       backgroundColor: context.bgColor,
       body: Stack(
         children: [
-          FadeTransition(
-            opacity: _contentFade,
-            child: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 60),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 60),
 
-                    // ── Logo & Başlık ──────────────────────────────────────────────
-                    Center(
-                      child: Column(
-                        children: [
-                          // Geçiş sürerken gerçek logo gizli; yerine üstte kayan
-                          // kopyası görünüyor.
-                          Opacity(
-                            opacity: _introDone ? 1 : 0,
-                            child: const DishrateWordmark(width: _logoWidth),
+                  // ── Logo & Başlık ──────────────────────────────────────────────
+                  Center(
+                    child: Column(
+                      children: [
+                        const DishrateWordmark(width: _logoWidth),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Yemek günlüğü ve keşfi',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: context.textSecondaryColor,
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Yemek günlüğü ve keşfi',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: context.textSecondaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                  ),
 
-                    const SizedBox(height: 52),
+                  const SizedBox(height: 52),
 
-                    // ── Form ──────────────────────────────────────────────────────
-                    const Text('Giriş Yap', style: AppTextStyles.titleLarge),
-                    const SizedBox(height: 24),
+                  // ── Form ──────────────────────────────────────────────────────
+                  const Text('Giriş Yap', style: AppTextStyles.titleLarge),
+                  const SizedBox(height: 24),
 
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          // E-posta veya kullanıcı adı
-                          _AuthTextField(
-                            controller: _emailController,
-                            label: null,
-                            hint: 'Kullanıcı adı veya e-posta',
-                            identifier: true,
-                            textInputAction: TextInputAction.next,
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'E-posta veya kullanıcı adı gerekli';
-                              }
-                              return null;
-                            },
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // E-posta veya kullanıcı adı
+                        _AuthTextField(
+                          controller: _emailController,
+                          label: null,
+                          hint: 'Kullanıcı adı veya e-posta',
+                          identifier: true,
+                          textInputAction: TextInputAction.next,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'E-posta veya kullanıcı adı gerekli';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Şifre
+                        _AuthTextField(
+                          controller: _passwordController,
+                          label: null,
+                          hint: 'Şifre',
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _login(),
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword
+                                ? 'Şifreyi göster'
+                                : 'Şifreyi gizle',
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              color: context.textSecondaryColor,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
+                          // Girişte karmaşıklık kuralı uygulanmaz — eski şifresi
+                          // olan kullanıcılar kilitlenmesin. Doğrulama sunucuda.
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Şifre gerekli' : null,
+                        ),
+                        if (_error != null) ...[
                           const SizedBox(height: 16),
+                          _ErrorBox(message: _error!),
+                        ],
 
-                          // Şifre
-                          _AuthTextField(
-                            controller: _passwordController,
-                            label: null,
-                            hint: 'Şifre',
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _login(),
-                            suffixIcon: IconButton(
-                              tooltip: _obscurePassword
-                                  ? 'Şifreyi göster'
-                                  : 'Şifreyi gizle',
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_rounded,
-                                color: context.textSecondaryColor,
-                                size: 20,
+                        const SizedBox(height: 28),
+
+                        // Giriş Butonu
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  AppColors.primary.withValues(alpha: 0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
+                              elevation: 0,
                             ),
-                            // Girişte karmaşıklık kuralı uygulanmaz — eski şifresi
-                            // olan kullanıcılar kilitlenmesin. Doğrulama sunucuda.
-                            validator: (v) => (v == null || v.isEmpty)
-                                ? 'Şifre gerekli'
-                                : null,
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 16),
-                            _ErrorBox(message: _error!),
-                          ],
-
-                          const SizedBox(height: 28),
-
-                          // Giriş Butonu
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.5),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2.5,
-                                      ),
-                                    )
-                                  : Text(
-                                      'Giriş yap',
-                                      style: AppTextStyles.titleSmall.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.5,
                                     ),
-                            ),
+                                  )
+                                : Text(
+                                    'Giriş yap',
+                                    style: AppTextStyles.titleSmall.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                  ),
 
-                    const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                    // ── Kayıt Ol ──────────────────────────────────────────────────
-                    Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Hesabın yok mu? ',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: context.textSecondaryColor,
-                            ),
+                  // ── Kayıt Ol ──────────────────────────────────────────────────
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Hesabın yok mu? ',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: context.textSecondaryColor,
                           ),
-                          Semantics(
-                            button: true,
-                            label: 'Kayıt ol',
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const RegisterScreen(),
-                                  ),
-                                );
-                              },
-                              child: MinTapArea(
-                                child: Text(
-                                  'Kayıt ol',
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                        ),
+                        Semantics(
+                          button: true,
+                          label: 'Kayıt ol',
+                          child: GestureDetector(
+                            onTap: () async {
+                              final ok = await Navigator.of(context)
+                                  .push<bool>(MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ));
+                              // Kayıt başarılı: giriş ekranı da kapanır.
+                              if (ok == true && context.mounted) {
+                                Navigator.of(context).pop(true);
+                              }
+                            },
+                            child: MinTapArea(
+                              child: Text(
+                                'Kayıt ol',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
           ),
-          if (!_introDone) _flyingLogo(),
+          // İçeriğin üstünde açılıyor (1.8): vazgeçmek için geri.
+          if (Navigator.of(context).canPop())
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(left: AppSpace.xs),
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back_rounded,
+                      color: context.textPrimaryColor),
+                  tooltip: 'Geri',
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -434,17 +366,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated) {
-      // Kayıt başarılı → önce karşılama ekranı, sonra ana ekran.
+      // Kayıt başarılı → önce kayıt adisyonu, sonra ana ekran.
       // Bu ekran giriş ekranının ÜZERİNE açıldığı için kapatılmalı; yoksa
       // _AuthGate arkada MainScaffold'a geçse bile kullanıcı burada kalır.
-      final name = authState.user?.firstName?.trim().isNotEmpty == true
-          ? authState.user!.firstName!.trim()
-          : (authState.user?.username ?? '');
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => WelcomeScreen(name: name)),
-      );
-      if (mounted) Navigator.of(context).pop(); // kayıt ekranını kapat
+      final user = authState.user;
+      if (user != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => WelcomeScreen(user: user)),
+        );
+      }
+      // Kayıt ekranı kapanır, kullanıcı kaldığı yere döner (1.8).
+      if (mounted) Navigator.of(context).pop(true);
       return;
     }
 
@@ -526,9 +458,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: null,
                       hint: 'Kullanıcı adı',
                       identifier: true,
-                      // Yorumlarda ad yerine kullanıcı adı görünüyor (karar
-                      // 25 Eylül); seçerken bilsin.
-                      helper: 'Yorumlarında bu adla görünürsün.',
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         final t = (v ?? '').trim();
@@ -665,7 +594,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 12),
               // Apple Guideline 1.2: kullanıcı içeriği olan uygulamada şartlar
               // (uygunsuz içeriğe tolerans yok) kayıtta kabul edilmeli (1.7).
-              _TermsNotice(textStyle: AppTextStyles.bodySmall.copyWith(
+              _TermsNotice(
+                  textStyle: AppTextStyles.bodySmall.copyWith(
                 color: context.textSecondaryColor,
               )),
               const SizedBox(height: 12),
@@ -765,7 +695,6 @@ class _AuthTextField extends StatelessWidget {
     this.suffixIcon,
     this.validator,
     this.identifier = false,
-    this.helper,
   });
 
   final TextEditingController controller;
@@ -783,9 +712,6 @@ class _AuthTextField extends StatelessWidget {
   /// klavye. Önceden iOS "modsim"i "modern"e çeviriyor, Türkçe klavye
   /// "haritatest" yerine "harıtatest" yazdırıyordu; ikisi de girişi bozuyordu.
   final bool identifier;
-
-  /// Alanın altındaki açıklama (ör. kullanıcı adının herkese görüneceği).
-  final String? helper;
 
   @override
   Widget build(BuildContext context) {
@@ -817,8 +743,6 @@ class _AuthTextField extends StatelessWidget {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            helperText: helper,
-            helperMaxLines: 2,
             hintStyle: AppTextStyles.bodyMedium.copyWith(
               color: context.textSecondaryColor.withValues(alpha: 0.6),
             ),

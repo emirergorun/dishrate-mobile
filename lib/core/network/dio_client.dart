@@ -14,6 +14,10 @@ class DioClient {
 
   static Dio get instance => _instance;
 
+  /// Oturum sunucuda geçersiz sayılınca (yenileme reddedildi) çağrılır;
+  /// `AuthNotifier` kendini misafire çevirmek için bağlanır.
+  static void Function()? onSessionExpired;
+
   static Dio _create() {
     final dio = Dio(
       BaseOptions(
@@ -153,6 +157,9 @@ class _AuthInterceptor extends Interceptor {
         final status = e.response?.statusCode;
         if (status == 401 || status == 403 || status == 404) {
           await _storage.clearAll();
+          // Uygulama misafire düşer (1.8). Önceden depo siliniyor ama ekran
+          // "girişli" kalıyordu; her istek sessizce 401 alıyordu.
+          DioClient.onSessionExpired?.call();
         }
         completer.complete(null);
       } catch (_) {

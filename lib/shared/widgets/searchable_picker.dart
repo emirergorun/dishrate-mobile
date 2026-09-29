@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -33,6 +35,8 @@ abstract final class SearchablePicker {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
+      // Panel çentiğin ve durum çubuğunun altında kalsın.
+      useSafeArea: true,
       backgroundColor: context.bgColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -98,12 +102,29 @@ class _PickerSheetState extends State<_PickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    final media = MediaQuery.of(context);
+    final viewInsets = media.viewInsets.bottom;
 
+    return LayoutBuilder(builder: (context, constraints) {
+      // Klavye açılınca panel yukarı itiliyor. Sabit %82 yükseklik klavyeyle
+      // birlikte ekrana sığmıyordu, başlık saatin altına giriyordu. Artık
+      // güvenli alana sığmayan kısım listeden kısalır.
+      final height = math.max(
+        0.0,
+        math.min(
+          media.size.height * 0.82,
+          constraints.maxHeight - viewInsets - 12,
+        ),
+      );
+      return _buildSheet(context, viewInsets, height);
+    });
+  }
+
+  Widget _buildSheet(BuildContext context, double viewInsets, double height) {
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.82,
+        height: height,
         child: Column(
           children: [
             const SizedBox(height: 10),

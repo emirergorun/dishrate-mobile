@@ -19,6 +19,7 @@ import '../../../shared/models/rating_request_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/edit_sheet_guard.dart';
+import '../../../shared/widgets/guest_prompt.dart';
 import '../../../shared/widgets/info_banner.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/pressable.dart';
@@ -203,14 +204,36 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   /// [silent] açıkken iskelet gösterilmez: başka ekranda puan verilince liste
   /// yerinde kalıp yalnızca tazelensin.
+  Widget _buildGuest(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      appBar: AppBar(
+        backgroundColor: context.bgColor,
+        title: const Text('Günlüğüm', style: AppTextStyles.headlineMedium),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: context.dividerColor),
+        ),
+      ),
+      body: ListView(
+        children: const [
+          GuestPrompt(
+            icon: TablerIcons.notebook,
+            title: 'Günlüğün Burada Birikir',
+            message:
+                'Puanladığın her yemek tarihiyle burada durur. Başlamak için giriş yap.',
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _load({bool silent = false}) async {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'Oturum bulunamadı';
-        });
+        // Misafir: davet gösteriliyor, hata değil (1.8).
+        setState(() => _isLoading = false);
       }
       return;
     }
@@ -419,6 +442,22 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Misafir → girişli: günlük yüklenir; girişli → misafir: liste silinir,
+    // bir sonraki hesaba sızmasın (1.8).
+    ref.listen<int?>(currentUserIdProvider, (prev, next) {
+      if (next != null && next != prev) {
+        _load();
+      } else if (next == null) {
+        setState(() {
+          _allRatings = [];
+          _displayed = [];
+          _error = null;
+          _isLoading = false;
+        });
+      }
+    });
+    if (ref.watch(currentUserIdProvider) == null) return _buildGuest(context);
+
     // Başka ekranda puan verilince/silinince liste sessizce tazelenir.
     ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
     // Yemek panelindeki "Günlüğe git" isteği.

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/models/user_model.dart';
 import '../network/api_errors.dart';
+import '../network/dio_client.dart';
 import 'auth_repository.dart';
 import 'token_storage.dart';
 
@@ -49,6 +50,9 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(const AuthState.loading()) {
+    DioClient.onSessionExpired = () {
+      if (state.isAuthenticated) state = const AuthState.unauthenticated();
+    };
     _initialize();
   }
 

@@ -26,8 +26,10 @@ import '../../../shared/models/wishlist_model.dart';
 import '../../../shared/providers/data_refresh.dart';
 import '../../../shared/widgets/dish_photo.dart';
 import '../../../shared/widgets/edit_sheet_guard.dart';
+import '../../../shared/widgets/guest_prompt.dart';
 import '../../../shared/widgets/info_banner.dart';
 import '../../../shared/widgets/rating_stars.dart';
+import '../../../shared/widgets/receipt/receipt_screen.dart';
 import '../../../shared/widgets/sheet_error.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/state_message.dart';
@@ -62,10 +64,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _photoBusy = false;
 
   /// En yüksek puanlı 5 değerlendirme (favori yemekler).
-  List<RatingModel> get _topFavorites {
-    final sorted = [..._ratings]..sort((a, b) => b.score.compareTo(a.score));
-    return sorted.take(5).toList();
-  }
+  List<RatingModel> get _topFavorites => topFavorites(_ratings);
 
   @override
   void initState() {
@@ -101,6 +100,69 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     } finally {
       if (mounted) setState(() => _photoBusy = false);
+    }
+  }
+
+  bool _receiptBusy = false;
+
+  /// "Adisyon çıkar" (1.9): kullanıcı adisyonu, sayılar sunucudan taze.
+  Future<void> _openReceipt() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || _receiptBusy) return;
+    setState(() => _receiptBusy = true);
+    try {
+      final results = await Future.wait([
+        UserRepository.instance.getUser(userId),
+        RatingRepository.instance.getRatingsByUser(userId),
+        WishlistRepository.instance.getWishlist(userId),
+      ]);
+      if (!mounted) return;
+      final user = results[0] as UserModel;
+      final ratings = results[1] as List<RatingModel>;
+      final wishlist = results[2] as List<WishlistModel>;
+      // Profil de aynı veriyle güncellensin; sayılar birbirini tutsun.
+      setState(() {
+        _user = user;
+        _ratings = ratings;
+        _wishlist = wishlist;
+      });
+      await Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => ReceiptScreen(
+            data: ReceiptData(
+              kind: ReceiptKind.user,
+              fullName: user.fullName,
+              username: user.username,
+              ratingCount: ratings.length,
+              wishlistCount: wishlist.length,
+              createdAt: user.createdAt,
+              memberCode: user.memberCode,
+              // Profildeki "Favori yemekler" panelinin ilk üçü, aynı sıra.
+              favorites: [
+                for (final r in topFavorites(ratings, count: 3))
+                  ReceiptFavorite(
+                    restaurant: r.restaurantName,
+                    dish: r.menuItemName,
+                    location: r.restaurantLocation,
+                  ),
+              ],
+              printedAt: DateTime.now(),
+            ),
+            buttonLabel: 'Kapat',
+            buttonArrow: false,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adisyon çıkarılamadı, tekrar dene.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _receiptBusy = false);
     }
   }
 
@@ -316,6 +378,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ));
   }
 
+  Widget _buildGuest(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      appBar: AppBar(
+        backgroundColor: context.bgColor,
+        title: const Text('Profil', style: AppTextStyles.headlineMedium),
+        actions: [
+          IconButton(
+            icon: Icon(TablerIcons.settings, color: context.textSecondaryColor),
+            onPressed: () => _openSettings(context),
+            tooltip: 'Ayarlar',
+          ),
+          const SizedBox(width: AppSpace.xs),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: context.dividerColor),
+        ),
+      ),
+      body: ListView(
+        children: [
+          const GuestPrompt(
+            icon: TablerIcons.user,
+            title: 'Profilin',
+            message: 'İstek Listesi ve favori yemeklerin için giriş yap.',
+          ),
+          const _SectionLabel('DESTEK'),
+          _ProfileItem(
+            icon: TablerIcons.message_circle,
+            label: 'Bize ulaş',
+            subtitle: AppLinks.supportEmail,
+            onTap: _contactUs,
+          ),
+          _ProfileItem(
+            icon: TablerIcons.file_text,
+            label: 'Kullanım şartları',
+            onTap: () => TermsSheet.show(context),
+          ),
+          const SizedBox(height: AppSpace.xl),
+        ],
+      ),
+    );
+  }
+
   void _confirmSignOut() {
     showDialog(
       context: context,
@@ -334,8 +440,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Oturumu kapat → _AuthGate otomatik giriş ekranına yönlendirir
+              // Çıkışta misafir olarak Keşfet'e dönülür (1.8); profil
+              // sekmesi misafir davetine geçer.
               ref.read(authProvider.notifier).logout();
+              ref.read(selectedTabProvider.notifier).state = 0;
             },
             style:
                 TextButton.styleFrom(foregroundColor: context.errorTextColor),
@@ -355,7 +463,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (_) => _DeleteAccountSheet(
-        onDeleted: () => ref.read(authProvider.notifier).clearDeletedAccount(),
+        onDeleted: () {
+          ref.read(authProvider.notifier).clearDeletedAccount();
+          ref.read(selectedTabProvider.notifier).state = 0;
+        },
       ),
     );
   }
@@ -369,8 +480,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ── Build ───────────────────────────────────────────────────────────────────
 
+  /// Misafir → girişli: profil yüklenir. Girişli → misafir: eldeki veri
+  /// silinir, bir sonraki hesaba sızmasın.
+  void _onUserChanged(int? previous, int? next) {
+    if (next != null && next != previous) {
+      _load();
+    } else if (next == null) {
+      setState(() {
+        _user = null;
+        _ratings = [];
+        _wishlist = [];
+        _failed = false;
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<int?>(currentUserIdProvider, _onUserChanged);
+    // Misafir: davet + destek + ayarlar (1.8).
+    if (ref.watch(currentUserIdProvider) == null) return _buildGuest(context);
+
     // Dışarıdan (puanlama, sekme değişimi) tetiklenen sessiz yenileme.
     ref.listen<int>(userDataRefreshProvider, (_, __) => _load(silent: true));
     // Yemek panelindeki "Tümünü gör": panel ve üstteki sayfalar kapandıktan
@@ -441,6 +572,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             onPhotoTap:
                                 _user == null ? null : () => _editPhoto(_user!),
                             photoBusy: _photoBusy,
+                            onReceiptTap: _user == null ? null : _openReceipt,
+                            receiptBusy: _receiptBusy,
                           ),
 
                           const SizedBox(height: AppSpace.sm),
@@ -586,6 +719,8 @@ class _ProfileHeader extends StatelessWidget {
     this.onWishlistTap,
     this.onPhotoTap,
     this.photoBusy = false,
+    this.onReceiptTap,
+    this.receiptBusy = false,
   });
 
   final UserModel? user;
@@ -597,6 +732,10 @@ class _ProfileHeader extends StatelessWidget {
   /// Avatara dokunulduğunda fotoğrafı değiştirme akışını başlatır.
   final VoidCallback? onPhotoTap;
   final bool photoBusy;
+
+  /// "Adisyon çıkar" (1.9).
+  final VoidCallback? onReceiptTap;
+  final bool receiptBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -713,6 +852,23 @@ class _ProfileHeader extends StatelessWidget {
                   onTap: onWishlistTap,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+          // Bize has: kullanıcının "fişi". Menüye gömülmedi, sayaçların
+          // hemen altında göze çarpsın (Emir, 29 Eylül).
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: receiptBusy ? null : onReceiptTap,
+              icon: receiptBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(TablerIcons.receipt, size: 18),
+              label: const Text('Adisyon çıkar'),
             ),
           ),
         ],

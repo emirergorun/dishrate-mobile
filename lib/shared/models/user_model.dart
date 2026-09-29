@@ -23,6 +23,12 @@ class UserModel {
   /// null → şu an değiştirilebilir.
   final DateTime? nameChangeAvailableAt;
 
+  /// Kayıt anı, yerel saatle (adisyon, 1.9). Eski sunucuda null.
+  final DateTime? createdAt;
+
+  /// Adisyondaki üye kodu, ör. "7K4P2Q". İç kimlik yerine gösterilir.
+  final String? memberCode;
+
   const UserModel({
     required this.userId,
     required this.username,
@@ -35,6 +41,8 @@ class UserModel {
     this.bio,
     this.role = UserRole.user,
     this.nameChangeAvailableAt,
+    this.createdAt,
+    this.memberCode,
   });
 
   /// Yeniden çerçevelenebilecek bir özgün görsel var mı?
@@ -76,6 +84,11 @@ class UserModel {
       nameChangeAvailableAt: json['nameChangeAvailableAt'] != null
           ? DateTime.tryParse(json['nameChangeAvailableAt'] as String)
           : null,
+      // Sunucu UTC gönderiyor; adisyonda telefonun saatiyle gösterilir.
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)?.toLocal()
+          : null,
+      memberCode: _blankToNull(json['memberCode'] as String?),
     );
   }
 

@@ -12,8 +12,9 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/providers/theme_provider.dart';
 import 'features/settings/providers/theme_storage.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
+import 'features/onboarding/guest_continue.dart';
+import 'features/onboarding/onboarding_screen.dart';
 import 'shared/widgets/dishrate_logo.dart';
 import 'shared/widgets/main_scaffold.dart';
 
@@ -30,8 +31,10 @@ Future<void> main() async {
   // Tema okunmadan önce olmalı: sonra çağrılırsa silinecek tercih okunur.
   await FreshInstall.clearIfNeeded();
   // Tema ilk kareden önce bilinmeli; yoksa uygulama bir an yanlış temada açılır.
-  final (_, themeMode) =
-      await (_precacheLogo(), ThemeStorage.instance.read()).wait;
+  final (_, themeMode) = await (
+    _precacheLogo(),
+    ThemeStorage.instance.read(),
+  ).wait;
   runApp(ProviderScope(
     overrides: [
       themeProvider.overrideWith((ref) => ThemeNotifier(themeMode)),
@@ -49,6 +52,7 @@ void _registerFontLicenses() {
     for (final (name, file) in [
       ('Urbanist', 'URBANIST-OFL.txt'),
       ('Poppins', 'POPPINS-OFL.txt'),
+      ('IBM Plex Mono', 'IBMPLEXMONO-OFL.txt'),
     ]) {
       final text = await rootBundle.loadString('assets/fonts/$file');
       yield LicenseEntryWithLineBreaks(['$name (font)'], text);
@@ -144,9 +148,17 @@ class DishrateApp extends ConsumerWidget {
 }
 
 /// Auth durumuna göre hangi ekranın gösterileceğine karar verir.
-/// - loading       → SplashScreen
-/// - authenticated → MainScaffold
-/// - unauthenticated → LoginScreen
+/// - loading                          → SplashScreen
+/// - unauthenticated (tanıtım geçilmedi) → OnboardingScreen
+/// - authenticated / misafir devam etti  → MainScaffold (misafir gezinme, 1.8)
+/// - unreachable                      → SplashScreen + "Tekrar dene"
+///
+/// Giriş yapılmamışken tanıtım her açılışta ve her çıkışta gelir (karar
+/// 29 Eylül); "Giriş yapmadan devam et" yalnız bu oturum için geçerli.
+///
+/// Girişli ve misafir aynı `MainScaffold`'u görür; giriş ya da çıkışta iskelet
+/// yeniden kurulmaz, kullanıcı hangi sekmedeyse orada kalır. Giriş ekranı kök
+/// değil, kilitli bir işe basınca içeriğin üstünde açılır (`requireLogin`).
 class _AuthGate extends ConsumerStatefulWidget {
   const _AuthGate();
 
@@ -170,16 +182,62 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    if (_intro) return const SplashScreen();
+    final guestContinued = ref.watch(guestContinuedProvider);
+    // Çıkış (ya da hesap silme, oturumun düşmesi): tanıtım yeniden gelir.
+    ref.listen(authProvider, (prev, next) {
+      if (prev?.isAuthenticated == true && !next.isAuthenticated) {
+        ref.read(guestContinuedProvider.notifier).state = false;
+      }
+    });
 
-    return switch (authState.status) {
-      AuthStatus.loading => const SplashScreen(),
-      AuthStatus.authenticated => const MainScaffold(),
-      AuthStatus.unauthenticated => const LoginScreen(),
+    // Açılış ekranı da geçişin içinde: dışında kalınca AnimatedSwitcher ilk
+    // kez Keşfet'le kuruluyor, ilk çocuğu animasyonsuz gösterdiği için açılış
+    // Keşfet'e kesme geçiyordu. Yükleme ve "Tekrar dene" aynı anahtarı taşır;
+    // aralarında geçiş oynamaz, logo yerinde kalır.
+    const splashKey = ValueKey('splash');
+    final Widget screen = switch (authState.status) {
+      _ when _intro => const SplashScreen(key: splashKey),
+      AuthStatus.loading => const SplashScreen(key: splashKey),
+      AuthStatus.unauthenticated when !guestContinued => OnboardingScreen(
+          key: const ValueKey('onboarding'),
+          onFinished: () =>
+              ref.read(guestContinuedProvider.notifier).state = true,
+        ),
+      AuthStatus.authenticated ||
+      AuthStatus.unauthenticated =>
+        const MainScaffold(key: ValueKey('shell')),
       // Açılışta sunucuya ulaşılamadı: oturum korunur, tekrar denenir.
       AuthStatus.unreachable => SplashScreen(
+          key: splashKey,
           onRetry: () => ref.read(authProvider.notifier).retry(),
         ),
     };
+    // Ekranlar arası geçiş sıralı: önce giden ekran hafifçe küçülüp söner
+    // (ilk yarı), sonra yenisi biraz aşağıdan kayıp büyüyerek gelir. Eski
+    // çapraz geçiş iki koyu ekran arasında 150 ms'de bitmiş gibi görünüyor,
+    // tanıtımdan Keşfet'e "direkt açıldı" hissi veriyordu (29 Eylül).
+    // Aradaki an zemin rengini gösterir; siyah boşluk kalmasın diye tema
+    // zemini altta. Girişli/misafir aynı 'shell' anahtarını taşıdığı için
+    // giriş ve çıkışta (misafirken) geçiş oynamaz, iskelet yerinde kalır.
+    return ColoredBox(
+      color: context.bgColor,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 750),
+        switchInCurve: const Interval(0.4, 1, curve: Curves.easeOutCubic),
+        switchOutCurve: const Interval(0.5, 1, curve: Curves.easeInCubic),
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, 0.02), end: Offset.zero)
+                .animate(animation),
+            child: ScaleTransition(
+              scale: Tween(begin: 0.96, end: 1.0).animate(animation),
+              child: child,
+            ),
+          ),
+        ),
+        child: screen,
+      ),
+    );
   }
 }

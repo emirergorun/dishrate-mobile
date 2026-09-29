@@ -7,7 +7,6 @@ import '../../../shared/widgets/dishrate_logo.dart';
 /// Açılış ekranındaki logonun genişliği. Sistem açılış ekranındaki logoyla
 /// aynı: ikisi arasında logo büyüyüp küçülmesin. `LaunchImage` 300 pt ama
 /// kenarlarında boşluk var; simülatörde ölçülen logo genişliği 278 pt.
-/// Giriş ekranı da logosunu bu boyuttan başlatıp yerine kaydırıyor.
 const double splashLogoWidth = 278;
 
 /// Uygulama açılışında gösterilen yükleme ekranı.
@@ -34,14 +33,6 @@ class SplashScreen extends StatefulWidget {
   /// Açılış ekranının en az görüneceği süre; geçiş yarıda kesilip ekran
   /// turuncudan doğrudan ana ekrana zıplamasın diye `main.dart` bunu bekler.
   static const Duration introDuration = Duration(milliseconds: 600);
-
-  /// Açılış ekranı bu oturumda gösterildi mi?
-  ///
-  /// Giriş ekranı logosunu ancak buradan geldiyse ortadan kaydırıyor. Önceden
-  /// giriş ekranının kendi "bir kez oynat" bayrağı vardı; ekran yeniden
-  /// kurulursa (auth durumu iki kez değişirse, sıcak yenilemede) animasyon
-  /// sessizce atlanıyordu.
-  static bool wasShown = false;
 
   /// Turuncu kare bu oturumda bir kez oynar. Ekran yeniden kurulursa (ör.
   /// "Tekrar dene" sonrası) baştan turuncuya dönmez.
@@ -79,7 +70,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    SplashScreen.wasShown = true;
     return AnimatedBuilder(
       animation: _t,
       builder: (context, _) {

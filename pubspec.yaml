@@ -130,9 +130,14 @@ flutter:
     - assets/images/
     - assets/branding/
     - assets/data/
+    # Tanıtım fotoğrafları (Unsplash License, atıf zorunlu değil).
+    - assets/onboarding/
+    - assets/onboarding/card/
+    - assets/onboarding/plate/
     # Uygulamadaki "Açık kaynak lisansları" sayfasında gösterilir (OFL şartı).
     - assets/fonts/URBANIST-OFL.txt
     - assets/fonts/POPPINS-OFL.txt
+    - assets/fonts/IBMPLEXMONO-OFL.txt
 
   # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart);
   # logo yazısı ("dishrate") her zaman Poppins'tir (AppFonts.wordmark).
@@ -188,3 +193,16 @@ flutter:
           style: italic
         - asset: assets/fonts/Urbanist-Black.ttf
           weight: 900
+
+    # Adisyon (1.9): fiş yazısı, sabit genişlikli. Yalnız adisyonda kullanılır.
+    # Kaynak: github.com/google/fonts/ofl/ibmplexmono (SIL OFL, lisans assets/fonts/IBMPLEXMONO-OFL.txt).
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexMono-Bold.ttf
+          weight: 700
