@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import '../../../shared/providers/categories_provider.dart';
+import '../../../shared/models/category_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -18,14 +21,14 @@ import '../../../shared/widgets/state_message.dart';
 import '../../restaurant/screens/restaurant_detail_screen.dart';
 import 'map_full_screen.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   static const _istanbul = LatLng(41.0082, 28.9784);
 
   /// Bundan kısa metinle arama yapılmaz — sunucu da yapmıyor.
@@ -120,17 +123,23 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  static String? _categoryNamed(String query) {
+  /// Kategori listesi sunucudan (2.10b); yüklenene kadar yedek liste.
+  List<CategoryModel> get _categories =>
+      ref.read(categoriesProvider).valueOrNull ?? AppCategories.fallback;
+
+  String? _categoryNamed(String query) {
     final key = TurkishText.searchKey(query);
-    for (final c in AppCategories.all) {
-      if (TurkishText.searchKey(c) == key) return c;
+    for (final c in _categories) {
+      if (TurkishText.searchKey(c.name) == key) return c.name;
     }
     return null;
   }
 
+  /// Çip adıyla görünür, sunucuya anahtarı gider.
   Future<List<SearchResult>> _searchCategory(String label) async {
+    final slug = AppCategories.slugOf(_categories, label) ?? label;
     final items =
-        await RestaurantRepository.instance.getMenuItemsByCategory(label);
+        await RestaurantRepository.instance.getMenuItemsByCategory(slug);
     return _groupByRestaurant(items);
   }
 
@@ -286,6 +295,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: _SearchCategoryChips(
+                      categories: [
+                        for (final c in watchCategories(ref)) c.name,
+                      ],
                       selectedCategory: _selectedCategory,
                       onCategoryTap: _onCategoryTap,
                     ),
@@ -311,16 +323,17 @@ class _SearchScreenState extends State<SearchScreen> {
 
 class _SearchCategoryChips extends StatelessWidget {
   const _SearchCategoryChips({
+    required this.categories,
     required this.selectedCategory,
     required this.onCategoryTap,
   });
 
+  final List<String> categories;
   final String? selectedCategory;
   final ValueChanged<String> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
-    const categories = AppCategories.all;
     // Şerit dokunma alanı kadar yüksek; çip görünüşte aynı boyda kalıyor.
     return SizedBox(
       height: AppSize.minTap,

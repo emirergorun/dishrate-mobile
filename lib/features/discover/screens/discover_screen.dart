@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/providers/categories_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../../core/constants/app_categories.dart';
@@ -105,9 +106,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       loc.province.trim().isEmpty ? null : loc.province;
   static String? _district(SelectedLocation loc) =>
       loc.hasDistrict ? loc.district : null;
-  String? get _category => _allSelected ? null : _selectedCategory;
-
-  static const List<String> _categories = ['Tümü', ...AppCategories.all];
+  /// Sunucuya giden süzgeç: seçili çipin anahtarı (2.10b). Çip ekranda
+  /// adıyla duruyor; ad sunucuda değişse de anahtar aynı kalır.
+  String? get _category => _allSelected
+      ? null
+      : AppCategories.slugOf(
+          ref.read(categoriesProvider).valueOrNull ?? AppCategories.fallback,
+          _selectedCategory);
 
   bool get _allSelected =>
       _selectedCategory == null || _selectedCategory == 'Tümü';
@@ -283,7 +288,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 padding: const EdgeInsets.only(
                     top: AppSpace.xs - CategoryChips.tapInset),
                 child: CategoryChips(
-                  categories: _categories,
+                  categories: [
+                    'Tümü',
+                    for (final c in watchCategories(ref)) c.name,
+                  ],
                   onSelected: (category) {
                     if (category == _selectedCategory) return;
                     setState(() => _selectedCategory = category);

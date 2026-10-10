@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../shared/providers/categories_provider.dart';
+import '../../../shared/models/category_model.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -127,9 +129,11 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     });
 
     try {
+      // Çip adıyla görünür, sunucuya anahtarı gider (2.10b).
+      final slug = AppCategories.slugOf(_categories, label) ?? label;
       final items =
-          await RestaurantRepository.instance.getMenuItemsByCategory(label);
-      final markers = _itemsToRestaurants(items);
+          await RestaurantRepository.instance.getMenuItemsByCategory(slug);
+      final markers = _itemsToRestaurants(items, categorySlug: slug);
       if (mounted) {
         setState(() {
           _visibleRestaurants = markers;
@@ -150,7 +154,13 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
     }
   }
 
-  List<RestaurantModel> _itemsToRestaurants(List<MenuItemModel> items) {
+  List<CategoryModel> get _categories =>
+      ref.read(categoriesProvider).valueOrNull ?? AppCategories.fallback;
+
+  /// Süzgeçten gelen yemeklerin restoranları. Listede olmayan restoranın
+  /// işaretine süzülen kategorinin ikonu konur.
+  List<RestaurantModel> _itemsToRestaurants(List<MenuItemModel> items,
+      {String? categorySlug}) {
     final seen = <int>{};
     final result = <RestaurantModel>[];
     for (final item in items) {
@@ -171,6 +181,8 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
             fullAddress: '',
             latitude: item.restaurantLatitude,
             longitude: item.restaurantLongitude,
+            categoryName: item.categoryName,
+            categorySlug: categorySlug,
           ));
         }
       }
@@ -219,7 +231,7 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                   // Restoranın türü (menüsündeki çoğunluk kategori) sade ikonla.
                   child: Center(
                     child: Icon(
-                      AppCategories.icon(r.categoryName),
+                      AppCategories.icon(r.categorySlug),
                       size: 22,
                       color: const Color(0xFF1A1A1A),
                     ),
@@ -432,7 +444,9 @@ class _MapFullScreenState extends ConsumerState<MapFullScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: AppCategories.all.map((label) {
+                    children: [
+                      for (final c in watchCategories(ref)) c.name,
+                    ].map((label) {
                       return Padding(
                         // Dokunma alanı çipin çevresini zaten dolduruyor.
                         padding: EdgeInsets.zero,
@@ -504,7 +518,7 @@ class _PreviewCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    AppCategories.icon(restaurant.categoryName),
+                    AppCategories.icon(restaurant.categorySlug),
                     size: 22,
                     color: context.textSecondaryColor,
                   ),

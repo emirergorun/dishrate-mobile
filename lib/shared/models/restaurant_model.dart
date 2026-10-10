@@ -11,6 +11,9 @@ class RestaurantModel {
   /// Menüsü boşsa null; genel ikon gösterilir.
   final String? categoryName;
 
+  /// Aynı kategorinin anahtarı; ikon buna bağlı (2.10b).
+  final String? categorySlug;
+
   const RestaurantModel({
     required this.restaurantId,
     required this.name,
@@ -21,6 +24,7 @@ class RestaurantModel {
     this.latitude,
     this.longitude,
     this.categoryName,
+    this.categorySlug,
   });
 
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,7 @@ class RestaurantModel {
       latitude: (address['latitude'] as num?)?.toDouble(),
       longitude: (address['longitude'] as num?)?.toDouble(),
       categoryName: json['categoryName'] as String?,
+      categorySlug: json['categorySlug'] as String?,
     );
   }
 }

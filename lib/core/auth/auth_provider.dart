@@ -180,7 +180,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   String _parseError(Object e) {
     // 400: kullanıcının düzeltebileceği sunucu mesajı (ör. "Bu kullanıcı adı
     // kullanılamaz…"). Genel mesaj neyin yanlış olduğunu söylemiyordu.
-    if (e is DioException && e.response?.statusCode == 400) {
+    // 429: istek sınırı ya da hatalı giriş kilidi (2.9) — sunucunun mesajı
+    // ne kadar bekleneceğini söylüyor.
+    final status = e is DioException ? e.response?.statusCode : null;
+    if (status == 400 || status == 429) {
       return userMessageFor(e, fallback: 'Bir hata oluştu, tekrar dene.');
     }
     if (e is Exception) {

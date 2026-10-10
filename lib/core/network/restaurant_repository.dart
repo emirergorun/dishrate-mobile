@@ -1,5 +1,6 @@
 import '../constants/api_constants.dart';
 import 'dio_client.dart';
+import '../../shared/models/category_model.dart';
 import '../../shared/models/restaurant_model.dart';
 import '../../shared/models/menu_item_model.dart';
 import '../../shared/models/feed_section_model.dart';
@@ -93,7 +94,15 @@ class RestaurantRepository {
 
 
 
-  /// Get menu items filtered by category name (kategori çipleri için)
+  /// Kategori listesi, çip sırasıyla (2.10b).
+  Future<List<CategoryModel>> getCategories() async {
+    final response = await _dio.get(ApiConstants.categories);
+    return (response.data as List<dynamic>)
+        .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Kategorideki yemekler; [category] kategorinin anahtarı (`slug`).
   Future<List<MenuItemModel>> getMenuItemsByCategory(String category) async {
     final response = await _dio.get(
       ApiConstants.menuItems,
