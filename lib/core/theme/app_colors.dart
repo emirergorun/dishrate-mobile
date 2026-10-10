@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 // ignore_for_file: avoid_classes_with_only_static_members
 
-/// Dishrate renk paleti.
+/// Uygulamanın renk paleti.
 ///
 /// Turuncu ve yıldız sarısı logodan gelir. Nötrler tek bir aileden (hafif
 /// sıcak kömür) türetildi: önceki palette soğuk iOS grileri ile nötr griler

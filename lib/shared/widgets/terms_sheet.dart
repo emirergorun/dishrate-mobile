@@ -4,6 +4,8 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/constants/app_brand.dart';
+import '../../core/constants/app_links.dart';
 
 /// Kullanım şartları paneli. Profil menüsünden ve kayıt ekranındaki
 /// "Kayıt olarak Kullanım Şartları’nı kabul etmiş olursun." bağlantısından
@@ -59,19 +61,19 @@ class TermsSheet extends StatelessWidget {
                 const _TermsSection(
                   title: '1. Kabul',
                   body:
-                      'Dishrate\'i kullanarak bu kullanım şartlarını kabul etmiş olursunuz. Şartları kabul etmiyorsanız uygulamayı kullanmayı bırakınız.',
+                      '${AppBrand.name}’yı kullanarak bu kullanım şartlarını kabul etmiş olursunuz. Şartları kabul etmiyorsanız uygulamayı kullanmayı bırakınız.',
                 ),
                 const _TermsSection(
                   title: '2. Kullanıcı İçeriği',
                   body:
-                      'Paylaştığınız değerlendirmeler ve yorumlar size aittir ve diğer kullanıcılara kullanıcı adınızla görünür; adınız ve soyadınız gösterilmez. Dishrate, bu içerikleri platform içinde görüntüleme ve analiz etme hakkına sahiptir. Yanıltıcı, hakaret içerikli veya yasadışı içerik paylaşmak yasaktır.',
+                      'Paylaştığınız değerlendirmeler ve yorumlar size aittir ve diğer kullanıcılara kullanıcı adınızla görünür; adınız ve soyadınız gösterilmez. ${AppBrand.name}, bu içerikleri platform içinde görüntüleme ve analiz etme hakkına sahiptir. Yanıltıcı, hakaret içerikli veya yasadışı içerik paylaşmak yasaktır.',
                 ),
                 // Apple Guideline 1.2: kullanıcının kabul ettiği şartlarda
                 // uygunsuz içeriğe tolerans olmadığı açıkça yazmalı.
                 const _TermsSection(
                   title: '3. Uygunsuz İçerik',
                   body:
-                      'Dishrate\'te hakaret, nefret söylemi, taciz, müstehcen ya da şiddet içeren içerik, spam ve reklam, başkalarına ait kişisel bilgiler ve yemekle ilgisi olmayan içerik paylaşmak yasaktır; bu tür içeriğe tolerans gösterilmez. Uygunsuz bulduğunuz bir yorumu ya da fotoğrafı "Bildir" ile bize iletebilir, yazarını engelleyebilirsiniz. Bildirilen içerik incelenir ve kurala aykırıysa kaldırılır; kuralı çiğneyen hesaplar kapatılır.',
+                      '${AppBrand.name}’da hakaret, nefret söylemi, taciz, müstehcen ya da şiddet içeren içerik, spam ve reklam, başkalarına ait kişisel bilgiler ve yemekle ilgisi olmayan içerik paylaşmak yasaktır; bu tür içeriğe tolerans gösterilmez. Uygunsuz bulduğunuz bir yorumu ya da fotoğrafı "Bildir" ile bize iletebilir, yazarını engelleyebilirsiniz. Bildirilen içerik incelenir ve kurala aykırıysa kaldırılır; kuralı çiğneyen hesaplar kapatılır.',
                 ),
                 const _TermsSection(
                   title: '4. Gizlilik',
@@ -86,12 +88,12 @@ class TermsSheet extends StatelessWidget {
                 const _TermsSection(
                   title: '6. Hizmet Değişiklikleri',
                   body:
-                      'Dishrate, herhangi bir bildirim yapmaksızın hizmeti geçici veya kalıcı olarak değiştirme ya da sonlandırma hakkını saklı tutar.',
+                      '${AppBrand.name}, herhangi bir bildirim yapmaksızın hizmeti geçici veya kalıcı olarak değiştirme ya da sonlandırma hakkını saklı tutar.',
                 ),
                 const _TermsSection(
                   title: '7. İletişim',
                   body:
-                      'Sorularınız için destek@dishrate.app adresine e-posta gönderebilirsiniz.',
+                      'Sorularınız için ${AppLinks.supportEmail} adresine e-posta gönderebilirsiniz.',
                 ),
                 const SizedBox(height: AppSpace.sm),
                 Text(

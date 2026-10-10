@@ -19,8 +19,9 @@ import '../../../core/data/turkey_addresses.dart';
 import '../../../shared/widgets/searchable_picker.dart';
 import '../../../core/location/location_service.dart';
 import 'see_all_screen.dart';
+import '../../../core/constants/app_brand.dart';
 
-/// Başlıktaki "dishrate" kelime markasının punto'su.
+/// Başlıktaki "decouva" kelime markasının punto'su.
 ///
 /// Başlık artık genişleyip daralmıyor: genişken yazı 1.5 kat büyüyüp konum
 /// yazısını da büyütüyor, kaydırınca ikisi birden zıplıyordu.
@@ -612,7 +613,7 @@ class _DiscoverAppBar extends ConsumerWidget {
         children: [
           // Logo kelime markası — hep küçük harf; ayarı token katmanında.
           Text(
-            'dishrate',
+            AppBrand.wordmark,
             style: AppTextStyles.wordmark(_wordmarkSize)
                 .copyWith(color: AppColors.primary),
           ),

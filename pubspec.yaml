@@ -1,12 +1,12 @@
 name: dishrate_mobile
-description: Dishrate — Yediğin her şeyi puanla.
+description: Decouva — Yediğin her şeyi puanla.
 publish_to: 'none'
 # Açılış ekranı ya da ikon değişince yapı numarasını (+ sonrası) artır.
 # Not: iOS açılış karesinin görüntüsünü telefonda önbelleğe alıyor ve bunu
 # üzerine kurulumda silmiyor — numarayı artırmak tek başına yetmiyor,
 # eski kare gidene kadar uygulamayı telefondan silip kurmak gerekiyor
 # (22 Eylül'de yaşandı).
-version: 1.0.0+6
+version: 1.0.0+7
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -148,9 +148,9 @@ flutter:
     - assets/fonts/IBMPLEXMONO-OFL.txt
 
   # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart);
-  # logo yazısı ("dishrate") her zaman Poppins'tir (AppFonts.wordmark).
+  # logo yazısı ("decouva") her zaman Poppins'tir (AppFonts.wordmark).
   fonts:
-    # Logo kelime markası ("dishrate") ve karşılaştırma için.
+    # Logo kelime markası ("decouva") ve karşılaştırma için.
     # Kaynak: github.com/itfoundry/Poppins (SIL OFL, lisans assets/fonts/POPPINS-OFL.txt).
     - family: Poppins
       fonts:

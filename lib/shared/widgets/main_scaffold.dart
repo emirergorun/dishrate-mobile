@@ -86,7 +86,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: _DishRateBottomNav(
+      bottomNavigationBar: _AppBottomNav(
         currentScreenIndex: _currentIndex,
         onTap: _onTabTapped,
       ),
@@ -96,8 +96,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
 // ── Bottom Navigation Bar ─────────────────────────────────────────────────────
 
-class _DishRateBottomNav extends StatelessWidget {
-  const _DishRateBottomNav({
+class _AppBottomNav extends StatelessWidget {
+  const _AppBottomNav({
     required this.currentScreenIndex,
     required this.onTap,
   });

@@ -7,8 +7,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../shared/auth/require_login.dart';
-import '../../shared/widgets/dishrate_logo.dart';
+import '../../shared/widgets/brand_logo.dart';
 import 'story_widgets.dart';
+import '../../core/constants/app_brand.dart';
 
 /// Tanıtımın son adımı (A4): siyah zeminde turuncu `d`, etrafında dönen
 /// yemek tabakları, "hoş geldin" ve hesap seçenekleri (1.8).
@@ -88,7 +89,7 @@ class AccountStep extends StatelessWidget {
           reveal(
             0.9,
             Text(
-              'Dishrate’e hoş geldin!',
+              '${AppBrand.name}’ya hoş geldin!',
               textAlign: TextAlign.center,
               style: OnboardingText.headline.copyWith(fontSize: 30),
             ),
@@ -248,7 +249,7 @@ class _Orbit extends StatelessWidget {
             offset: Offset(0, markDy),
             child: Transform.scale(
               scale: markScale,
-              child: const DishrateMark(size: 112),
+              child: const BrandMark(size: 112),
             ),
           ),
         ),

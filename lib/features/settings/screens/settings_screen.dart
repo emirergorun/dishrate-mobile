@@ -7,6 +7,7 @@ import '../../../core/constants/app_links.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../providers/theme_provider.dart';
+import '../../../core/constants/app_brand.dart';
 
 // ignore_for_file: avoid_positional_boolean_parameters
 
@@ -105,7 +106,7 @@ class SettingsScreen extends ConsumerWidget {
             value: '',
             onTap: () => showLicensePage(
               context: context,
-              applicationName: 'Dishrate',
+              applicationName: AppBrand.name,
               applicationVersion: version,
             ),
           ),

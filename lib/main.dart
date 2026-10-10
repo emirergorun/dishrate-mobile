@@ -15,8 +15,9 @@ import 'features/settings/providers/theme_storage.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/onboarding/guest_continue.dart';
 import 'features/onboarding/onboarding_screen.dart';
-import 'shared/widgets/dishrate_logo.dart';
+import 'shared/widgets/brand_logo.dart';
 import 'shared/widgets/main_scaffold.dart';
+import 'core/constants/app_brand.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,7 +40,7 @@ Future<void> main() async {
     overrides: [
       themeProvider.overrideWith((ref) => ThemeNotifier(themeMode)),
     ],
-    child: const DishrateApp(),
+    child: const AppRoot(),
   ));
   // Geliştirmede yerel ağ izni açılışta sorulsun; bkz. warmUpLocalNetwork.
   unawaited(warmUpLocalNetwork());
@@ -88,14 +89,14 @@ Future<void> _precacheLogo() async {
   // Açılış turuncu kareyle başlıyor, sonra temaya geçiyor: üç sürüm de
   // hazır olmalı. Bir sorun olursa açılışı bekletmemek için süre sınırı var.
   await Future.wait([
-    resolve(DishrateWordmark.brandProvider),
-    resolve(DishrateWordmark.provider(true)),
-    resolve(DishrateWordmark.provider(false)),
+    resolve(BrandWordmark.brandProvider),
+    resolve(BrandWordmark.provider(true)),
+    resolve(BrandWordmark.provider(false)),
   ]).timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
 }
 
-class DishrateApp extends ConsumerWidget {
-  const DishrateApp({super.key});
+class AppRoot extends ConsumerWidget {
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -120,7 +121,7 @@ class DishrateApp extends ConsumerWidget {
     );
 
     return MaterialApp(
-      title: 'Dishrate',
+      title: AppBrand.name,
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.light,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/dishrate_logo.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
 /// Açılış ekranındaki logonun genişliği. Sistem açılış ekranındaki logoyla
 /// aynı: ikisi arasında logo büyüyüp küçülmesin. `LaunchImage` 300 pt ama
@@ -85,13 +85,13 @@ class _SplashScreenState extends State<SplashScreen>
               if (t < 1)
                 Opacity(
                   opacity: 1 - t,
-                  child: const DishrateWordmark(
+                  child: const BrandWordmark(
                       width: splashLogoWidth, onBrand: true),
                 ),
               if (t > 0)
                 Opacity(
                   opacity: t,
-                  child: const DishrateWordmark(width: splashLogoWidth),
+                  child: const BrandWordmark(width: splashLogoWidth),
                 ),
               // Gösterge ve hata mesajı turuncu karede görünmez; tema geldikçe
               // birlikte beliriyor.

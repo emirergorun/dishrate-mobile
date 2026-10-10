@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart' show FontWeight;
 
-/// Dishrate font aileleri.
+/// Uygulamanın font aileleri.
 ///
 /// Uygulamadaki **tek** font tanımı burasıdır. `AppTextStyles` ve `AppTheme`
 /// bu sınıfı okur; hiçbir yerde font adı elle yazılmaz.
 ///
 /// Arayüz fontu [active], logo yazısı [wordmark]. İkisi bilerek ayrı: arayüz
-/// fontu değişse de "dishrate" yazısı logonun kendisiyle yan yana geldiği
+/// fontu değişse de "decouva" yazısı logonun kendisiyle yan yana geldiği
 /// yerlerde (açılış, giriş, keşfet başlığı) birebir aynı görünmeli.
 ///
 /// Kalıcı olarak değiştirmek: [active] içindeki `defaultValue`.

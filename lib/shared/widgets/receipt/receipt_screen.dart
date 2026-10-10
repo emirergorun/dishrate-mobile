@@ -10,7 +10,8 @@ import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/app_theme.dart';
-import '../dishrate_logo.dart';
+import '../brand_logo.dart';
+import '../../../core/constants/app_brand.dart';
 
 /// Adisyon (1.9): kullanıcının "fişi". Tasarım Claude Cowork'ün videosundan
 /// (29 Eylül) uyarlandı: termal yazıcı yuvasından basılarak çıkan bir adisyon.
@@ -384,9 +385,9 @@ class _Paper extends StatelessWidget {
             // Kağıt açık renk: tema koyu olsa da logonun açık zemin sürümü.
             Center(
               child: Image(
-                image: DishrateWordmark.provider(false),
+                image: BrandWordmark.provider(false),
                 width: 132,
-                height: 132 / DishrateWordmark.aspectRatio,
+                height: 132 / BrandWordmark.aspectRatio,
               ),
             ),
             const SizedBox(height: 10),
@@ -443,7 +444,9 @@ class _Paper extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              data.memberCode == null ? 'DR' : 'DR-${data.memberCode}',
+              data.memberCode == null
+                  ? AppBrand.memberCodePrefix
+                  : '${AppBrand.memberCodePrefix}-${data.memberCode}',
               textAlign: TextAlign.center,
               style:
                   _mono.copyWith(fontSize: 11, letterSpacing: 3, color: _faint),
@@ -578,7 +581,7 @@ class _ZigzagTop extends CustomClipper<Path> {
   bool shouldReclip(_ZigzagTop old) => false;
 }
 
-/// Turuncu mürekkep damgası: "HOŞ GELDİN", altında "DISHRATE · yıl".
+/// Turuncu mürekkep damgası: "HOŞ GELDİN", altında "DECOUVA · yıl".
 /// Büyükten vurularak iner, hafif eğik. Yalnız kayıt adisyonunda.
 class _Stamp extends StatelessWidget {
   const _Stamp({
@@ -626,7 +629,7 @@ class _Stamp extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'DISHRATE · $year',
+                  '${AppBrand.name.toUpperCase()} · $year',
                   style: const TextStyle(
                     fontFamily: AppFonts.active,
                     fontSize: 10,

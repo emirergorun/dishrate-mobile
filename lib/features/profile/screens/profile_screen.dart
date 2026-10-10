@@ -43,6 +43,7 @@ import '../../../core/utils/relative_date.dart';
 import '../../rating/providers/rating_flow_provider.dart';
 import '../../rating/screens/add_rating_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../core/constants/app_brand.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -360,7 +361,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       // `queryParameters` boşlukları "+" yapıyor, posta uygulaması da "+"
       // olarak gösteriyor; elle kodlanır.
       query: [
-        'subject=${Uri.encodeComponent('Dishrate Geri Bildirimi')}',
+        'subject=${Uri.encodeComponent('${AppBrand.name} Geri Bildirimi')}',
         if (version != null)
           'body=${Uri.encodeComponent('\n\n—\nSürüm: $version')}',
       ].join('&'),

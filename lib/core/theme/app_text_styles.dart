@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_fonts.dart';
 
-/// Dishrate tipografi sistemi.
+/// Uygulamanın tipografi sistemi.
 ///
 /// Font ailesi ve ağırlıklar [AppFonts] üzerinden gelir — burada sayı yazılmaz.
 ///
@@ -132,7 +132,7 @@ abstract final class AppTextStyles {
       );
 
   // ─── Kelime markası ───────────────────────────────────────────────────────
-  /// "dishrate" yazısı. Arayüz fontundan ve ağırlık skalasından bilerek
+  /// "decouva" yazısı. Arayüz fontundan ve ağırlık skalasından bilerek
   /// bağımsız: ayar logonun kendisinden (Poppins SemiBold, harf aralığı −%2).
   /// Harf aralığı puntoya oranlı, punto değişse de logoyla oran korunur.
   /// Rengi ekran verir.

@@ -7,7 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/email_validator.dart';
 import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/min_tap_area.dart';
-import '../../../shared/widgets/dishrate_logo.dart';
+import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/terms_sheet.dart';
 import 'welcome_screen.dart';
 
@@ -93,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Center(
                     child: Column(
                       children: [
-                        const DishrateWordmark(width: _logoWidth),
+                        const BrandWordmark(width: _logoWidth),
                         const SizedBox(height: 10),
                         Text(
                           'Yemek günlüğü ve keşfi',

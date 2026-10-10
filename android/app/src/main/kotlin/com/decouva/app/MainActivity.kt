@@ -1,4 +1,4 @@
-package com.dishrate.app
+package com.decouva.app
 
 import io.flutter.embedding.android.FlutterActivity
 

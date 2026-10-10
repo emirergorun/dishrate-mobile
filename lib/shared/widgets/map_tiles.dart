@@ -20,7 +20,7 @@ class AppTileLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     return TileLayer(
       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      userAgentPackageName: 'com.dishrate.app',
+      userAgentPackageName: 'com.decouva.app',
       maxNativeZoom: 19,
       tileBuilder: context.isDark ? darkModeTileBuilder : null,
     );
