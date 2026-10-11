@@ -154,7 +154,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
-              const Text('Şifreni Sıfırla', style: AppTextStyles.headlineLarge),
+              const Text('Şifreni sıfırla', style: AppTextStyles.headlineLarge),
               const SizedBox(height: 8),
               Text(
                 // Metin hesabın var olup olmadığını söylemiyor; kod gelmezse

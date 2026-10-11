@@ -29,6 +29,10 @@ class UserModel {
   /// Adisyondaki üye kodu, ör. "7K4P2Q". İç kimlik yerine gösterilir.
   final String? memberCode;
 
+  /// E-posta doğrulandı mı (2.8, yumuşak doğrulama: yalnız Profil'de
+  /// hatırlatma). Eski sunucu alanı göndermezse doğrulanmış sayılır.
+  final bool emailVerified;
+
   const UserModel({
     required this.userId,
     required this.username,
@@ -43,6 +47,7 @@ class UserModel {
     this.nameChangeAvailableAt,
     this.createdAt,
     this.memberCode,
+    this.emailVerified = true,
   });
 
   /// Yeniden çerçevelenebilecek bir özgün görsel var mı?
@@ -89,6 +94,7 @@ class UserModel {
           ? DateTime.tryParse(json['createdAt'] as String)?.toLocal()
           : null,
       memberCode: _blankToNull(json['memberCode'] as String?),
+      emailVerified: json['emailVerified'] as bool? ?? true,
     );
   }
 

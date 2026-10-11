@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../../shared/providers/pending_notice.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,7 @@ import '../../../shared/widgets/swipe_to_delete.dart';
 import '../../../shared/widgets/terms_sheet.dart';
 import '../../../shared/widgets/main_scaffold.dart';
 import '../widgets/profile_photo_editor.dart';
+import 'verify_email_screen.dart';
 
 import '../../../core/utils/password_validator.dart';
 import '../../../core/utils/relative_date.dart';
@@ -102,6 +104,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
+  }
+
+  /// E-posta doğrulama ekranı (2.8); başarıda profil tazelenir.
+  Future<void> _verifyEmail() async {
+    final user = _user;
+    if (user == null) return;
+    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: user.email)),
+    );
+    if (ok != true || !mounted) return;
+    _showNotice('E-postan doğrulandı.');
+    await _load(silent: true);
+  }
+
+  /// Alttaki bilgi şeridi ("E-postan doğrulandı."); Günlük'teki gibi 5 sn
+  /// görünür, yumuşakça girip çıkar (`InfoBannerStack`).
+  String? _notice;
+  int _noticeId = 0;
+  Timer? _noticeTimer;
+
+  void _showNotice(String message) {
+    _noticeTimer?.cancel();
+    setState(() {
+      _notice = message;
+      _noticeId++;
+    });
+    _noticeTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _notice = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _noticeTimer?.cancel();
+    super.dispose();
   }
 
   bool _receiptBusy = false;
@@ -513,7 +550,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       });
     });
 
-    return Scaffold(
+    final page = Scaffold(
       backgroundColor: context.bgColor,
       body: _isLoading
           ? const SafeArea(child: _ProfileSkeleton())
@@ -576,6 +613,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             onReceiptTap: _user == null ? null : _openReceipt,
                             receiptBusy: _receiptBusy,
                           ),
+
+                          // E-posta doğrulanmamışsa hatırlatma (2.8, yumuşak).
+                          if (_user != null && !_user!.emailVerified)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  AppSpace.screen,
+                                  AppSpace.sm,
+                                  AppSpace.screen,
+                                  0),
+                              child: InfoBanner(
+                                icon: TablerIcons.mail,
+                                message: 'E-postanı doğrula',
+                                actionLabel: 'Doğrula',
+                                onAction: _verifyEmail,
+                              ),
+                            ),
 
                           const SizedBox(height: AppSpace.sm),
 
@@ -662,6 +715,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ],
                 ),
+    );
+    return Stack(
+      children: [
+        page,
+        // Bilgi şeridi — alt menünün hemen üstünde (Günlük'teki gibi).
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 12,
+          child: InfoBannerStack(banners: [
+            if (_notice != null)
+              InfoBanner(
+                key: ValueKey('notice_$_noticeId'),
+                icon: Icons.check_circle_outline_rounded,
+                message: _notice!,
+              ),
+          ]),
+        ),
+      ],
     );
   }
 }
@@ -2413,15 +2485,13 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
     try {
       await UserRepository.instance.deleteAccount(password: password);
       if (!mounted) return;
-      // Mesaj uygulamanın kök ScaffoldMessenger'ına gidiyor; profil ekranı
-      // kapanıp giriş ekranı açıldığında da görünür kalır.
-      final messenger = ScaffoldMessenger.of(context);
+      // Mesajı açılacak tanıtım ekranı gösterir: burada gösterilince profil
+      // ekranı geçişte kalktığı için bildirim yarıda kesiliyordu.
+      ProviderScope.containerOf(context, listen: false)
+          .read(pendingNoticeProvider.notifier)
+          .state = 'Hesabın ve bütün verilerin silindi.';
       Navigator.pop(context);
       widget.onDeleted();
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Hesabın ve bütün verilerin silindi.'),
-        behavior: SnackBarBehavior.floating,
-      ));
     } catch (e) {
       if (!mounted) return;
       setState(() {

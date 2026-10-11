@@ -17,7 +17,11 @@ import 'welcome_screen.dart';
 const double _logoWidth = 200;
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.fromRegister = false});
+
+  /// Kayıt ekranındaki "Giriş yap"tan açıldı: "Kayıt ol" yeni bir kayıt
+  /// ekranı açmaz, geri döner (ekranlar üst üste birikmesin).
+  final bool fromRegister;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -247,9 +251,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           label: 'Kayıt ol',
                           child: GestureDetector(
                             onTap: () async {
+                              if (widget.fromRegister) {
+                                Navigator.of(context).pop(false);
+                                return;
+                              }
                               final ok = await Navigator.of(context)
                                   .push<bool>(MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
+                                builder: (_) =>
+                                    const RegisterScreen(fromLogin: true),
                               ));
                               // Kayıt başarılı: giriş ekranı da kapanır.
                               if (ok == true && context.mounted) {
@@ -297,7 +306,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 // ── Kayıt ekranı burada da tanımlı — circular import olmadan ──────────────────
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.fromLogin = false});
+
+  /// Giriş ekranındaki "Kayıt ol"dan açıldı: "Giriş yap" geri döner. Değilse
+  /// (tanıtım, misafir daveti) giriş ekranını açar; geri dönmek kullanıcıyı
+  /// tanıtıma atıyordu (11 Ekim).
+  final bool fromLogin;
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -566,7 +580,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       label: 'Giriş yap',
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.of(context).pop(),
+                        onTap: () async {
+                          if (widget.fromLogin) {
+                            Navigator.of(context).pop();
+                            return;
+                          }
+                          final ok = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const LoginScreen(fromRegister: true),
+                            ),
+                          );
+                          // Giriş başarılı: kayıt ekranı da kapanır, bekleyen
+                          // iş (ör. puan verme) sürer.
+                          if (ok == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
+                        },
                         child: MinTapArea(
                           child: Text(
                             'Giriş yap',

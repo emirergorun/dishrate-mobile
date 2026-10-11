@@ -13,6 +13,17 @@ class UserRepository {
     return UserModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Yeni e-posta doğrulama kodu gönder (2.8). Saatte 3'ten fazlası 429.
+  Future<void> sendEmailVerification() async {
+    await _dio.post(ApiConstants.emailVerification);
+  }
+
+  /// E-postayı 6 haneli kodla doğrula (2.8). Hatalı kod 400 + mesaj.
+  Future<void> verifyEmail(String code) async {
+    await _dio.post('${ApiConstants.emailVerification}/verify',
+        data: {'code': code});
+  }
+
   /// Profil güncelle (PATCH). Yalnızca verilen alanlar gönderilir.
   /// İsim/soyisim 15 günde bir değiştirilebilir — kural ihlalinde backend
   /// 409 + Türkçe mesaj döner (DioException olarak yükselir).

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../shared/providers/pending_notice.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
@@ -60,7 +62,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _precached = true;
       OnboardingAssets.precache(context);
       _scheduleButton(_index);
+      _showPendingNotice();
     }
+  }
+
+  /// Önceki ekrandan kalan mesaj (ör. hesap silindi): kök geçiş bitince bu
+  /// ekranın kendi Scaffold'unda gösterilir, giriş ve çıkışı yarıda kalmaz.
+  void _showPendingNotice() {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final message = container.read(pendingNoticeProvider);
+    if (message == null) return;
+    container.read(pendingNoticeProvider.notifier).state = null;
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ));
+    });
   }
 
   @override

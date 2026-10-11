@@ -22,6 +22,7 @@ abstract final class ApiConstants {
 
   // Diğer endpoint'ler
   static const String users = '/users';
+  static const String emailVerification = '/users/me/email-verification';
   static const String restaurants = '/restaurants';
   static const String menuItems = '/menu-items';
   static const String ratings = '/ratings';
