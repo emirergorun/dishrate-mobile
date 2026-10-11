@@ -39,12 +39,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       TextEditingController(text: widget.initialIdentifier ?? '');
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
   bool _codeSent = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   String? _error;
-  String? _info;
   int _resendLeft = 0;
   Timer? _resendTimer;
 
@@ -54,6 +55,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     _identifierController.dispose();
     _codeController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -66,12 +68,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      final message =
-          await AuthRepository.instance.requestPasswordReset(_identifier);
+      await AuthRepository.instance.requestPasswordReset(_identifier);
       if (!mounted) return;
       setState(() {
         _codeSent = true;
-        _info = message;
         _isLoading = false;
       });
       _startResendTimer();
@@ -157,10 +157,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const Text('Şifreni Sıfırla', style: AppTextStyles.headlineLarge),
               const SizedBox(height: 8),
               Text(
+                // Metin hesabın var olup olmadığını söylemiyor; kod gelmezse
+                // aşağıdaki not yönlendiriyor.
                 _codeSent
-                    ? (_info ?? '')
-                    : 'Hesabının e-posta adresini ya da kullanıcı adını yaz; '
-                        'e-postana 6 haneli bir kod gönderelim.',
+                    ? 'E-postana gönderdiğimiz 6 haneli kodu gir.'
+                    : 'Kullanıcı adı veya e-postanı gir. Şifreni sıfırlaman '
+                        'için bir kod göndereceğiz.',
                 style: AppTextStyles.bodyMedium
                     .copyWith(color: context.textSecondaryColor),
               ),
@@ -176,7 +178,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 onPressed: _codeSent ? _resetPassword : _sendCode,
               ),
               if (_codeSent) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                Text(
+                  'Kod gelmediyse girdiğin bilgilerin doğruluğunu kontrol '
+                  'edebilir veya tekrardan kod isteyebilirsin.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: context.textSecondaryColor),
+                ),
+                const SizedBox(height: 4),
                 Center(
                   child: TextButton(
                     onPressed: _isLoading || _resendLeft > 0 ? null : _sendCode,
@@ -238,9 +248,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             hint: 'Yeni şifre',
             obscureText: _obscurePassword,
             autofillHints: const [AutofillHints.newPassword],
-            textInputAction: TextInputAction.done,
+            textInputAction: TextInputAction.next,
             onChanged: (_) => setState(() {}),
-            onFieldSubmitted: (_) => _resetPassword(),
             suffixIcon: IconButton(
               tooltip: _obscurePassword ? 'Şifreyi göster' : 'Şifreyi gizle',
               icon: Icon(
@@ -256,6 +265,32 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             validator: PasswordValidator.validate,
           ),
           PasswordRuleChips(password: _passwordController.text),
+          const SizedBox(height: 16),
+          AuthTextField(
+            controller: _confirmController,
+            hint: 'Yeni şifre (tekrar)',
+            obscureText: _obscureConfirm,
+            autofillHints: const [AutofillHints.newPassword],
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _resetPassword(),
+            suffixIcon: IconButton(
+              tooltip: _obscureConfirm ? 'Şifreyi göster' : 'Şifreyi gizle',
+              icon: Icon(
+                _obscureConfirm
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                color: context.textSecondaryColor,
+                size: 20,
+              ),
+              onPressed: () =>
+                  setState(() => _obscureConfirm = !_obscureConfirm),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Yeni şifreyi tekrar yaz';
+              if (v != _passwordController.text) return 'Şifreler eşleşmiyor';
+              return null;
+            },
+          ),
         ],
       ),
     );
