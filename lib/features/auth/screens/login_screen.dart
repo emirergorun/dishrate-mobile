@@ -9,6 +9,8 @@ import '../../../core/utils/password_validator.dart';
 import '../../../shared/widgets/min_tap_area.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/terms_sheet.dart';
+import '../widgets/auth_form_widgets.dart';
+import 'forgot_password_screen.dart';
 import 'welcome_screen.dart';
 
 /// Giriş ekranındaki logonun genişliği.
@@ -36,6 +38,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// Kod ve yeni şifreyle giriş yapılırsa giriş ekranı da kapanır.
+  Future<void> _forgotPassword() async {
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => ForgotPasswordScreen(
+        initialIdentifier: _emailController.text.trim(),
+      ),
+    ));
+    if (ok == true && mounted) Navigator.of(context).pop(true);
   }
 
   Future<void> _login() async {
@@ -116,7 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Column(
                       children: [
                         // E-posta veya kullanıcı adı
-                        _AuthTextField(
+                        AuthTextField(
                           controller: _emailController,
                           label: null,
                           hint: 'Kullanıcı adı veya e-posta',
@@ -132,7 +144,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 16),
 
                         // Şifre
-                        _AuthTextField(
+                        AuthTextField(
                           controller: _passwordController,
                           label: null,
                           hint: 'Şifre',
@@ -158,9 +170,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           validator: (v) =>
                               (v == null || v.isEmpty) ? 'Şifre gerekli' : null,
                         ),
+                        // Şifremi unuttum (2.7): e-postaya kod, uygulamanın içinde.
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isLoading ? null : _forgotPassword,
+                            child: Text(
+                              'Şifremi unuttum',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
                         if (_error != null) ...[
                           const SizedBox(height: 16),
-                          _ErrorBox(message: _error!),
+                          AuthErrorBox(message: _error!),
                         ],
 
                         const SizedBox(height: 28),
@@ -262,44 +288,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Form içinde kalan hata kutusu.
-///
-/// Önceden hata alttan çıkan bir bildirimdi ve giriş ekranı baştan kuruluyordu;
-/// kullanıcı yazdıklarını kaybediyordu.
-class _ErrorBox extends StatelessWidget {
-  const _ErrorBox({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline_rounded,
-              size: 18, color: context.errorTextColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodyMedium
-                  .copyWith(color: context.errorTextColor),
-            ),
-          ),
         ],
       ),
     );
@@ -420,7 +408,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _AuthTextField(
+                          child: AuthTextField(
                             controller: _firstNameController,
                             label: null,
                             hint: 'Ad',
@@ -436,7 +424,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _AuthTextField(
+                          child: AuthTextField(
                             controller: _lastNameController,
                             label: null,
                             hint: 'Soyad',
@@ -453,7 +441,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _AuthTextField(
+                    AuthTextField(
                       controller: _usernameController,
                       label: null,
                       hint: 'Kullanıcı adı',
@@ -473,7 +461,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    _AuthTextField(
+                    AuthTextField(
                       controller: _emailController,
                       label: null,
                       hint: 'E-posta',
@@ -482,7 +470,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       validator: EmailValidator.validate,
                     ),
                     const SizedBox(height: 16),
-                    _AuthTextField(
+                    AuthTextField(
                       controller: _passwordController,
                       label: null,
                       hint: 'Şifre',
@@ -509,47 +497,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
 
                     // Şifre kuralları — yazdıkça yeşile döner
-                    if (_passwordController.text.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
-                          children: PasswordValidator.rules.map((rule) {
-                            final ok = rule.test(_passwordController.text);
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  ok
-                                      ? Icons.check_circle_rounded
-                                      : Icons.circle_outlined,
-                                  size: 14,
-                                  color: ok
-                                      ? AppColors.success
-                                      : context.textSecondaryColor,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  rule.label,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    fontSize: 11,
-                                    color: ok
-                                        ? AppColors.success
-                                        : context.textSecondaryColor,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
+                    PasswordRuleChips(password: _passwordController.text),
 
                     if (_error != null) ...[
                       const SizedBox(height: 16),
-                      _ErrorBox(message: _error!),
+                      AuthErrorBox(message: _error!),
                     ],
 
                     const SizedBox(height: 28),
@@ -676,107 +628,6 @@ class _TermsNotice extends StatelessWidget {
           Text('’nı kabul etmiş olursun.', style: textStyle),
         ],
       ),
-    );
-  }
-}
-
-// ── Hesap Türü Toggle ─────────────────────────────────────────────────────────
-
-class _AuthTextField extends StatelessWidget {
-  const _AuthTextField({
-    required this.controller,
-    this.label,
-    required this.hint,
-    this.obscureText = false,
-    this.keyboardType,
-    this.textInputAction,
-    this.onFieldSubmitted,
-    this.onChanged,
-    this.suffixIcon,
-    this.validator,
-    this.identifier = false,
-  });
-
-  final TextEditingController controller;
-  final String? label;
-  final String hint;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final ValueChanged<String>? onFieldSubmitted;
-  final ValueChanged<String>? onChanged;
-  final Widget? suffixIcon;
-  final String? Function(String?)? validator;
-
-  /// Kullanıcı adı / e-posta alanı: otomatik düzeltme ve öneri kapalı, ASCII
-  /// klavye. Önceden iOS "modsim"i "modern"e çeviriyor, Türkçe klavye
-  /// "haritatest" yerine "harıtatest" yazdırıyordu; ikisi de girişi bozuyordu.
-  final bool identifier;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (label != null)
-          Text(
-            label!,
-            style: AppTextStyles.bodySmall.copyWith(
-              fontWeight: FontWeight.w600,
-              color: context.textSecondaryColor,
-            ),
-          ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: identifier ? TextInputType.emailAddress : keyboardType,
-          autocorrect: !identifier,
-          enableSuggestions: !identifier,
-          textCapitalization: TextCapitalization.none,
-          textInputAction: textInputAction,
-          onFieldSubmitted: onFieldSubmitted,
-          onChanged: onChanged,
-          validator: validator,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: context.textPrimaryColor,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: AppTextStyles.bodyMedium.copyWith(
-              color: context.textSecondaryColor.withValues(alpha: 0.6),
-            ),
-            filled: true,
-            fillColor: context.surfaceColor,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: context.dividerColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: context.dividerColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-            ),
-            suffixIcon: suffixIcon,
-          ),
-        ),
-      ],
     );
   }
 }

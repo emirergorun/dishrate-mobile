@@ -48,6 +48,36 @@ class AuthRepository {
     return AuthResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Şifremi unuttum, 1. adım (2.7): kayıtlı hesap varsa e-postaya kod gider.
+  /// Cevap hesabın var olup olmadığından bağımsız; sunucunun mesajı döner.
+  Future<String> requestPasswordReset(String identifier) async {
+    final response = await _dio.post(
+      ApiConstants.authPasswordForgot,
+      data: {'identifier': identifier},
+    );
+    final data = response.data;
+    return data is Map && data['message'] is String
+        ? data['message'] as String
+        : 'Bu bilgiyle kayıtlı bir hesap varsa e-postana 6 haneli bir kod gönderdik.';
+  }
+
+  /// Şifremi unuttum, 2. adım: kod + yeni şifre. Başarıda sunucu bütün
+  /// oturumları kapatır; ardından yeni şifreyle giriş yapılır.
+  Future<void> resetPassword({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _dio.post(
+      ApiConstants.authPasswordReset,
+      data: {
+        'identifier': identifier,
+        'code': code,
+        'newPassword': newPassword
+      },
+    );
+  }
+
   Future<void> logout(String refreshToken) async {
     await _dio.post(
       ApiConstants.authLogout,

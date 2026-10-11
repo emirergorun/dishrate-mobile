@@ -14,6 +14,8 @@ abstract final class ApiConstants {
   static const String authRegister = '/auth/register';
   static const String authRefresh = '/auth/refresh';
   static const String authLogout = '/auth/logout';
+  static const String authPasswordForgot = '/auth/password/forgot';
+  static const String authPasswordReset = '/auth/password/reset';
 
   // Dosya yükleme
   static const String files = '/files';
