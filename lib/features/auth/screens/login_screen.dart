@@ -13,8 +13,9 @@ import '../widgets/auth_form_widgets.dart';
 import 'forgot_password_screen.dart';
 import 'welcome_screen.dart';
 
-/// Giriş ekranındaki logonun genişliği.
-const double _logoWidth = 200;
+/// Giriş ekranındaki yatay logonun genişliği; eski logonun görünen
+/// genişliğiyle (168 pt) aynı.
+const double _logoWidth = 168;
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, this.fromRegister = false});
@@ -109,7 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Center(
                     child: Column(
                       children: [
-                        const BrandWordmark(width: _logoWidth),
+                        const BrandLogo(width: _logoWidth),
                         const SizedBox(height: 10),
                         Text(
                           'Yemek günlüğü ve keşfi',

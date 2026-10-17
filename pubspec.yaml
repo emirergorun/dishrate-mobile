@@ -6,7 +6,7 @@ publish_to: 'none'
 # üzerine kurulumda silmiyor — numarayı artırmak tek başına yetmiyor,
 # eski kare gidene kadar uygulamayı telefondan silip kurmak gerekiyor
 # (22 Eylül'de yaşandı).
-version: 1.0.0+7
+version: 1.0.0+9
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -61,6 +61,10 @@ dependencies:
   url_launcher: ^6.3.2
   # Ayarlar'daki sürüm uygulamanın gerçek sürümünden okunur (elle yazılmaz).
   package_info_plus: ^10.2.1
+  # Logo (17 Ekim): SVG'ler assets/brand/svg/ (bkz. shared/widgets/brand_logo.dart).
+  flutter_svg: ^2.0.10
+  # Tanıtımın son sayfasındaki (A4) logo animasyonu, assets/brand/video/.
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
@@ -75,60 +79,55 @@ dev_dependencies:
   flutter_native_splash: ^2.4.6
 
 # ── Uygulama ikonu ────────────────────────────────────────────────────────────
-# Kaynak: logo paketi "DISHRATE KESİN LOGO" → icon-3-orange-bg-white-d
-# (turuncu zemin, beyaz `d`). Karar 22 Eylül; 23 Eylül'de gövdesi 9° yatık
-# yeni işaretle yenilendi, renk birleşimi aynı kaldı.
+# Kaynak: logo paketi "decouva-logo-paketi" (17 Ekim; repo dışı, üst klasörde).
+# Koyu zemin (#0D0D0D) + pul yığını. iOS ikonu paketin AppIcon-1024'ü değil:
+# amblem ana ekranda küçük duruyordu (genişliğin %74'ü), paketin amblem.png'sinden
+# %15 büyük (genişliğin %85'i, ortalı) yeniden üretildi (Emir, 17 Ekim). Android
+# ön planı paketteki gibi (güvenli alan küçük).
 # Yeniden üretmek için:  dart run flutter_launcher_icons
 flutter_launcher_icons:
-  image_path: assets/branding/app_icon.png
+  image_path: assets/brand/icon/app_icon.png
   ios: true
   remove_alpha_ios: true          # App Store saydam ikon kabul etmiyor
-  # iOS 18+ koyu ve renkli ikon görünümleri (karar 29 Eylül). Ana ikon
-  # turuncu kalır; bunları sistem yalnız o görünümler seçiliyken (ör. koyu
-  # moddaki Spotlight) kullanır. Verilmeyince iOS kendisi üretiyordu.
-  # Koyu: paketteki 2 numaranın (siyah zemin, turuncu d) zemini saydam —
-  # Apple zemini kendisi çiziyor. Renkli: 4 numara (siyah zemin, beyaz d),
-  # sistem parlaklığa göre boyar.
-  image_path_ios_dark_transparent: assets/branding/icon_dark.png
-  image_path_ios_tinted_grayscale: assets/branding/icon_tinted.png
+  # iOS 18+ koyu ve renkli ikon görünümleri (sistem yalnız o görünümler
+  # seçiliyken kullanır, ör. koyu moddaki Spotlight). Pakette yok; paketin
+  # PNG'lerinden ana ikondaki amblemle aynı yer ve ölçüde üretildi (17 Ekim):
+  # koyu = saydam zemin + renkli amblem, renkli = siyah zemin + beyaz amblem.
+  image_path_ios_dark_transparent: assets/brand/icon/ios_dark.png
+  image_path_ios_tinted_grayscale: assets/brand/icon/ios_tinted.png
   android: ic_launcher
   min_sdk_android: 21
-  # Android uyarlanabilir ikon: zemin turuncu, önplan saydam beyaz `d`
-  # (iOS ikonuyla aynı görünsün).
-  adaptive_icon_background: "#FF6B35"
-  adaptive_icon_foreground: assets/branding/icon_foreground.png
-  adaptive_icon_monochrome: assets/branding/icon_foreground.png
+  adaptive_icon_background: "#0D0D0D"
+  adaptive_icon_foreground: assets/brand/icon/android_foreground.png
+  adaptive_icon_monochrome: assets/brand/icon/android_monochrome.png
   web:
     generate: true
-    image_path: assets/branding/app_icon.png
-    # Web uygulamasının açılış zemini — uygulamanın evi siyah, ikonun zemini değil.
+    image_path: assets/brand/icon/app_icon.png
     background_color: "#0D0D0D"
-    theme_color: "#FF6B35"
+    theme_color: "#0D0D0D"
 
 # ── Açılış ekranı ─────────────────────────────────────────────────────────────
-# Kare **temadan bağımsız**: turuncu zemin, beyaz `d` ve beyaz yazı — uygulama
-# ikonunun büyümüş hali. Sebep: bu kareyi iOS, uygulamanın kodu çalışmadan
-# çiziyor; kullanıcının uygulama içi tema tercihini bilemez, yalnızca cihazın
-# temasını bilir. Temaya bağlasaydık, tercihi cihazdan farklı olan kullanıcı
-# her açılışta ters temada bir kare görürdü (karar 23 Eylül).
-# Uygulamanın kendi açılış ekranı (SplashScreen) aynı turuncu kareyle başlar,
-# sonra temanın rengine geçer; iki kare arasında fark görünmesin diye logo
-# ölçüsü ve yeri birebir aynı.
+# Kare **temadan bağımsız**: siyah zemin (#0D0D0D) + dikey logo (pul yığını,
+# altında beyaz "decouva"), karar 17 Ekim. Sebep (23 Eylül'den beri aynı): bu
+# kareyi iOS, uygulamanın kodu çalışmadan çiziyor; kullanıcının uygulama içi
+# tema tercihini bilemez. Uygulamanın açılış ekranı (SplashScreen) aynı kareyle
+# başlar, sonra temanın rengine geçer; logonun ölçüsü ve yeri birebir aynı.
+# Görsel @4x okunuyor: splash.png'deki logo 680 px = ekranda 170 pt.
 # Yeniden üretmek için:  dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#FF6B35"
-  image: assets/branding/splash_logo_brand.png
-  color_dark: "#FF6B35"
-  image_dark: assets/branding/splash_logo_brand.png
+  color: "#0D0D0D"
+  image: assets/brand/splash/splash.png
+  color_dark: "#0D0D0D"
+  image_dark: assets/brand/splash/splash.png
   android_12:
     # Android 12+ açılışı yuvarlak maskeli tek ikon ister — yazı sığmaz,
-    # bu yüzden yalnızca işaret kullanılır.
-    image: assets/branding/splash_android12.png
-    icon_background_color: "#FF6B35"
-    color: "#FF6B35"
-    image_dark: assets/branding/splash_android12.png
-    icon_background_color_dark: "#FF6B35"
-    color_dark: "#FF6B35"
+    # bu yüzden yalnız amblem.
+    image: assets/brand/splash/android12.png
+    icon_background_color: "#0D0D0D"
+    color: "#0D0D0D"
+    image_dark: assets/brand/splash/android12.png
+    icon_background_color_dark: "#0D0D0D"
+    color_dark: "#0D0D0D"
   web: false
 
 flutter:
@@ -136,7 +135,8 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/branding/
+    - assets/brand/svg/
+    - assets/brand/video/
     - assets/data/
     # Tanıtım fotoğrafları (Unsplash License, atıf zorunlu değil).
     - assets/onboarding/
@@ -147,10 +147,10 @@ flutter:
     - assets/fonts/POPPINS-OFL.txt
     - assets/fonts/IBMPLEXMONO-OFL.txt
 
-  # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart);
-  # logo yazısı ("decouva") her zaman Poppins'tir (AppFonts.wordmark).
+  # Aktif arayüz fontu AppFonts.active ile seçilir (lib/core/theme/app_fonts.dart).
+  # Logo yazısı font değil, SVG (assets/brand/svg/).
   fonts:
-    # Logo kelime markası ("decouva") ve karşılaştırma için.
+    # Font karşılaştırması için (APP_FONT=Poppins).
     # Kaynak: github.com/itfoundry/Poppins (SIL OFL, lisans assets/fonts/POPPINS-OFL.txt).
     - family: Poppins
       fonts:

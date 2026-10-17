@@ -1,87 +1,125 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../core/constants/app_brand.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Marka görselleri (Decouva; ad `AppBrand`'da).
 ///
-/// Kaynak: `DISHRATE KESİN LOGO` paketinin `d` işareti (23 Eylül 2026;
-/// gövdesi dikeyden 9° sağa yatık) + Poppins Bold kelime markası. Ad
-/// Decouva olunca (Ekim 2026) yazı "decouva" ile yeniden üretildi (Poppins
-/// Bold 355 pt, harf aralığı -7 — eskisiyle aynı ayar), işaret ve tuval aynı;
-/// kalıcı logo gelene kadar geçici. Kullanılan dosyalar paketin zeminsiz ("extra") sürümleri:
-///   • [BrandWordmark] → işaret + yazı; yazı rengi temaya göre değişir
-///   • [BrandMark]     → yalnız işaret (turuncu `d`)
+/// Logo 17 Ekim 2026: üç pul üst üste (altta iki sarı, üstte "d"li turuncu)
+/// + özel "d" ile başlayan "decouva" yazısı. Kaynak repo dışındaki
+/// `decouva-logo-paketi/` (üst klasör); dosyalar `assets/brand/svg/`'de,
+/// paketteki Türkçe adların İngilizcesiyle.
 ///
-/// İşaretin turuncusu her iki temada da aynı: koyu temada beyaz, açık temada
-/// siyah olan yalnızca yazıdır. İşaretin oranları ve kilidin boşluğu paketin
-/// kılavuzunda sabit — görselleri yeniden ölçeklemek dışında değiştirme.
+/// Logo yazısı bir görseldir, fontla yazılmaz. Paketin kuralları: oranlar
+/// korunur, renk/efekt değişmez; pul yığını 40 px'ten, yazı 14 px'ten küçük
+/// kullanılmaz.
+abstract final class BrandAssets {
+  static const _dir = 'assets/brand/svg';
 
-/// İşaret + "decouva" yazısından oluşan yatay logo kilidi.
-///
-/// [width] logonun genişliğidir; yükseklik oranı korunarak hesaplanır.
+  /// "decouva" yazısı, tek renk (çizerken boyanır).
+  static const wordmark = '$_dir/wordmark.svg';
+
+  /// Amblem + yazı, yan yana. `onDark`: koyu zemin için (beyaz yazı).
+  static const horizontalOnDark = '$_dir/logo_horizontal_on_dark.svg';
+  static const horizontalOnLight = '$_dir/logo_horizontal_on_light.svg';
+
+  /// Yatay logo, tamamı siyah (amblem dahil). Adisyon: termal fiş gibi
+  /// basılmış görünsün, kağıttaki tek renk damga olsun (Emir, 17 Ekim).
+  /// Pakete sonradan eklendi (`logo-yatay-siyah.svg`).
+  static const horizontalMono = '$_dir/logo_horizontal_mono.svg';
+
+  /// Amblem üstte, yazı altta (açılış ekranı).
+  static const verticalOnDark = '$_dir/logo_vertical_on_dark.svg';
+  static const verticalOnLight = '$_dir/logo_vertical_on_light.svg';
+
+  /// SVG'ler önceden çözülür; açılışta ve girişte logo gecikmeli belirmesin
+  /// (bkz. `main.dart`).
+  static Future<void> precache() => Future.wait([
+        for (final path in [
+          wordmark,
+          horizontalOnDark,
+          horizontalOnLight,
+          horizontalMono,
+          verticalOnDark,
+          verticalOnLight,
+        ])
+          () {
+            final loader = SvgAssetLoader(path);
+            return svg.cache.putIfAbsent(
+                loader.cacheKey(null), () => loader.loadBytes(null));
+          }(),
+      ]);
+}
+
+/// Yalnız "decouva" yazısı; varsayılan turuncu (Keşfet başlığı).
 class BrandWordmark extends StatelessWidget {
-  const BrandWordmark({super.key, this.width = 180, this.onBrand = false});
+  const BrandWordmark({super.key, this.height = 18, this.color});
 
-  /// Kaynak görselin en-boy oranı (2400 × 989). Dosya değişirse burası da
-  /// değişmeli; oran tutmazsa logo ezilir.
-  static const double aspectRatio = 2400 / 989;
+  /// Kaynağın en-boy oranı (viewBox 4404.84 × 748).
+  static const double aspectRatio = 4404.84 / 748;
 
-  /// Görselin kaç piksel genişlikte çözüleceği.
-  ///
-  /// Kaynak 2400 px; tam boy çözmek açılışta birkaç kare sürüyor ve logo
-  /// gecikmeli beliriyordu. 900 px, 3x ekranda 300 pt'lik en büyük
-  /// kullanımımıza yetiyor. Tek değer: açılış ve giriş ekranı aynı önbellek
-  /// kaydını paylaşsın, ikisi arasında yeniden çözme olmasın.
-  static const int decodeWidth = 900;
-
-  /// Önceden çözmek için (bkz. `main.dart`).
-  static ImageProvider provider(bool dark) => ResizeImage(
-        AssetImage(dark ? darkAsset : lightAsset),
-        width: decodeWidth,
-      );
-
-  /// Turuncu zemin üstündeki sürüm (açılış karesi).
-  static ImageProvider get brandProvider =>
-      const ResizeImage(AssetImage(brandAsset), width: decodeWidth);
-
-  static const String darkAsset = 'assets/branding/logo_wordmark_dark.png';
-  static const String lightAsset = 'assets/branding/logo_wordmark_light.png';
-
-  /// Tamamı beyaz sürüm; yalnızca turuncu zemin üstünde kullanılır. Üç dosyada
-  /// da logo aynı yerde ve aynı ölçüde — aralarında geçiş yaparken kaymaz.
-  static const String brandAsset = 'assets/branding/logo_wordmark_brand.png';
-
-  final double width;
-
-  /// Turuncu zemin üstünde mi duruyor: öyleyse işaret de yazı da beyaz.
-  final bool onBrand;
+  final double height;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    return Image(
-      image: onBrand ? brandProvider : provider(context.isDark),
-      width: width,
-      height: width / aspectRatio,
-      fit: BoxFit.contain,
-      semanticLabel: AppBrand.name,
+    return SvgPicture.asset(
+      BrandAssets.wordmark,
+      height: height,
+      width: height * aspectRatio,
+      colorFilter:
+          ColorFilter.mode(color ?? AppColors.primary, BlendMode.srcIn),
+      semanticsLabel: AppBrand.name,
     );
   }
 }
 
-/// Yazısız işaret — turuncu `d`. Dar alanlar için (AppBar, avatar, rozet).
-class BrandMark extends StatelessWidget {
-  const BrandMark({super.key, this.size = 72});
+/// Amblem + yazı. [onDark] verilmezse temaya göre seçilir: koyu temada beyaz,
+/// açık temada siyah yazılı sürüm. Amblem iki sürümde de aynı.
+class BrandLogo extends StatelessWidget {
+  const BrandLogo({
+    super.key,
+    required this.width,
+    this.vertical = false,
+    this.onDark,
+  });
 
-  final double size;
+  /// Tamamı siyah yatay logo (adisyon).
+  static Widget mono({Key? key, required double width}) => SvgPicture.asset(
+        BrandAssets.horizontalMono,
+        key: key,
+        width: width,
+        height: width / horizontalAspectRatio,
+        semanticsLabel: AppBrand.name,
+      );
+
+  /// Kaynakların en-boy oranları (viewBox).
+  static const double horizontalAspectRatio = 3853.52 / 1000;
+  static const double verticalAspectRatio = 1213.48 / 1337.22;
+
+  final double width;
+  final bool vertical;
+  final bool? onDark;
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/branding/mark.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      semanticLabel: AppBrand.name,
+    final dark = onDark ?? context.isDark;
+    final String asset;
+    final double ratio;
+    if (vertical) {
+      asset = dark ? BrandAssets.verticalOnDark : BrandAssets.verticalOnLight;
+      ratio = verticalAspectRatio;
+    } else {
+      asset =
+          dark ? BrandAssets.horizontalOnDark : BrandAssets.horizontalOnLight;
+      ratio = horizontalAspectRatio;
+    }
+    return SvgPicture.asset(
+      asset,
+      width: width,
+      height: width / ratio,
+      semanticsLabel: AppBrand.name,
     );
   }
 }

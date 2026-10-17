@@ -5,9 +5,8 @@ import 'package:flutter/material.dart' show FontWeight;
 /// Uygulamadaki **tek** font tanımı burasıdır. `AppTextStyles` ve `AppTheme`
 /// bu sınıfı okur; hiçbir yerde font adı elle yazılmaz.
 ///
-/// Arayüz fontu [active], logo yazısı [wordmark]. İkisi bilerek ayrı: arayüz
-/// fontu değişse de "decouva" yazısı logonun kendisiyle yan yana geldiği
-/// yerlerde (açılış, giriş, keşfet başlığı) birebir aynı görünmeli.
+/// Arayüz fontu [active]. Logo yazısı ("decouva") font değil, SVG
+/// (`shared/widgets/brand_logo.dart`, 17 Ekim).
 ///
 /// Kalıcı olarak değiştirmek: [active] içindeki `defaultValue`.
 /// Kodu değiştirmeden karşılaştırmak:
@@ -20,7 +19,7 @@ abstract final class AppFonts {
   /// f'nin kancasına yapışıp "ı" gibi okunmuyor.
   static const String urbanist = 'Urbanist';
 
-  /// Logo kelime markasının ailesi (Poppins SemiBold, harf aralığı −%2).
+  /// Karşılaştırma için ikinci aile (`APP_FONT=Poppins`).
   static const String poppins = 'Poppins';
 
   /// Arayüzün kullandığı aktif font ailesi.
@@ -28,9 +27,6 @@ abstract final class AppFonts {
     'APP_FONT',
     defaultValue: urbanist,
   );
-
-  /// Logo yazısı — [active] ne olursa olsun değişmez.
-  static const String wordmark = poppins;
 
   /// Adisyonun fiş yazısı (1.9), sabit genişlikli. Yalnız adisyonda.
   static const String receipt = 'IBMPlexMono';

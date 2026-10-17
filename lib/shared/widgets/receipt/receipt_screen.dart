@@ -382,13 +382,10 @@ class _Paper extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Kağıt açık renk: tema koyu olsa da logonun açık zemin sürümü.
+            // Siyah-beyaz logo: fiş basılmış gibi, kağıttaki tek renk kayıt
+            // adisyonunun turuncu damgası (17 Ekim).
             Center(
-              child: Image(
-                image: BrandWordmark.provider(false),
-                width: 132,
-                height: 132 / BrandWordmark.aspectRatio,
-              ),
+              child: BrandLogo.mono(width: 112),
             ),
             const SizedBox(height: 10),
             Text(

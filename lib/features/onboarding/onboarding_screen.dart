@@ -50,6 +50,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _pages = PageController();
   int _index = 0;
 
+  /// A4'ün logo animasyonu. Tanıtım açılırken hazırlanır: A4'e gelindiğinde
+  /// video yüklenmeyi beklemeden oynasın.
+  final _openingVideo = OpeningVideo.createController()..initialize();
+
   /// "Devam et"in göründüğü sayfalar; geri dönülen sayfada hemen görünür.
   final Set<int> _ready = {};
   Timer? _readyTimer;
@@ -86,6 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _readyTimer?.cancel();
     _pages.dispose();
+    _openingVideo.dispose();
     super.dispose();
   }
 
@@ -158,6 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             controller: _pages,
                             index: _accountIndex,
                             onExplore: widget.onFinished,
+                            video: _openingVideo,
                           ),
                         ],
                       ),

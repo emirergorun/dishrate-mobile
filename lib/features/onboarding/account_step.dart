@@ -1,22 +1,25 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../shared/auth/require_login.dart';
-import '../../shared/widgets/brand_logo.dart';
 import 'story_widgets.dart';
 import '../../core/constants/app_brand.dart';
 
-/// Tanıtımın son adımı (A4): siyah zeminde turuncu `d`, etrafında dönen
-/// yemek tabakları, "hoş geldin" ve hesap seçenekleri (1.8).
+/// Tanıtımın son adımı (A4): logo animasyonu (pullar üst üste konur, altında
+/// "decouva" belirir; 17 Ekim, eski dönen tabakların yerine), "hoş geldin" ve
+/// hesap seçenekleri (1.8).
 ///
 /// Giriş ya da kayıt başarılı olunca auth durumu değişir ve uygulamanın kapısı
 /// kendiliğinden Keşfet'e geçer. "Giriş yapmadan devam et" misafir olarak
 /// açar.
+/// İlk metnin (hoş geldin) belirdiği an, saniye. Videoda logo yazısı 2,43
+/// sn'de beliriyor.
+const double _revealStart = 2.5;
+
 class AccountStep extends StatelessWidget {
   const AccountStep({
     super.key,
@@ -24,18 +27,20 @@ class AccountStep extends StatelessWidget {
     required this.controller,
     required this.index,
     required this.onExplore,
+    required this.video,
   });
 
   final bool active;
   final PageController controller;
   final int index;
   final VoidCallback onExplore;
+  final VideoPlayerController video;
 
   @override
   Widget build(BuildContext context) {
     return StoryTime(
       active: active,
-      stillTime: 3,
+      stillTime: _revealStart + 0.5 + 0.5,
       builder: (context, t) => AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
@@ -52,9 +57,11 @@ class AccountStep extends StatelessWidget {
   }
 
   Widget _content(BuildContext context, double t, double offset, double width) {
-    // Metin ve düğmeler sırayla söner-kayarak gelir.
+    // Metin ve düğmeler sırayla söner-kayarak gelir; videoda "decouva"
+    // yazısı belirdikten sonra (2,4 sn).
     Widget reveal(double at, Widget child) {
-      final p = phase(t, at, at + 0.5);
+      final start = _revealStart + at - 0.9;
+      final p = phase(t, start, start + 0.5);
       return Opacity(
         opacity: p,
         child:
@@ -74,13 +81,7 @@ class AccountStep extends StatelessWidget {
                 opacity: (1 - offset.abs() * 1.1).clamp(0.0, 1.0),
                 child: ExcludeSemantics(
                   child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox.square(
-                        dimension: _Orbit.size,
-                        child: _Orbit(t: t),
-                      ),
-                    ),
+                    child: OpeningVideo(controller: video, active: active),
                   ),
                 ),
               ),
@@ -170,156 +171,126 @@ class AccountStep extends StatelessWidget {
   }
 }
 
-/// Ortada turuncu `d` ve ışığı, kesik çizgili yörünge, dönen dört tabak.
-class _Orbit extends StatelessWidget {
-  const _Orbit({required this.t});
-  final double t;
+/// A4'ün logo animasyonu (`assets/brand/video/opening.mp4`, logo paketinin
+/// `decouva-acilis.mp4`'ü; 1080×1920, 4,4 sn, sessiz).
+///
+/// Sayfa etkin olunca baştan bir kez oynar ve son karede (logo + yazı) durur;
+/// sayfadan çıkınca durup başa sarar, geri gelindiğinde baştan oynar (eski
+/// dönen tabaklar gibi). "Hareketi azalt" açıksa yalnız son kare görünür.
+class OpeningVideo extends StatefulWidget {
+  const OpeningVideo(
+      {super.key, required this.controller, required this.active});
 
-  static const size = 400.0;
-  static const _ring = 148.0;
+  final VideoPlayerController controller;
+  final bool active;
 
-  /// Bir tam tur süresi (sn).
-  static const _period = 40.0;
+  static const asset = 'assets/brand/video/opening.mp4';
 
-  // (yemek, başlangıç açısı °, çap, yörüngeden uzaklık)
-  static const _plates = [
-    ('burger', -95.0, 96.0, 146.0),
-    ('pizza', -12.0, 88.0, 156.0),
-    ('durum', 82.0, 90.0, 140.0),
-    ('baklava', 168.0, 82.0, 152.0),
-  ];
+  /// Sessiz video çalarken kullanıcının dinlediği müzik durmasın.
+  static VideoPlayerController createController() =>
+      VideoPlayerController.asset(
+        asset,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+
+  /// Videonun gösterilen bölgesi (piksel). Pullar kenarlardan uçarak geldiği
+  /// için genişliğin tamamı; dikeyde bütün karelerdeki hareketin alanı
+  /// (y 375–1341) ve biraz pay. Gerisi boş zemin.
+  static const double _videoW = 1080, _videoH = 1920;
+  static const double _cropTop = 360, _cropBottom = 1380;
+
+  // Videonun zemini dosyada #0B0B0B ama iOS onu uygulamanın zeminiyle aynı
+  // tonda (#0D0D0D) çiziyor (simülatörde ölçüldü, 17 Ekim). Renk düzeltmesi
+  // eklemeyin: denendi, kırpılan alan 2 ton açık bir kutu olarak görünüyordu.
 
   @override
-  Widget build(BuildContext context) {
-    const c = size / 2;
-    // `d` ekranın ortasına yakın büyük başlar, küçülerek yerine oturur.
-    final settle = phase(t, 0, 0.9, Curves.easeInOutCubic);
-    final markScale = mix(1.8, 1, settle);
-    final markDy = mix(110, 0, settle);
-    final glow = phase(t, 0.4, 1.1);
-    final ring = phase(t, 0.55, 1.3, Curves.easeInOut);
-    final spin = t * 2 * math.pi / _period;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Işık
-        Positioned.fill(
-          child: Opacity(
-            opacity: glow,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.30),
-                    AppColors.primary.withValues(alpha: 0.0),
-                  ],
-                  stops: const [0, 0.55],
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Yörünge
-        Positioned.fill(
-          child:
-              CustomPaint(painter: _RingPainter(progress: ring, radius: _ring)),
-        ),
-        // Tabaklar
-        for (var i = 0; i < _plates.length; i++)
-          () {
-            final p = _plates[i];
-            final a = p.$2 * math.pi / 180 + spin;
-            final pop =
-                phase(t, 0.75 + i * 0.12, 1.35 + i * 0.12, Curves.elasticOut);
-            final d = p.$3;
-            return Positioned(
-              left: c + math.cos(a) * p.$4 - d / 2,
-              top: c + math.sin(a) * p.$4 - d / 2,
-              child: Transform.scale(
-                scale: pop,
-                child: _Plate(image: OnboardingAssets.plate(p.$1), size: d),
-              ),
-            );
-          }(),
-        // İşaret
-        Center(
-          child: Transform.translate(
-            offset: Offset(0, markDy),
-            child: Transform.scale(
-              scale: markScale,
-              child: const BrandMark(size: 112),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  State<OpeningVideo> createState() => _OpeningVideoState();
 }
 
-class _Plate extends StatelessWidget {
-  const _Plate({required this.image, required this.size});
-  final String image;
-  final double size;
+class _OpeningVideoState extends State<OpeningVideo> {
+  VideoPlayerController get _c => widget.controller;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: Image.asset(image, fit: BoxFit.cover, cacheWidth: 240),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _c.addListener(_onReady);
   }
-}
-
-/// Kesik çizgili yörünge halkası; [progress] 0→1 boyunca saat yönünde çizilir.
-class _RingPainter extends CustomPainter {
-  _RingPainter({required this.progress, required this.radius});
-  final double progress;
-  final double radius;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0) return;
-    final center = size.center(Offset.zero);
-    // Dışta çok soluk düz halka
-    canvas.drawCircle(
-      center,
-      radius + 30,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: 0.05 * progress),
-    );
-    final dash = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.28);
-    const count = 56;
-    const sweep = 2 * math.pi / count;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final visible = (count * progress).floor();
-    for (var i = 0; i < visible; i++) {
-      canvas.drawArc(rect, -math.pi / 2 + i * sweep, sweep * 0.55, false, dash);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(OpeningVideo old) {
+    super.didUpdateWidget(old);
+    if (old.active != widget.active) _sync();
+  }
+
+  @override
+  void dispose() {
+    _c.removeListener(_onReady);
+    super.dispose();
+  }
+
+  bool _wasReady = false;
+
+  /// Video sayfa etkinleştikten sonra hazır olursa oynatmayı o an başlat.
+  void _onReady() {
+    final ready = _c.value.isInitialized;
+    if (ready && !_wasReady) {
+      _wasReady = true;
+      _sync();
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _sync() {
+    if (!_c.value.isInitialized) return;
+    _c.setVolume(0);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      // Son kare: tam sona sarınca bazı cihazlarda boş kare geliyor.
+      _c.pause();
+      _c.seekTo(_c.value.duration - const Duration(milliseconds: 30));
+      return;
+    }
+    if (widget.active) {
+      _c.seekTo(Duration.zero).then((_) => _c.play());
+    } else {
+      _c.pause();
+      _c.seekTo(Duration.zero);
     }
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.radius != radius;
+  Widget build(BuildContext context) {
+    const cropH = OpeningVideo._cropBottom - OpeningVideo._cropTop;
+    // Align'ın hizası: videonun _cropTop'u kutunun üstüne denk gelsin.
+    const alignY =
+        2 * OpeningVideo._cropTop / (OpeningVideo._videoH - cropH) - 1;
+    return AspectRatio(
+      aspectRatio: OpeningVideo._videoW / cropH,
+      child: !_c.value.isInitialized
+          ? const SizedBox.shrink()
+          : ClipRect(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: OpeningVideo._videoW,
+                  height: cropH,
+                  child: OverflowBox(
+                    maxHeight: OpeningVideo._videoH,
+                    alignment: const Alignment(0, alignY),
+                    child: SizedBox(
+                      width: OpeningVideo._videoW,
+                      height: OpeningVideo._videoH,
+                      child: VideoPlayer(_c),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
 }

@@ -61,38 +61,18 @@ void _registerFontLicenses() {
   });
 }
 
-/// Açılış logosunu uygulama çizilmeden önce çözer.
+/// Logo SVG'lerini uygulama çizilmeden önce çözer.
 ///
-/// Logo büyük bir PNG; çözülmesi birkaç kare sürüyordu. O arada sistem açılış
+/// Çözülmeden çizilen logo birkaç kare boş kalıyordu: o arada sistem açılış
 /// ekranı kaybolup Flutter'ın boş ilk karesi görünüyor, logo bir an sönüp
 /// yeniden yanıyordu. Bu süre boyunca sistem açılış ekranı ekranda kalıyor.
+/// Bir sorun olursa açılışı bekletmemek için süre sınırı var.
 Future<void> _precacheLogo() async {
-  Future<void> resolve(ImageProvider provider) {
-    final done = Completer<void>();
-    // Ekranda kullanılan sağlayıcının aynısı: önbellek anahtarı tutsun.
-    final stream = provider.resolve(ImageConfiguration.empty);
-    late final ImageStreamListener listener;
-    listener = ImageStreamListener(
-      (_, __) {
-        if (!done.isCompleted) done.complete();
-        stream.removeListener(listener);
-      },
-      onError: (_, __) {
-        if (!done.isCompleted) done.complete();
-        stream.removeListener(listener);
-      },
-    );
-    stream.addListener(listener);
-    return done.future;
+  try {
+    await BrandAssets.precache().timeout(const Duration(milliseconds: 1500));
+  } catch (_) {
+    // Logo sonradan çizilir; açılış durmasın.
   }
-
-  // Açılış turuncu kareyle başlıyor, sonra temaya geçiyor: üç sürüm de
-  // hazır olmalı. Bir sorun olursa açılışı bekletmemek için süre sınırı var.
-  await Future.wait([
-    resolve(BrandWordmark.brandProvider),
-    resolve(BrandWordmark.provider(true)),
-    resolve(BrandWordmark.provider(false)),
-  ]).timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
 }
 
 class AppRoot extends ConsumerWidget {
@@ -168,7 +148,7 @@ class _AuthGate extends ConsumerStatefulWidget {
 }
 
 class _AuthGateState extends ConsumerState<_AuthGate> {
-  /// Açılış ekranı turuncu kareden temaya geçerken bekleniyor. Sunucu daha
+  /// Açılış ekranı siyah kareden temaya geçerken bekleniyor. Sunucu daha
   /// hızlı cevap verirse ekran geçişin ortasında değişip zıplıyordu.
   bool _intro = true;
 

@@ -4,19 +4,20 @@ import '../../../core/theme/app_metrics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/brand_logo.dart';
 
-/// Açılış ekranındaki logonun genişliği. Sistem açılış ekranındaki logoyla
-/// aynı: ikisi arasında logo büyüyüp küçülmesin. `LaunchImage` 300 pt ama
-/// kenarlarında boşluk var; simülatörde ölçülen logo genişliği 278 pt.
-const double splashLogoWidth = 278;
+/// Açılış ekranındaki dikey logonun genişliği. Sistem açılış ekranındaki
+/// logoyla aynı (`assets/brand/splash/splash.png`'de 680 px, görsel @4x
+/// okunuyor): ikisi arasında logo büyüyüp küçülmesin.
+const double splashLogoWidth = 170;
 
 /// Uygulama açılışında gösterilen yükleme ekranı.
 /// AuthProvider token kontrolü yaparken görünür.
 ///
-/// Sistem açılış karesi turuncudur ve temadan bağımsızdır: o kareyi iOS,
-/// uygulamanın kodu çalışmadan çiziyor, kullanıcının tema tercihini bilemiyor.
-/// Bu ekran da aynı turuncu kareyle başlar (aynı logo, aynı ölçü, aynı yer),
-/// sonra temanın rengine geçer. Böylece sistemden uygulamaya geçiş görünmez ve
-/// hiçbir açılışta ters temada kare kalmaz (karar 23 Eylül).
+/// Sistem açılış karesi siyahtır (#0D0D0D, dikey logo) ve temadan bağımsızdır:
+/// o kareyi iOS, uygulamanın kodu çalışmadan çiziyor, kullanıcının tema
+/// tercihini bilemiyor. Bu ekran da aynı kareyle başlar (aynı logo, aynı ölçü,
+/// aynı yer), sonra temanın rengine geçer. Böylece sistemden uygulamaya geçiş
+/// görünmez ve hiçbir açılışta ters temada kare kalmaz (karar 23 Eylül; kare
+/// 17 Ekim'de yeni logoyla turuncudan siyaha döndü).
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, this.onRetry});
 
@@ -24,18 +25,18 @@ class SplashScreen extends StatefulWidget {
   /// "Tekrar dene" çıkar. Logo yerinden oynamaz.
   final VoidCallback? onRetry;
 
-  /// Turuncu karenin ekranda tutulduğu süre.
+  /// Sistem karesinin ekranda tutulduğu süre.
   static const Duration brandHold = Duration(milliseconds: 220);
 
-  /// Turuncudan temaya geçiş.
+  /// Kareden temaya geçiş.
   static const Duration brandFade = Duration(milliseconds: 320);
 
   /// Açılış ekranının en az görüneceği süre; geçiş yarıda kesilip ekran
-  /// turuncudan doğrudan ana ekrana zıplamasın diye `main.dart` bunu bekler.
+  /// kareden doğrudan ana ekrana zıplamasın diye `main.dart` bunu bekler.
   static const Duration introDuration = Duration(milliseconds: 600);
 
-  /// Turuncu kare bu oturumda bir kez oynar. Ekran yeniden kurulursa (ör.
-  /// "Tekrar dene" sonrası) baştan turuncuya dönmez.
+  /// Kare bu oturumda bir kez oynar. Ekran yeniden kurulursa (ör.
+  /// "Tekrar dene" sonrası) baştan kareye dönmez.
   static bool brandShown = false;
 
   @override
@@ -75,28 +76,31 @@ class _SplashScreenState extends State<SplashScreen>
       builder: (context, _) {
         final t = _t.value;
         return Scaffold(
-          backgroundColor: Color.lerp(AppColors.primary, context.bgColor, t),
+          backgroundColor:
+              Color.lerp(AppColors.background, context.bgColor, t),
           body: Stack(
             alignment: Alignment.center,
             children: [
-              // İki logo üst üste: turuncu zemindeki beyaz sürüm sönerken
-              // temanın sürümü yanıyor. Dosyalarda logo aynı yerde olduğu için
-              // geçişte kaymıyor.
+              // İki logo üst üste: koyu zemin sürümü (beyaz yazı) sönerken
+              // temanın sürümü yanıyor. Amblem iki dosyada da aynı yerde,
+              // geçişte kaymıyor; açık temada yalnız yazı siyaha döner.
               if (t < 1)
                 Opacity(
                   opacity: 1 - t,
-                  child: const BrandWordmark(
-                      width: splashLogoWidth, onBrand: true),
+                  child: const BrandLogo(
+                      width: splashLogoWidth, vertical: true, onDark: true),
                 ),
               if (t > 0)
                 Opacity(
                   opacity: t,
-                  child: const BrandWordmark(width: splashLogoWidth),
+                  child:
+                      const BrandLogo(width: splashLogoWidth, vertical: true),
                 ),
-              // Gösterge ve hata mesajı turuncu karede görünmez; tema geldikçe
-              // birlikte beliriyor.
+              // Gösterge ve hata mesajı sistem karesinde görünmez; tema
+              // geldikçe birlikte beliriyor. Dikey logo uzun: küçük ekranda
+              // (iPhone SE) hata mesajı logoya değmesin diye aşağıda.
               Align(
-                alignment: const Alignment(0, 0.35),
+                alignment: const Alignment(0, 0.5),
                 child: Opacity(opacity: t, child: _belowLogo(context)),
               ),
             ],

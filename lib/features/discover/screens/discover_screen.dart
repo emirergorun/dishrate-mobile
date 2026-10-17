@@ -20,13 +20,14 @@ import '../../../core/data/turkey_addresses.dart';
 import '../../../shared/widgets/searchable_picker.dart';
 import '../../../core/location/location_service.dart';
 import 'see_all_screen.dart';
-import '../../../core/constants/app_brand.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
-/// Başlıktaki "decouva" kelime markasının punto'su.
+/// Başlıktaki "decouva" logo yazısının yüksekliği (SVG, 17 Ekim). Eski
+/// 24 pt Poppins yazının görünen yüksekliğiyle aynı (≈18 × 106 pt).
 ///
 /// Başlık artık genişleyip daralmıyor: genişken yazı 1.5 kat büyüyüp konum
 /// yazısını da büyütüyor, kaydırınca ikisi birden zıplıyordu.
-const double _wordmarkSize = 24;
+const double _wordmarkHeight = 18;
 
 /// Bölümün düzeni — bkz. `dish_layouts.dart`. Yan yana iki bölüm aynı
 /// düzeni kullanmıyor.
@@ -619,12 +620,8 @@ class _DiscoverAppBar extends ConsumerWidget {
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Logo kelime markası — hep küçük harf; ayarı token katmanında.
-          Text(
-            AppBrand.wordmark,
-            style: AppTextStyles.wordmark(_wordmarkSize)
-                .copyWith(color: AppColors.primary),
-          ),
+          // Logo yazısı (SVG, turuncu). Boyu eski 24 pt Poppins yazıyla aynı.
+          const BrandWordmark(height: _wordmarkHeight),
           const Spacer(),
           // Konum — dokunulunca il/ilçe seçilir; GPS seçeneği de o listenin
           // başında duruyor. Keşfet'in tüm içeriği bu seçime bağlı, bu yüzden
