@@ -1,13 +1,16 @@
 /// Uygulamanın dışarıya açılan adresleri — tek yerde.
 ///
-/// Adresi `null` olan bağlantının satırı arayüzde hiç çizilmez: basınca bir
-/// şey yapmayan öğe mağaza incelemesinde "yarım içerik" sayılıyor (1.6).
+/// Adresi olmayan bağlantı için arayüze satır konmaz: basınca bir şey
+/// yapmayan öğe mağaza incelemesinde "yarım içerik" sayılıyor (1.6).
 abstract final class AppLinks {
-  /// Destek e-postası ("Bize ulaş"). Alan adı alındı (decouva.com, 9 Ekim);
-  /// e-posta sağlayıcısı kurulana kadar (2.6) bu adrese giden posta geri döner.
+  /// Destek e-postası ("Bize ulaş"). Gelen posta Cloudflare yönlendirmesiyle
+  /// destek kutusuna düşer (2.6).
   static const String supportEmail = 'destek@decouva.com';
 
-  /// Gizlilik politikası sayfası. Web sitesi yayına girince (2.10)
-  /// doldurulacak; o zamana kadar Ayarlar'daki satır görünmez.
-  static const String? privacyPolicy = null;
+  /// Gizlilik politikası sayfası (2.10); Ayarlar'daki satır.
+  static const String privacyPolicy = 'https://decouva.com/gizlilik';
+
+  /// Kullanım şartlarının web'deki tam metni (2.10); şartlar panelinin
+  /// altındaki bağlantı.
+  static const String termsOfUse = 'https://decouva.com/kullanim-sartlari';
 }

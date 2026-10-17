@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_links.dart';
+import 'min_tap_area.dart';
 
 /// Kullanım şartları paneli. Profil menüsünden ve kayıt ekranındaki
 /// "Kayıt olarak Kullanım Şartları’nı kabul etmiş olursun." bağlantısından
 /// açılır (1.7).
 ///
 /// Metin geçici: yol haritası 4.3'te hukuki metinle değişecek. O yüzden hâlâ
-/// siz dilinde (MARKA.md §6'daki tek istisna).
+/// siz dilinde (MARKA.md §6'daki tek istisna). Web'deki taslak
+/// (decouva.com/kullanim-sartlari, 2.10) bu yedi maddeyi aynen içerir ve
+/// dört madde daha ekler; metin kesinleşince ikisi birlikte güncellenmeli.
 class TermsSheet extends StatelessWidget {
   const TermsSheet({super.key});
 
@@ -78,7 +82,7 @@ class TermsSheet extends StatelessWidget {
                 const _TermsSection(
                   title: '4. Gizlilik',
                   body:
-                      'Kişisel verileriniz 6698 sayılı KVKK kapsamında korunmaktadır. Verileriniz üçüncü şahıslarla paylaşılmaz. Ayrıntılı bilgi için Gizlilik Politikamızı inceleyiniz.',
+                      'Kişisel verileriniz 6698 sayılı KVKK kapsamında korunmaktadır. Verileriniz yalnızca hizmeti sağlamak için birlikte çalıştığımız sağlayıcılarla, Gizlilik Politikası’nda belirtildiği ölçüde paylaşılır. Ayrıntılı bilgi için Gizlilik Politikamızı inceleyiniz.',
                 ),
                 const _TermsSection(
                   title: '5. Hesap Güvenliği',
@@ -96,8 +100,10 @@ class TermsSheet extends StatelessWidget {
                       'Sorularınız için ${AppLinks.supportEmail} adresine e-posta gönderebilirsiniz.',
                 ),
                 const SizedBox(height: AppSpace.sm),
+                const _FullTextLink(),
+                const SizedBox(height: AppSpace.sm),
                 Text(
-                  'Son güncelleme: Eylül 2026',
+                  'Son güncelleme: Ekim 2026',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: context.textTertiaryColor,
                     fontStyle: FontStyle.italic,
@@ -107,6 +113,37 @@ class TermsSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Web'deki tam metnin bağlantısı (2.10).
+class _FullTextLink extends StatelessWidget {
+  const _FullTextLink();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      label: 'Kullanım şartlarının tam metnini aç',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: () => launchUrl(Uri.parse(AppLinks.termsOfUse),
+            mode: LaunchMode.inAppBrowserView),
+        child: MinTapArea(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Tam metin: decouva.com/kullanim-sartlari',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: context.accentTextColor,
+                decoration: TextDecoration.underline,
+                decorationColor: context.accentTextColor,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

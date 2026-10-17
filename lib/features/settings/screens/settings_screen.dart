@@ -19,7 +19,6 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     // Yüklenirken ya da okunamazsa çizgi; elle yazılmış sürüm göstermek yerine.
     final version = ref.watch(appVersionProvider).valueOrNull ?? '—';
-    const privacyPolicy = AppLinks.privacyPolicy;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -90,16 +89,14 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Sürüm',
             value: version,
           ),
-          // Adres web sitesiyle gelecek (yol haritası 2.10); o zamana kadar
-          // satır yok — basınca bir şey yapmayan öğe bırakılmıyor.
-          if (privacyPolicy != null)
-            _InfoItem(
-              icon: Icons.privacy_tip_outlined,
-              label: 'Gizlilik politikası',
-              value: '',
-              onTap: () => launchUrl(Uri.parse(privacyPolicy),
-                  mode: LaunchMode.inAppBrowserView),
-            ),
+          // Web sitesindeki sayfa (2.10).
+          _InfoItem(
+            icon: Icons.privacy_tip_outlined,
+            label: 'Gizlilik politikası',
+            value: '',
+            onTap: () => launchUrl(Uri.parse(AppLinks.privacyPolicy),
+                mode: LaunchMode.inAppBrowserView),
+          ),
           _InfoItem(
             icon: Icons.description_outlined,
             label: 'Açık kaynak lisansları',
